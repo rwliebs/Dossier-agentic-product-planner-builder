@@ -5,7 +5,7 @@ import { ChevronRight, Zap } from 'lucide-react';
 import { StoryMapCanvas } from './story-map-canvas';
 import { ArchitectureView } from './architecture-view';
 import { Button } from '@/components/ui/button';
-import type { Iteration, ContextDoc, CodeFile } from './types';
+import type { Iteration, ContextDoc, CodeFile, ProjectContext } from './types';
 
 interface IterationBlockProps {
   iteration: Iteration;
@@ -18,6 +18,7 @@ interface IterationBlockProps {
   onUpdateFileDescription?: (fileId: string, description: string) => void;
   onSelectDoc?: (doc: ContextDoc) => void;
   onFileClick?: (file: CodeFile) => void;
+  projectContext?: ProjectContext;
 }
 
 export function IterationBlock({
@@ -31,6 +32,7 @@ export function IterationBlock({
   onUpdateFileDescription,
   onSelectDoc,
   onFileClick,
+  projectContext,
 }: IterationBlockProps) {
   // Count cards by status
   const allCards = iteration.epics.flatMap((epic) =>
@@ -113,6 +115,7 @@ export function IterationBlock({
             onSelectDoc={onSelectDoc}
             onSelectFile={onFileClick}
             codeFiles={iteration.codeFiles}
+            projectContext={projectContext}
           />
         ) : (
           <ArchitectureView 

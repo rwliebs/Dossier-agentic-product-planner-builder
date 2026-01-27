@@ -5,7 +5,7 @@ import { Header } from '@/components/dossier/header';
 import { LeftSidebar } from '@/components/dossier/left-sidebar';
 import { IterationBlock } from '@/components/dossier/iteration-block';
 import { RightPanel } from '@/components/dossier/right-panel';
-import type { Iteration, ContextDoc, CodeFile } from '@/components/dossier/types';
+import type { Iteration, ContextDoc, CodeFile, ProjectContext } from '@/components/dossier/types';
 
 // Sample data structure with iterations
 const sampleIterations: Iteration[] = [
@@ -434,6 +434,14 @@ describe('DatePicker', () => {
 export default function DossierPage() {
   const [viewMode, setViewMode] = useState<'functionality' | 'architecture'>('functionality');
   const [agentStatus, setAgentStatus] = useState<'idle' | 'building' | 'reviewing'>('idle');
+  
+  // Project context - shows users what spawned this map
+  const projectContext: ProjectContext = {
+    userRequest: "Build a dating app that helps couples coordinate their schedules and find times to meet",
+    generatedAt: "2 hours ago",
+    activeAgents: 3,
+    lastUpdate: "2 min ago",
+  };
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [rightPanelTab, setRightPanelTab] = useState<'files' | 'terminal' | 'docs'>('files');
@@ -563,6 +571,7 @@ export default function DossierPage() {
                 setRightPanelTab('terminal');
                 setRightPanelOpen(true);
               }}
+              projectContext={projectContext}
             />
           ))}
         </div>

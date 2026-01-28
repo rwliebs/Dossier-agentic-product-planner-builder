@@ -1,9 +1,14 @@
 'use client';
 
-import React from "react"
-
+import React from 'react';
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, Sparkles, Github, Check, FolderGit2, FileCode, ChevronRight, Plus, X } from 'lucide-react';
+import { 
+  Send, Bot, User, Loader2, Sparkles, Github, Check, FileCode, Plus, X, 
+  ChevronDown, ChevronUp, FileText, Upload, Link, FolderOpen, Folder,
+  ChevronRight
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Message {
   id: string;
@@ -16,6 +21,13 @@ interface ClarifyingQuestion {
   id: string;
   question: string;
   options?: string[];
+}
+
+interface ContextFile {
+  id: string;
+  name: string;
+  path: string;
+  type: 'code' | 'doc' | 'schema';
 }
 
 interface IdeationViewProps {
@@ -39,17 +51,129 @@ const initialQuestions: ClarifyingQuestion[] = [
   },
 ];
 
-// Mock GitHub repo data
-const mockRepoFiles = [
-  { path: 'src/components/Dashboard.tsx', type: 'component' },
-  { path: 'src/components/CustomerList.tsx', type: 'component' },
-  { path: 'src/api/customers.ts', type: 'api' },
-  { path: 'src/api/invoices.ts', type: 'api' },
-  { path: 'src/hooks/useCustomers.ts', type: 'hook' },
-  { path: 'src/lib/db.ts', type: 'util' },
-  { path: 'src/types/customer.ts', type: 'schema' },
-  { path: 'prisma/schema.prisma', type: 'schema' },
+// Mock GitHub repo file tree
+interface FileNode {
+  name: string;
+  type: 'file' | 'folder';
+  path: string;
+  children?: FileNode[];
+}
+
+const mockFileTree: FileNode[] = [
+  {
+    name: 'src',
+    type: 'folder',
+    path: '/src',
+    children: [
+      {
+        name: 'components',
+        type: 'folder',
+        path: '/src/components',
+        children: [
+          { name: 'Dashboard.tsx', type: 'file', path: '/src/components/Dashboard.tsx' },
+          { name: 'CustomerList.tsx', type: 'file', path: '/src/components/CustomerList.tsx' },
+          { name: 'InvoiceTable.tsx', type: 'file', path: '/src/components/InvoiceTable.tsx' },
+        ],
+      },
+      {
+        name: 'api',
+        type: 'folder',
+        path: '/src/api',
+        children: [
+          { name: 'customers.ts', type: 'file', path: '/src/api/customers.ts' },
+          { name: 'invoices.ts', type: 'file', path: '/src/api/invoices.ts' },
+        ],
+      },
+      {
+        name: 'hooks',
+        type: 'folder',
+        path: '/src/hooks',
+        children: [
+          { name: 'useCustomers.ts', type: 'file', path: '/src/hooks/useCustomers.ts' },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'prisma',
+    type: 'folder',
+    path: '/prisma',
+    children: [
+      { name: 'schema.prisma', type: 'file', path: '/prisma/schema.prisma' },
+    ],
+  },
 ];
+
+function FileTreeNode({
+  node,
+  depth = 0,
+  selectedFiles,
+  onToggleFile,
+}: {
+  node: FileNode;
+  depth?: number;
+  selectedFiles: string[];
+  onToggleFile: (path: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(depth < 2);
+  const isSelected = selectedFiles.includes(node.path);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => {
+          if (node.type === 'folder') {
+            setIsOpen(!isOpen);
+          } else {
+            onToggleFile(node.path);
+          }
+        }}
+        className={`w-full flex items-center gap-1.5 py-1.5 px-2 hover:bg-secondary text-left group transition-colors ${
+          isSelected ? 'bg-primary/10 text-primary' : ''
+        }`}
+        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+      >
+        {node.type === 'folder' ? (
+          <>
+            {isOpen ? (
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            )}
+            {isOpen ? (
+              <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <Folder className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+          </>
+        ) : (
+          <>
+            <span className="w-3" />
+            <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
+          </>
+        )}
+        <span className="text-xs truncate flex-1">{node.name}</span>
+        {node.type === 'file' && isSelected && (
+          <Check className="h-3 w-3 text-primary" />
+        )}
+      </button>
+      {node.type === 'folder' && isOpen && node.children && (
+        <div>
+          {node.children.map((child) => (
+            <FileTreeNode
+              key={child.path}
+              node={child}
+              depth={depth + 1}
+              selectedFiles={selectedFiles}
+              onToggleFile={onToggleFile}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function IdeationView({ onComplete }: IdeationViewProps) {
   const [input, setInput] = useState('');
@@ -59,19 +183,42 @@ export function IdeationView({ onComplete }: IdeationViewProps) {
   const [userIdea, setUserIdea] = useState('');
   const [phase, setPhase] = useState<'input' | 'questions' | 'generating'>('input');
   const [selectedContextFiles, setSelectedContextFiles] = useState<string[]>([]);
-  const [showFilePicker, setShowFilePicker] = useState(false);
+  const [contextDocs, setContextDocs] = useState<ContextFile[]>([]);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['github', 'context']));
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  // Mock GitHub connection status
-  const githubConnected = true;
+
+  // Mock GitHub connection - toggle to false to see unconnected state
+  const [githubConnected, setGithubConnected] = useState(true);
   const repoName = 'acme/servicepro-app';
 
+  const toggleSection = (section: string) => {
+    const newExpanded = new Set(expandedSections);
+    if (newExpanded.has(section)) {
+      newExpanded.delete(section);
+    } else {
+      newExpanded.add(section);
+    }
+    setExpandedSections(newExpanded);
+  };
+
   const toggleContextFile = (path: string) => {
-    setSelectedContextFiles(prev => 
-      prev.includes(path) 
-        ? prev.filter(p => p !== path)
-        : [...prev, path]
+    setSelectedContextFiles((prev) =>
+      prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]
     );
+  };
+
+  const addContextDoc = () => {
+    const newDoc: ContextFile = {
+      id: crypto.randomUUID(),
+      name: 'New Document',
+      path: '',
+      type: 'doc',
+    };
+    setContextDocs((prev) => [...prev, newDoc]);
+  };
+
+  const removeContextDoc = (id: string) => {
+    setContextDocs((prev) => prev.filter((d) => d.id !== id));
   };
 
   const scrollToBottom = () => {
@@ -98,14 +245,13 @@ export function IdeationView({ onComplete }: IdeationViewProps) {
     setInput('');
     setIsThinking(true);
 
-    // Simulate agent thinking
     setTimeout(() => {
       setIsThinking(false);
       addMessage(
         'agent',
         `Great idea! I'd like to understand your vision better so I can create a comprehensive implementation plan. Let me ask a few clarifying questions.`
       );
-      
+
       setTimeout(() => {
         setPhase('questions');
         askQuestion(0);
@@ -115,10 +261,9 @@ export function IdeationView({ onComplete }: IdeationViewProps) {
 
   const askQuestion = (index: number) => {
     if (index >= initialQuestions.length) {
-      // All questions answered, generate the map
       setPhase('generating');
       addMessage('agent', 'Perfect! I have enough context now. Let me generate your implementation roadmap...');
-      
+
       setTimeout(() => {
         onComplete(userIdea);
       }, 2500);
@@ -127,7 +272,7 @@ export function IdeationView({ onComplete }: IdeationViewProps) {
 
     const q = initialQuestions[index];
     setCurrentQuestionIndex(index);
-    
+
     setTimeout(() => {
       addMessage('agent', q.question);
     }, 500);
@@ -143,17 +288,16 @@ export function IdeationView({ onComplete }: IdeationViewProps) {
 
     setTimeout(() => {
       setIsThinking(false);
-      
-      // Acknowledge and move to next question
+
       const acknowledgments = [
         'Got it, that helps!',
-        'Thanks, that\'s useful context.',
+        "Thanks, that's useful context.",
         'Understood!',
         'Great, that gives me a clearer picture.',
       ];
-      
+
       addMessage('agent', acknowledgments[currentQuestionIndex % acknowledgments.length]);
-      
+
       setTimeout(() => {
         askQuestion(currentQuestionIndex + 1);
       }, 600);
@@ -174,246 +318,277 @@ export function IdeationView({ onComplete }: IdeationViewProps) {
   const currentQuestion = phase === 'questions' ? initialQuestions[currentQuestionIndex] : null;
 
   return (
-    <div className="flex-1 flex flex-col bg-background">
-      {/* Header */}
-      <div className="border-b border-border px-8 py-6">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                </div>
-                <h1 className="text-lg font-semibold text-foreground">New Project</h1>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Describe your product idea and I'll help you create an implementation roadmap.
-              </p>
+    <div className="flex-1 flex overflow-hidden">
+      {/* Left Sidebar - GitHub & Context */}
+      <div className="w-72 border-r border-border bg-background flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-border">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-primary" />
             </div>
-            
-            {/* GitHub Connection Status */}
-            {githubConnected && (
-              <div className="shrink-0">
-                <div className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-lg border border-border">
-                  <Github className="h-4 w-4 text-foreground" />
-                  <span className="text-sm font-medium text-foreground">{repoName}</span>
-                  <Check className="h-3.5 w-3.5 text-green-500" />
+            <div>
+              <h1 className="font-mono text-sm font-bold uppercase tracking-wider text-foreground">
+                New Project
+              </h1>
+              <span className="inline-block mt-1 px-2 py-0.5 text-[10px] uppercase tracking-wider font-mono bg-yellow-900 text-yellow-50">
+                Planning
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <ScrollArea className="flex-1">
+          {/* GitHub Section */}
+          <div className="border-b border-border">
+            <button
+              onClick={() => toggleSection('github')}
+              className="w-full flex items-center justify-between p-4 hover:bg-secondary transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Github className="h-4 w-4" />
+                <span className="text-xs uppercase tracking-wider font-mono font-bold">Repository</span>
+              </div>
+              {expandedSections.has('github') ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronUp className="h-3 w-3" />
+              )}
+            </button>
+            {expandedSections.has('github') && (
+              <div className="px-4 pb-4 border-t border-border pt-3">
+                {githubConnected ? (
+                  <>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-secondary rounded border border-border mb-3">
+                      <Github className="h-4 w-4 text-foreground" />
+                      <span className="text-xs font-mono text-foreground flex-1 truncate">{repoName}</span>
+                      <Check className="h-3.5 w-3.5 text-green-500" />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mb-3">
+                      Select files to include as context for planning.
+                    </p>
+                    <div className="border border-border rounded bg-background max-h-64 overflow-y-auto">
+                      {mockFileTree.map((node) => (
+                        <FileTreeNode
+                          key={node.path}
+                          node={node}
+                          selectedFiles={selectedContextFiles}
+                          onToggleFile={toggleContextFile}
+                        />
+                      ))}
+                    </div>
+                    {selectedContextFiles.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1">
+                        {selectedContextFiles.map((path) => (
+                          <div
+                            key={path}
+                            className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-[10px] rounded"
+                          >
+                            <span>{path.split('/').pop()}</span>
+                            <button onClick={() => toggleContextFile(path)} className="hover:bg-primary/20 rounded p-0.5">
+                              <X className="h-2.5 w-2.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Connect a GitHub repo to include existing code as context.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs bg-transparent"
+                      onClick={() => setGithubConnected(true)}
+                    >
+                      <Github className="h-3.5 w-3.5 mr-2" />
+                      Connect Repository
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Context Documents Section */}
+          <div className="border-b border-border">
+            <button
+              onClick={() => toggleSection('context')}
+              className="w-full flex items-center justify-between p-4 hover:bg-secondary transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                <span className="text-xs uppercase tracking-wider font-mono font-bold">
+                  Context Docs ({contextDocs.length})
+                </span>
+              </div>
+              {expandedSections.has('context') ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronUp className="h-3 w-3" />
+              )}
+            </button>
+            {expandedSections.has('context') && (
+              <div className="px-4 pb-4 border-t border-border pt-3 space-y-2">
+                <p className="text-[11px] text-muted-foreground mb-3">
+                  Add documents, specs, or links to inform planning.
+                </p>
+                {contextDocs.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center gap-2 p-2 rounded border border-border hover:bg-secondary transition-colors group"
+                  >
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-mono text-foreground flex-1 truncate">{doc.name}</span>
+                    <button
+                      onClick={() => removeContextDoc(doc.id)}
+                      className="opacity-0 group-hover:opacity-100 hover:bg-secondary rounded p-1 transition-opacity"
+                    >
+                      <X className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" size="sm" className="flex-1 text-xs h-8 bg-transparent" onClick={addContextDoc}>
+                    <Upload className="h-3 w-3 mr-1.5" />
+                    Upload
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1 text-xs h-8 bg-transparent" onClick={addContextDoc}>
+                    <Link className="h-3 w-3 mr-1.5" />
+                    Add Link
+                  </Button>
                 </div>
               </div>
             )}
           </div>
-          
-          {/* Context Files Section */}
-          {githubConnected && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <FolderGit2 className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">Project Context</span>
-                  <span className="text-xs text-muted-foreground">(optional)</span>
+        </ScrollArea>
+      </div>
+
+      {/* Center - Chat */}
+      <div className="flex-1 flex flex-col bg-background">
+        {/* Chat Header */}
+        <div className="border-b border-border px-6 py-4">
+          <h2 className="text-sm font-medium text-foreground">Describe your idea</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Tell me what you want to build and I'll create an implementation roadmap.
+          </p>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <div className="max-w-2xl mx-auto space-y-4">
+            {messages.length === 0 && (
+              <div className="text-center py-12">
+                <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-secondary mb-4">
+                  <Bot className="h-6 w-6 text-muted-foreground" />
                 </div>
-                <button
-                  onClick={() => setShowFilePicker(!showFilePicker)}
-                  className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 rounded transition-colors"
-                >
-                  <Plus className="h-3 w-3" />
-                  Add files for context
-                </button>
-              </div>
-              
-              {/* Selected Context Files */}
-              {selectedContextFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {selectedContextFiles.map((path) => (
-                    <div
-                      key={path}
-                      className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full"
-                    >
-                      <FileCode className="h-3 w-3" />
-                      <span>{path.split('/').pop()}</span>
-                      <button
-                        onClick={() => toggleContextFile(path)}
-                        className="hover:bg-primary/20 rounded-full p-0.5"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {selectedContextFiles.length === 0 && !showFilePicker && (
-                <p className="text-xs text-muted-foreground">
-                  Adding existing files helps the agent understand your codebase when planning new features.
+                <h2 className="text-base font-medium text-foreground mb-2">What would you like to build?</h2>
+                <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                  Describe your product idea or feature. I'll ask a few questions then generate a plan.
                 </p>
-              )}
-              
-              {/* File Picker */}
-              {showFilePicker && (
-                <div className="bg-background border border-border rounded-lg p-3 max-h-48 overflow-y-auto">
-                  <div className="space-y-1">
-                    {mockRepoFiles.map((file) => (
-                      <button
-                        key={file.path}
-                        onClick={() => toggleContextFile(file.path)}
-                        className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-secondary transition-colors ${
-                          selectedContextFiles.includes(file.path) ? 'bg-primary/10 text-primary' : 'text-foreground'
-                        }`}
-                      >
-                        <FileCode className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate text-left">{file.path}</span>
-                        {selectedContextFiles.includes(file.path) && (
-                          <Check className="h-3 w-3 ml-auto shrink-0" />
-                        )}
-                      </button>
-                    ))}
+              </div>
+            )}
+
+            {messages.map((message) => (
+              <div key={message.id} className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                <div
+                  className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 ${
+                    message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'
+                  }`}
+                >
+                  {message.role === 'user' ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                </div>
+                <div
+                  className={`max-w-[80%] rounded-lg px-3 py-2 ${
+                    message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground'
+                  }`}
+                >
+                  <p className="text-sm leading-relaxed">{message.content}</p>
+                </div>
+              </div>
+            ))}
+
+            {isThinking && (
+              <div className="flex gap-3">
+                <div className="h-7 w-7 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                  <Bot className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+                <div className="bg-secondary rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Thinking...</span>
                   </div>
-                  <button
-                    onClick={() => setShowFilePicker(false)}
-                    className="mt-2 w-full py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Done
-                  </button>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+
+            {phase === 'generating' && (
+              <div className="flex gap-3">
+                <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
+                </div>
+                <div className="bg-primary/10 rounded-lg px-3 py-2 flex-1 max-w-[80%]">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                    <span className="text-sm text-primary font-medium">Generating roadmap...</span>
+                  </div>
+                  <div className="mt-2 space-y-1.5">
+                    <div className="h-1.5 bg-primary/20 rounded animate-pulse" style={{ width: '80%' }} />
+                    <div className="h-1.5 bg-primary/20 rounded animate-pulse" style={{ width: '60%' }} />
+                    <div className="h-1.5 bg-primary/20 rounded animate-pulse" style={{ width: '70%' }} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
         </div>
-      </div>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="max-w-3xl mx-auto space-y-6">
-          {messages.length === 0 && (
-            <div className="text-center py-12">
-              <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-secondary mb-4">
-                <Bot className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h2 className="text-lg font-medium text-foreground mb-2">What would you like to build?</h2>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Describe your product idea, feature, or problem you want to solve. I'll ask clarifying questions and generate an implementation plan.
-              </p>
-            </div>
-          )}
-
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
-            >
-              <div
-                className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-muted-foreground'
-                }`}
-              >
-                {message.role === 'user' ? (
-                  <User className="h-4 w-4" />
-                ) : (
-                  <Bot className="h-4 w-4" />
-                )}
-              </div>
-              <div
-                className={`max-w-[80%] rounded-lg px-4 py-3 ${
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-foreground'
-                }`}
-              >
-                <p className="text-sm leading-relaxed">{message.content}</p>
-              </div>
-            </div>
-          ))}
-
-          {isThinking && (
-            <div className="flex gap-3">
-              <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                <Bot className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="bg-secondary rounded-lg px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Thinking...</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {phase === 'generating' && (
-            <div className="flex gap-3">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-              </div>
-              <div className="bg-primary/10 rounded-lg px-4 py-3 flex-1">
-                <div className="flex items-center gap-3">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  <span className="text-sm text-primary font-medium">Generating implementation roadmap...</span>
-                </div>
-                <div className="mt-3 space-y-2">
-                  <div className="h-2 bg-primary/20 rounded animate-pulse" style={{ width: '80%' }} />
-                  <div className="h-2 bg-primary/20 rounded animate-pulse" style={{ width: '60%' }} />
-                  <div className="h-2 bg-primary/20 rounded animate-pulse" style={{ width: '70%' }} />
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
-
-      {/* Quick Answer Options */}
-      {currentQuestion?.options && phase === 'questions' && !isThinking && (
-        <div className="px-8 pb-2">
-          <div className="max-w-3xl mx-auto">
-            <div className="flex flex-wrap gap-2">
+        {/* Quick Options */}
+        {currentQuestion?.options && phase === 'questions' && !isThinking && (
+          <div className="px-6 pb-2">
+            <div className="max-w-2xl mx-auto flex flex-wrap gap-2">
               {currentQuestion.options.map((option) => (
                 <button
                   key={option}
                   onClick={() => handleAnswerQuestion(option)}
-                  className="px-3 py-1.5 text-sm bg-secondary hover:bg-secondary/80 text-foreground rounded-full border border-border transition-colors"
+                  className="px-3 py-1.5 text-xs bg-secondary hover:bg-secondary/80 text-foreground rounded-full border border-border transition-colors"
                 >
                   {option}
                 </button>
               ))}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Input Area */}
-      {phase !== 'generating' && (
-        <div className="border-t border-border px-8 py-4">
-          <div className="max-w-3xl mx-auto">
-            <div className="flex gap-3">
+        {/* Input */}
+        {phase !== 'generating' && (
+          <div className="border-t border-border px-6 py-4">
+            <div className="max-w-2xl mx-auto flex gap-3">
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={
-                  phase === 'input'
-                    ? 'Describe your product idea...'
-                    : 'Type your answer...'
-                }
-                className="flex-1 px-4 py-3 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                placeholder={phase === 'input' ? 'Describe your product idea...' : 'Type your answer...'}
+                className="flex-1 px-4 py-2.5 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                 disabled={isThinking}
               />
               <button
                 onClick={phase === 'input' ? handleSubmitIdea : () => handleAnswerQuestion()}
                 disabled={!input.trim() || isThinking}
-                className="px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                <Send className="h-5 w-5" />
+                <Send className="h-4 w-4" />
               </button>
             </div>
-            <p className="text-xs text-muted-foreground mt-2 text-center">
-              Press Enter to send
-            </p>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

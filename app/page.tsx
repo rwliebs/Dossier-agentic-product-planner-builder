@@ -6,6 +6,7 @@ import { LeftSidebar } from '@/components/dossier/left-sidebar';
 import { IterationBlock } from '@/components/dossier/iteration-block';
 import { RightPanel } from '@/components/dossier/right-panel';
 import { MessageSquare, Bot, Clock } from 'lucide-react';
+import { IdeationView } from '@/components/dossier/ideation-view';
 import type { Iteration, ContextDoc, CodeFile, ProjectContext } from '@/components/dossier/types';
 
 // Sample data structure with iterations
@@ -522,15 +523,23 @@ export function JobScheduler() {
 ];
 
 export default function DossierPage() {
+  const [appMode, setAppMode] = useState<'ideation' | 'active'>('ideation');
   const [viewMode, setViewMode] = useState<'functionality' | 'architecture'>('functionality');
   const [agentStatus, setAgentStatus] = useState<'idle' | 'building' | 'reviewing'>('idle');
+  const [userRequest, setUserRequest] = useState('');
   
   // Project context - shows users what spawned this map
   const projectContext: ProjectContext = {
-    userRequest: "Build a field service management app like Jobber - capture leads, send quotes, schedule jobs, and invoice customers",
-    generatedAt: "2 hours ago",
+    userRequest: userRequest || "Build a field service management app like Jobber - capture leads, send quotes, schedule jobs, and invoice customers",
+    generatedAt: "Just now",
     activeAgents: 3,
-    lastUpdate: "2 min ago",
+    lastUpdate: "Just now",
+  };
+  
+  const handleIdeationComplete = (request: string) => {
+    setUserRequest(request);
+    setAppMode('active');
+    setAgentStatus('building');
   };
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
@@ -614,6 +623,15 @@ export default function DossierPage() {
       }))
     );
   };
+
+  // Show ideation view when in ideation mode
+  if (appMode === 'ideation') {
+    return (
+      <div className="h-screen w-screen flex flex-col bg-background">
+        <IdeationView onComplete={handleIdeationComplete} />
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background">

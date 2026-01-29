@@ -741,19 +741,19 @@ export default function DossierPage() {
           )}
         </div>
 
-        {/* Right Panel - Files/Terminal/Docs (Collapsible, hidden on mobile) */}
-        {rightPanelOpen && (
-        <div className="hidden lg:block">
-          <RightPanel
-            isOpen={rightPanelOpen}
-            onClose={() => setRightPanelOpen(false)}
-            activeDoc={selectedDoc}
-            activeFile={selectedFile}
-            activeTab={rightPanelTab}
-            onTabChange={setRightPanelTab}
-          />
+        {/* Right Panel - Files/Terminal/Docs (hidden on mobile/tablet) */}
+        <div className="hidden md:block">
+          {rightPanelOpen && (
+            <RightPanel
+              isOpen={rightPanelOpen}
+              onClose={() => setRightPanelOpen(false)}
+              activeDoc={selectedDoc}
+              activeFile={selectedFile}
+              activeTab={rightPanelTab}
+              onTabChange={setRightPanelTab}
+            />
+          )}
         </div>
-        )}
       </div>
     </div>
   );

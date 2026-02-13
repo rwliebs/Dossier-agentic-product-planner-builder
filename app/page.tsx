@@ -1,525 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Header } from '@/components/dossier/header';
 import { LeftSidebar } from '@/components/dossier/left-sidebar';
 import { IterationBlock } from '@/components/dossier/iteration-block';
 import { RightPanel } from '@/components/dossier/right-panel';
 import { MessageSquare, Bot, Clock, Sparkles } from 'lucide-react';
 import type { Iteration, ContextDoc, CodeFile, ProjectContext } from '@/components/dossier/types';
+import { mapSnapshotToIterations } from '@/lib/map-adapter';
 
-// Sample data structure with iterations
-const sampleIterations: Iteration[] = [
-  {
-    id: 'iteration-1',
-    phase: 'mvp',
-    label: 'MVP',
-    description: 'Core lead capture, quoting, and job scheduling',
-    epics: [
-      {
-        id: 'epic-1',
-        title: 'Lead Management',
-        color: 'yellow',
-        activities: [
-          {
-            id: 'activity-1',
-            epicId: 'epic-1',
-            title: 'Capturing new leads',
-            cards: [
-              {
-                id: 'card-1',
-                activityId: 'activity-1',
-                title: 'Lead intake form with customer details',
-                description: 'Capture name, address, phone, service type',
-                status: 'active',
-                priority: 1,
-                contextDocs: [
-                  {
-                    id: 'doc-1',
-                    name: 'Lead Data Model',
-                    type: 'doc',
-                    title: 'Lead Entity Schema',
-                    content: `# Lead Data Model
-
-## Required Fields
-- customer_name: string
-- phone: string (validated format)
-- email: string (optional)
-- address: { street, city, state, zip }
-- service_type: enum (lawn_care, plumbing, electrical, hvac, cleaning)
-- source: enum (website, phone, referral, advertisement)
-
-## Status Flow
-new -> contacted -> qualified -> converted | lost
-
-## Notes
-- Leads can have multiple contact attempts logged
-- Property details captured for service estimation`,
-                  },
-                  {
-                    id: 'doc-2',
-                    name: 'Address Validation',
-                    type: 'design',
-                    title: 'Google Places Integration',
-                    content: `# Address Autocomplete
-
-## Implementation
-- Use Google Places Autocomplete API
-- Validate service area coverage
-- Store lat/lng for routing optimization
-- Cache frequent addresses`,
-                  },
-                ],
-                requirements: ['Form validation', 'Address autocomplete', 'Phone formatting'],
-                knownFacts: [{ id: 'kf-1', text: 'Using Google Places for address validation', source: 'Tech spec' }],
-                assumptions: [{ id: 'a-1', text: 'Service area is within 50 mile radius' }],
-                questions: [{ id: 'q-1', text: 'Should we capture property size for lawn care leads?' }],
-                codeFileIds: ['file-1', 'file-2'],
-                testFileIds: ['file-6', 'file-7'],
-              },
-              {
-                id: 'card-2',
-                activityId: 'activity-1',
-                title: 'Lead assignment to team members',
-                description: 'Route leads based on service type and availability',
-                status: 'questions',
-                priority: 2,
-                contextDocs: [],
-                requirements: ['Team member profiles', 'Service specializations', 'Workload balancing'],
-                knownFacts: [],
-                assumptions: [],
-                questions: [{ id: 'q-2', text: 'Should assignment be automatic or manual review first?' }],
-                quickAnswer: 'Start with manual assignment, add auto-assignment in V2 based on rules.',
-                codeFileIds: ['file-3'],
-              },
-            ],
-          },
-        ],
-      },
-      {
-        id: 'epic-2',
-        title: 'Quoting',
-        color: 'blue',
-        activities: [
-          {
-            id: 'activity-2',
-            epicId: 'epic-2',
-            title: 'Creating and sending quotes',
-            cards: [
-              {
-                id: 'card-3',
-                activityId: 'activity-2',
-                title: 'Quote builder with line items',
-                description: 'Build quotes with services, materials, labor',
-                status: 'review',
-                priority: 1,
-                contextDocs: [],
-                requirements: ['Line item editor', 'Tax calculation', 'Discount support'],
-                knownFacts: [],
-                assumptions: [],
-                questions: [],
-                codeFileIds: ['file-4'],
-                testFileIds: ['file-8'],
-              },
-              {
-                id: 'card-4',
-                activityId: 'activity-2',
-                title: 'Email quote to customer',
-                description: 'Send branded PDF quote via email',
-                status: 'todo',
-                priority: 2,
-                contextDocs: [],
-                requirements: ['PDF generation', 'Email delivery', 'Acceptance link'],
-                knownFacts: [],
-                assumptions: [],
-                questions: [],
-                codeFileIds: ['file-5'],
-              },
-            ],
-          },
-        ],
-      },
-      {
-        id: 'epic-3',
-        title: 'Scheduling',
-        color: 'green',
-        activities: [
-          {
-            id: 'activity-3',
-            epicId: 'epic-3',
-            title: 'Booking jobs',
-            cards: [
-              {
-                id: 'card-5',
-                activityId: 'activity-3',
-                title: 'Calendar view with drag-drop scheduling',
-                description: 'Visual scheduler for team assignments',
-                status: 'todo',
-                priority: 1,
-                contextDocs: [],
-                requirements: ['Week/day views', 'Drag-drop jobs', 'Team member lanes'],
-                knownFacts: [],
-                assumptions: [],
-                questions: [],
-                codeFileIds: ['file-9'],
-              },
-            ],
-          },
-        ],
-      },
-    ],
-    codeFiles: [
-      { 
-        id: 'file-1', 
-        path: '/app/components/LeadForm.tsx', 
-        name: 'LeadForm.tsx', 
-        type: 'component', 
-        cardIds: ['card-1'], 
-        epicIds: ['epic-1'],
-        description: 'Lead intake form with validation',
-        code: `'use client';
-
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { AddressAutocomplete } from './AddressAutocomplete';
-
-interface LeadFormData {
-  customerName: string;
-  phone: string;
-  email?: string;
-  address: string;
-  serviceType: 'lawn_care' | 'plumbing' | 'electrical' | 'hvac' | 'cleaning';
-  notes?: string;
-}
-
-export function LeadForm({ onSubmit }: { onSubmit: (data: LeadFormData) => void }) {
-  const { register, handleSubmit, formState: { errors } } = useForm<LeadFormData>();
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <input {...register('customerName', { required: true })} placeholder="Customer Name" />
-      <input {...register('phone', { required: true })} placeholder="Phone" type="tel" />
-      <AddressAutocomplete {...register('address', { required: true })} />
-      <select {...register('serviceType', { required: true })}>
-        <option value="lawn_care">Lawn Care</option>
-        <option value="plumbing">Plumbing</option>
-        <option value="electrical">Electrical</option>
-      </select>
-      <button type="submit">Create Lead</button>
-    </form>
-  );
-}`
-      },
-      { 
-        id: 'file-2', 
-        path: '/api/leads/route.ts', 
-        name: 'route.ts', 
-        type: 'api', 
-        cardIds: ['card-1'], 
-        epicIds: ['epic-1'],
-        description: 'Lead CRUD API endpoints',
-        code: `import { db } from '@/lib/db';
-import { leads } from '@/lib/schema';
-
-export async function POST(req: Request) {
-  const data = await req.json();
-  
-  const lead = await db.insert(leads).values({
-    customerName: data.customerName,
-    phone: data.phone,
-    email: data.email,
-    address: data.address,
-    serviceType: data.serviceType,
-    status: 'new',
-    createdAt: new Date(),
-  }).returning();
-
-  return Response.json({ lead: lead[0] });
-}
-
-export async function GET() {
-  const allLeads = await db.select().from(leads).orderBy(leads.createdAt);
-  return Response.json({ leads: allLeads });
-}`
-      },
-      { 
-        id: 'file-3', 
-        path: '/app/components/LeadAssignment.tsx', 
-        name: 'LeadAssignment.tsx', 
-        type: 'component', 
-        cardIds: ['card-2'], 
-        epicIds: ['epic-1'],
-        description: 'Team member assignment dropdown',
-        code: `'use client';
-
-import { useState } from 'react';
-import { useTeamMembers } from '@/hooks/useTeamMembers';
-
-export function LeadAssignment({ leadId, currentAssignee }: { leadId: string; currentAssignee?: string }) {
-  const { members } = useTeamMembers();
-  const [assignee, setAssignee] = useState(currentAssignee);
-
-  const handleAssign = async (memberId: string) => {
-    await fetch(\`/api/leads/\${leadId}/assign\`, {
-      method: 'POST',
-      body: JSON.stringify({ assigneeId: memberId }),
-    });
-    setAssignee(memberId);
-  };
-
-  return (
-    <select value={assignee} onChange={(e) => handleAssign(e.target.value)}>
-      <option value="">Unassigned</option>
-      {members.map((m) => (
-        <option key={m.id} value={m.id}>{m.name}</option>
-      ))}
-    </select>
-  );
-}`
-      },
-      { 
-        id: 'file-4', 
-        path: '/app/components/QuoteBuilder.tsx', 
-        name: 'QuoteBuilder.tsx', 
-        type: 'component', 
-        cardIds: ['card-3'], 
-        epicIds: ['epic-2'],
-        description: 'Quote line item editor',
-        code: `'use client';
-
-import { useState } from 'react';
-
-interface LineItem {
-  id: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-}
-
-export function QuoteBuilder({ leadId }: { leadId: string }) {
-  const [items, setItems] = useState<LineItem[]>([]);
-  const [taxRate] = useState(0.08);
-
-  const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-  const tax = subtotal * taxRate;
-  const total = subtotal + tax;
-
-  const addItem = () => {
-    setItems([...items, { id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 }]);
-  };
-
-  return (
-    <div className="quote-builder">
-      <h2>Quote for Lead #{leadId}</h2>
-      {items.map((item) => (
-        <div key={item.id} className="line-item">
-          <input placeholder="Description" />
-          <input type="number" placeholder="Qty" />
-          <input type="number" placeholder="Price" />
-        </div>
-      ))}
-      <button onClick={addItem}>Add Line Item</button>
-      <div className="totals">
-        <p>Subtotal: \${subtotal.toFixed(2)}</p>
-        <p>Tax: \${tax.toFixed(2)}</p>
-        <p>Total: \${total.toFixed(2)}</p>
-      </div>
-    </div>
-  );
-}`
-      },
-      { 
-        id: 'file-5', 
-        path: '/api/quotes/send/route.ts', 
-        name: 'route.ts', 
-        type: 'api', 
-        cardIds: ['card-4'], 
-        epicIds: ['epic-2'],
-        description: 'Quote email delivery endpoint',
-        code: `import { generateQuotePDF } from '@/lib/pdf';
-import { sendEmail } from '@/lib/email';
-
-export async function POST(req: Request) {
-  const { quoteId, recipientEmail } = await req.json();
-  
-  // Generate PDF
-  const pdfBuffer = await generateQuotePDF(quoteId);
-  
-  // Send email with PDF attachment
-  await sendEmail({
-    to: recipientEmail,
-    subject: 'Your Quote from ServicePro',
-    template: 'quote',
-    attachments: [{ filename: 'quote.pdf', content: pdfBuffer }],
-  });
-
-  return Response.json({ success: true });
-}`
-      },
-      { 
-        id: 'file-6', 
-        path: '/tests/lead-form.test.ts', 
-        name: 'lead-form.test.ts', 
-        type: 'util', 
-        cardIds: ['card-1'], 
-        epicIds: ['epic-1'],
-        description: 'Lead form validation tests',
-        code: `import { render, screen, fireEvent } from '@testing-library/react';
-import { LeadForm } from '@/app/components/LeadForm';
-
-describe('LeadForm', () => {
-  it('validates required fields', async () => {
-    render(<LeadForm onSubmit={jest.fn()} />);
-    fireEvent.click(screen.getByText('Create Lead'));
-    expect(await screen.findByText('Customer name is required')).toBeInTheDocument();
-  });
-
-  it('formats phone number correctly', () => {
-    render(<LeadForm onSubmit={jest.fn()} />);
-    const phoneInput = screen.getByPlaceholder('Phone');
-    fireEvent.change(phoneInput, { target: { value: '5551234567' } });
-    expect(phoneInput).toHaveValue('(555) 123-4567');
-  });
-});`
-      },
-      { 
-        id: 'file-7', 
-        path: '/tests/lead-api.test.ts', 
-        name: 'lead-api.test.ts', 
-        type: 'util', 
-        cardIds: ['card-1'], 
-        epicIds: ['epic-1'],
-        description: 'Lead API integration tests',
-        code: `import { POST, GET } from '@/api/leads/route';
-
-describe('Leads API', () => {
-  it('creates a new lead', async () => {
-    const req = new Request('http://localhost/api/leads', {
-      method: 'POST',
-      body: JSON.stringify({ customerName: 'John Doe', phone: '555-1234' }),
-    });
-    const res = await POST(req);
-    const data = await res.json();
-    expect(data.lead.customerName).toBe('John Doe');
-  });
-
-  it('returns all leads', async () => {
-    const res = await GET();
-    const data = await res.json();
-    expect(Array.isArray(data.leads)).toBe(true);
-  });
-});`
-      },
-      { 
-        id: 'file-8', 
-        path: '/tests/quote-builder.test.ts', 
-        name: 'quote-builder.test.ts', 
-        type: 'util', 
-        cardIds: ['card-3'], 
-        epicIds: ['epic-2'],
-        description: 'Quote builder calculation tests',
-        code: `import { render, screen, fireEvent } from '@testing-library/react';
-import { QuoteBuilder } from '@/app/components/QuoteBuilder';
-
-describe('QuoteBuilder', () => {
-  it('calculates totals correctly', () => {
-    render(<QuoteBuilder leadId="123" />);
-    fireEvent.click(screen.getByText('Add Line Item'));
-    // Add item with qty=2, price=100
-    expect(screen.getByText('Subtotal: $200.00')).toBeInTheDocument();
-    expect(screen.getByText('Tax: $16.00')).toBeInTheDocument();
-    expect(screen.getByText('Total: $216.00')).toBeInTheDocument();
-  });
-});`
-      },
-      { 
-        id: 'file-9', 
-        path: '/app/components/JobScheduler.tsx', 
-        name: 'JobScheduler.tsx', 
-        type: 'component', 
-        cardIds: ['card-5'], 
-        epicIds: ['epic-3'],
-        description: 'Drag-drop job scheduling calendar',
-        code: `'use client';
-
-import { useState } from 'react';
-import { DndContext, DragEndEvent } from '@dnd-kit/core';
-
-export function JobScheduler() {
-  const [jobs, setJobs] = useState([]);
-  const [view, setView] = useState<'week' | 'day'>('week');
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over) {
-      // Update job time slot
-      console.log('Move job', active.id, 'to', over.id);
-    }
-  };
-
-  return (
-    <DndContext onDragEnd={handleDragEnd}>
-      <div className="scheduler">
-        <div className="view-toggle">
-          <button onClick={() => setView('week')}>Week</button>
-          <button onClick={() => setView('day')}>Day</button>
-        </div>
-        <div className="calendar-grid">
-          {/* Time slots and job cards */}
-        </div>
-      </div>
-    </DndContext>
-  );
-}`
-      },
-    ],
-    dataFlows: [
-      { id: 'flow-1', fromFileId: 'file-1', toFileId: 'file-2', direction: 'output', label: 'create lead' },
-      { id: 'flow-2', fromFileId: 'file-3', toFileId: 'file-2', direction: 'output', label: 'assign lead' },
-      { id: 'flow-3', fromFileId: 'file-4', toFileId: 'file-5', direction: 'output', label: 'send quote' },
-    ],
-  },
-  {
-    id: 'iteration-2',
-    phase: 'v2',
-    label: 'V2',
-    description: 'Invoicing and payment collection',
-    epics: [
-      {
-        id: 'epic-4',
-        title: 'Billing',
-        color: 'purple',
-        activities: [
-          {
-            id: 'activity-4',
-            epicId: 'epic-4',
-            title: 'Invoicing completed work',
-            cards: [
-              {
-                id: 'card-6',
-                activityId: 'activity-4',
-                title: 'Invoice generation from jobs',
-                description: 'Convert completed jobs to invoices',
-                status: 'todo',
-                priority: 1,
-                contextDocs: [],
-                requirements: ['Job-to-invoice conversion', 'Payment terms', 'Due dates'],
-                knownFacts: [],
-                assumptions: [{ id: 'a-2', text: 'Invoices generated after job completion' }],
-                questions: [],
-                codeFileIds: ['file-10'],
-              },
-            ],
-          },
-        ],
-      },
-    ],
-    codeFiles: [
-      { id: 'file-10', path: '/api/invoices/route.ts', name: 'route.ts', type: 'api', cardIds: ['card-6'], epicIds: ['epic-4'] },
-    ],
-    dataFlows: [],
-  },
-];
+const defaultProjectId = process.env.NEXT_PUBLIC_DEFAULT_PROJECT_ID ?? '';
 
 export default function DossierPage() {
   const [appMode, setAppMode] = useState<'ideation' | 'active'>('ideation');
@@ -546,7 +36,36 @@ export default function DossierPage() {
   const [selectedDoc, setSelectedDoc] = useState<ContextDoc | null>(null);
   const [selectedFile, setSelectedFile] = useState<CodeFile | null>(null);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
-  const [iterations, setIterations] = useState<Iteration[]>(sampleIterations);
+  const [iterations, setIterations] = useState<Iteration[]>([]);
+  const [mapLoading, setMapLoading] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+
+  const fetchMap = useCallback(async () => {
+    if (!defaultProjectId) return;
+    setMapLoading(true);
+    setMapError(null);
+    try {
+      const res = await fetch(`/api/projects/${defaultProjectId}/map`);
+      if (!res.ok) {
+        setMapError(res.status === 404 ? 'Project not found' : 'Failed to load map');
+        setIterations([]);
+        return;
+      }
+      const snapshot = await res.json();
+      setIterations(mapSnapshotToIterations(snapshot));
+    } catch {
+      setMapError('Failed to load map');
+      setIterations([]);
+    } finally {
+      setMapLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (appMode === 'active' && defaultProjectId) {
+      fetchMap();
+    }
+  }, [appMode, defaultProjectId, fetchMap]);
 
   const handleCardAction = (cardId: string, action: string) => {
     // Find the card to get context
@@ -649,7 +168,7 @@ export default function DossierPage() {
           onIdeationComplete={handleIdeationComplete}
           onPlanningApplied={() => {
             setAgentStatus('reviewing');
-            // TODO: Refetch map from API when Step 5 frontend migration is complete
+            fetchMap();
           }}
         />
 
@@ -714,7 +233,24 @@ export default function DossierPage() {
 
               {/* Iterations */}
               <div className="flex-1 overflow-y-auto">
-                {iterations.map((iteration) => (
+                {mapLoading && (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="text-sm text-muted-foreground">Loading map...</div>
+                  </div>
+                )}
+                {!mapLoading && mapError && (
+                  <div className="flex flex-col items-center justify-center py-16 gap-2">
+                    <p className="text-sm text-destructive">{mapError}</p>
+                    <button
+                      type="button"
+                      onClick={() => fetchMap()}
+                      className="text-xs text-muted-foreground hover:text-foreground underline"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+                {!mapLoading && !mapError && iterations.map((iteration) => (
                   <IterationBlock
                     key={iteration.id}
                     iteration={iteration}

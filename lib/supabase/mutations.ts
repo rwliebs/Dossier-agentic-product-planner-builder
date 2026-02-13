@@ -12,6 +12,13 @@ import {
   getActivitiesByWorkflow,
   getStepsByActivity,
   getCardById,
+  getArtifactById,
+  verifyCardInProject,
+  getCardPlannedFiles,
+  getCardRequirements,
+  getCardFacts,
+  getCardAssumptions,
+  getCardQuestions,
 } from "./queries";
 
 export interface ActionInput {
@@ -59,6 +66,18 @@ export async function applyAction(
       return applyCreateCard(supabase, projectId, action);
     case "updateCard":
       return applyUpdateCard(supabase, projectId, action);
+    case "reorderCard":
+      return applyReorderCard(supabase, projectId, action);
+    case "linkContextArtifact":
+      return applyLinkContextArtifact(supabase, projectId, action);
+    case "upsertCardPlannedFile":
+      return applyUpsertCardPlannedFile(supabase, projectId, action);
+    case "approveCardPlannedFile":
+      return applyApproveCardPlannedFile(supabase, projectId, action);
+    case "upsertCardKnowledgeItem":
+      return applyUpsertCardKnowledgeItem(supabase, projectId, action);
+    case "setCardKnowledgeStatus":
+      return applySetCardKnowledgeStatus(supabase, projectId, action);
     default:
       return { applied: false, rejectionReason: `Unsupported action type: ${action.action_type}` };
   }
@@ -279,4 +298,363 @@ async function applyUpdateCard(
     return { applied: false, rejectionReason: error.message };
   }
   return { applied: true };
+}
+
+async function applyReorderCard(
+  supabase: SupabaseClient,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const cardId = action.target_ref.card_id as string;
+  if (!cardId) {
+    return { applied: false, rejectionReason: "card_id is required in target_ref" };
+  }
+
+  const inProject = await verifyCardInProject(supabase, cardId, projectId);
+  if (!inProject) {
+    return { applied: false, rejectionReason: "Card not found or not in project" };
+  }
+
+  const newStepId = (action.payload.new_step_id as string) ?? undefined;
+  const newPosition = action.payload.new_position as number;
+
+  if (typeof newPosition !== "number" || newPosition < 0) {
+    return { applied: false, rejectionReason: "new_position is required and must be non-negative" };
+  }
+
+  const card = await getCardById(supabase, cardId);
+  if (!card) {
+    return { applied: false, rejectionReason: "Card not found" };
+  }
+
+  const activityId = (card as Record<string, unknown>).workflow_activity_id as string;
+  if (newStepId !== undefined) {
+    const steps = await getStepsByActivity(supabase, activityId);
+    if (!steps.some((s) => s.id === newStepId)) {
+      return { applied: false, rejectionReason: "new_step_id not found in card's activity" };
+    }
+  }
+
+  const updates: Record<string, unknown> = {
+    position: newPosition,
+    updated_at: new Date().toISOString(),
+  };
+  if (newStepId !== undefined) {
+    updates.step_id = newStepId;
+  }
+
+  const { error } = await supabase
+    .from(TABLES.cards)
+    .update(updates)
+    .eq("id", cardId);
+
+  if (error) {
+    return { applied: false, rejectionReason: error.message };
+  }
+  return { applied: true };
+}
+
+async function applyLinkContextArtifact(
+  supabase: SupabaseClient,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const cardId = action.target_ref.card_id as string;
+  const contextArtifactId = action.payload.context_artifact_id as string;
+
+  if (!cardId || !contextArtifactId) {
+    return { applied: false, rejectionReason: "card_id and context_artifact_id are required" };
+  }
+
+  const inProject = await verifyCardInProject(supabase, cardId, projectId);
+  if (!inProject) {
+    return { applied: false, rejectionReason: "Card not found or not in project" };
+  }
+
+  const artifact = await getArtifactById(supabase, contextArtifactId);
+  if (!artifact) {
+    return { applied: false, rejectionReason: "Context artifact not found" };
+  }
+
+  const artifactProjectId = (artifact as Record<string, unknown>).project_id as string;
+  if (artifactProjectId !== projectId) {
+    return { applied: false, rejectionReason: "Context artifact does not belong to project" };
+  }
+
+  const linkedBy = (action.payload.linked_by as string) ?? null;
+  const usageHint = (action.payload.usage_hint as string) ?? null;
+
+  const { error } = await supabase.from(TABLES.card_context_artifacts).insert({
+    card_id: cardId,
+    context_artifact_id: contextArtifactId,
+    linked_by: linkedBy,
+    usage_hint: usageHint,
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      return { applied: true };
+    }
+    return { applied: false, rejectionReason: error.message };
+  }
+  return { applied: true };
+}
+
+async function applyUpsertCardPlannedFile(
+  supabase: SupabaseClient,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const cardId = action.target_ref.card_id as string;
+  if (!cardId) {
+    return { applied: false, rejectionReason: "card_id is required in target_ref" };
+  }
+
+  const inProject = await verifyCardInProject(supabase, cardId, projectId);
+  if (!inProject) {
+    return { applied: false, rejectionReason: "Card not found or not in project" };
+  }
+
+  const plannedFileId = (action.payload.planned_file_id as string) ?? crypto.randomUUID();
+  const logicalFileName = action.payload.logical_file_name as string;
+  const artifactKind = action.payload.artifact_kind as string;
+  const fileAction = action.payload.action as string;
+  const intentSummary = action.payload.intent_summary as string;
+  const moduleHint = (action.payload.module_hint as string) ?? null;
+  const contractNotes = (action.payload.contract_notes as string) ?? null;
+  const position = (action.payload.position as number) ?? 0;
+
+  if (!logicalFileName?.trim() || !intentSummary?.trim()) {
+    return { applied: false, rejectionReason: "logical_file_name and intent_summary are required" };
+  }
+
+  const existingFiles = await getCardPlannedFiles(supabase, cardId);
+  const existingIndex = existingFiles.findIndex((f) => (f as { id?: string }).id === plannedFileId);
+
+  if (existingIndex >= 0) {
+    const { error } = await supabase
+      .from(TABLES.card_planned_files)
+      .update({
+        logical_file_name: logicalFileName.trim(),
+        module_hint: moduleHint,
+        artifact_kind: artifactKind,
+        action: fileAction,
+        intent_summary: intentSummary.trim(),
+        contract_notes: contractNotes,
+        position,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", plannedFileId)
+      .eq("card_id", cardId);
+
+    if (error) {
+      return { applied: false, rejectionReason: error.message };
+    }
+  } else {
+    const { error } = await supabase.from(TABLES.card_planned_files).insert({
+      id: plannedFileId,
+      card_id: cardId,
+      logical_file_name: logicalFileName.trim(),
+      module_hint: moduleHint,
+      artifact_kind: artifactKind,
+      action: fileAction,
+      intent_summary: intentSummary.trim(),
+      contract_notes: contractNotes,
+      status: "proposed",
+      position,
+    });
+
+    if (error) {
+      return { applied: false, rejectionReason: error.message };
+    }
+  }
+  return { applied: true };
+}
+
+async function applyApproveCardPlannedFile(
+  supabase: SupabaseClient,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const cardId = action.target_ref.card_id as string;
+  const plannedFileId = action.payload.planned_file_id as string;
+  const status = action.payload.status as string;
+
+  if (!cardId || !plannedFileId || !status) {
+    return { applied: false, rejectionReason: "card_id, planned_file_id, and status are required" };
+  }
+
+  if (status !== "approved" && status !== "proposed") {
+    return { applied: false, rejectionReason: "status must be 'approved' or 'proposed'" };
+  }
+
+  const inProject = await verifyCardInProject(supabase, cardId, projectId);
+  if (!inProject) {
+    return { applied: false, rejectionReason: "Card not found or not in project" };
+  }
+
+  const files = await getCardPlannedFiles(supabase, cardId);
+  const file = files.find((f) => (f as { id?: string }).id === plannedFileId);
+  if (!file) {
+    return { applied: false, rejectionReason: "Planned file not found for card" };
+  }
+
+  const { error } = await supabase
+    .from(TABLES.card_planned_files)
+    .update({
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", plannedFileId)
+    .eq("card_id", cardId);
+
+  if (error) {
+    return { applied: false, rejectionReason: error.message };
+  }
+  return { applied: true };
+}
+
+async function applyUpsertCardKnowledgeItem(
+  supabase: SupabaseClient,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const cardId = action.target_ref.card_id as string;
+  const itemType = action.payload.item_type as string;
+  const text = action.payload.text as string;
+  const itemId = (action.payload.knowledge_item_id as string) ?? crypto.randomUUID();
+  const evidenceSource = (action.payload.evidence_source as string) ?? null;
+  const confidence = (action.payload.confidence as number) ?? null;
+  const position = (action.payload.position as number) ?? 0;
+
+  if (!cardId || !itemType || !text?.trim()) {
+    return { applied: false, rejectionReason: "card_id, item_type, and text are required" };
+  }
+
+  const inProject = await verifyCardInProject(supabase, cardId, projectId);
+  if (!inProject) {
+    return { applied: false, rejectionReason: "Card not found or not in project" };
+  }
+
+  const validTypes = ["requirement", "fact", "assumption", "question"];
+  if (!validTypes.includes(itemType)) {
+    return { applied: false, rejectionReason: `item_type must be one of: ${validTypes.join(", ")}` };
+  }
+
+  const table =
+    itemType === "requirement"
+      ? TABLES.card_requirements
+      : itemType === "fact"
+        ? TABLES.card_known_facts
+        : itemType === "assumption"
+          ? TABLES.card_assumptions
+          : TABLES.card_questions;
+
+  const getExisting =
+    itemType === "requirement"
+      ? getCardRequirements
+      : itemType === "fact"
+        ? getCardFacts
+        : itemType === "assumption"
+          ? getCardAssumptions
+          : getCardQuestions;
+
+  const existing = await getExisting(supabase, cardId);
+  const existingIndex = existing.findIndex((r) => (r as { id?: string }).id === itemId);
+
+  const baseRow: Record<string, unknown> = {
+    card_id: cardId,
+    text: text.trim(),
+    status: "draft",
+    source: "user",
+    confidence,
+    position,
+  };
+
+  if (itemType === "fact") {
+    (baseRow as Record<string, unknown>).evidence_source = evidenceSource;
+  }
+
+  if (existingIndex >= 0) {
+    const updatePayload: Record<string, unknown> = {
+      text: text.trim(),
+      confidence,
+      position,
+      updated_at: new Date().toISOString(),
+    };
+    if (itemType === "fact") {
+      (updatePayload as Record<string, unknown>).evidence_source = evidenceSource;
+    }
+
+    const { error } = await supabase
+      .from(table)
+      .update(updatePayload)
+      .eq("id", itemId)
+      .eq("card_id", cardId);
+
+    if (error) {
+      return { applied: false, rejectionReason: error.message };
+    }
+  } else {
+    const insertPayload = { ...baseRow, id: itemId };
+    const { error } = await supabase.from(table).insert(insertPayload);
+
+    if (error) {
+      return { applied: false, rejectionReason: error.message };
+    }
+  }
+  return { applied: true };
+}
+
+async function applySetCardKnowledgeStatus(
+  supabase: SupabaseClient,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const cardId = action.target_ref.card_id as string;
+  const knowledgeItemId = action.payload.knowledge_item_id as string;
+  const status = action.payload.status as string;
+
+  if (!cardId || !knowledgeItemId || !status) {
+    return { applied: false, rejectionReason: "card_id, knowledge_item_id, and status are required" };
+  }
+
+  const validStatuses = ["draft", "approved", "rejected"];
+  if (!validStatuses.includes(status)) {
+    return { applied: false, rejectionReason: `status must be one of: ${validStatuses.join(", ")}` };
+  }
+
+  const inProject = await verifyCardInProject(supabase, cardId, projectId);
+  if (!inProject) {
+    return { applied: false, rejectionReason: "Card not found or not in project" };
+  }
+
+  const tables = [
+    TABLES.card_requirements,
+    TABLES.card_known_facts,
+    TABLES.card_assumptions,
+    TABLES.card_questions,
+  ] as const;
+
+  for (const table of tables) {
+    const { data, error } = await supabase
+      .from(table)
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", knowledgeItemId)
+      .eq("card_id", cardId)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      return { applied: false, rejectionReason: error.message };
+    }
+    if (data) {
+      return { applied: true };
+    }
+  }
+
+  return { applied: false, rejectionReason: "Knowledge item not found" };
 }

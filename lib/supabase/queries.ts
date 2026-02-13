@@ -268,3 +268,24 @@ export async function getCardPlannedFiles(supabase: SupabaseClient, cardId: stri
   if (error) throw error;
   return data ?? [];
 }
+
+/** Get all card IDs in a workflow (for workflow-scope run validation). */
+export async function getCardIdsByWorkflow(
+  supabase: SupabaseClient,
+  workflowId: string
+): Promise<string[]> {
+  const activities = await getActivitiesByWorkflow(supabase, workflowId);
+  const cardIds: string[] = [];
+
+  for (const act of activities) {
+    const steps = await getStepsByActivity(supabase, act.id);
+    for (const step of steps) {
+      const cards = await getCardsByStep(supabase, step.id);
+      cardIds.push(...cards.map((c) => c.id));
+    }
+    const activityCards = await getCardsByActivity(supabase, act.id);
+    cardIds.push(...activityCards.map((c) => c.id));
+  }
+
+  return [...new Set(cardIds)];
+}

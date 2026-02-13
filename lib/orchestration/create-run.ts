@@ -10,6 +10,10 @@ import {
   ORCHESTRATION_TABLES,
 } from "@/lib/supabase/queries/orchestration";
 import {
+  getCardIdsByWorkflow,
+  getCardPlannedFiles,
+} from "@/lib/supabase/queries";
+import {
   validateRunInputAgainstPolicy,
   validateScopeAgainstPolicy,
 } from "./run-validation";
@@ -90,6 +94,29 @@ export async function createRun(
         success: false,
         validationErrors: scopeValidation.errors,
       };
+    }
+
+    // Validate approved planned files: build requires ≥1 approved planned file per targeted card
+    const targetedCardIds =
+      input.scope === "card" && input.card_id
+        ? [input.card_id]
+        : input.scope === "workflow" && input.workflow_id
+          ? await getCardIdsByWorkflow(supabase, input.workflow_id)
+          : [];
+
+    for (const cardId of targetedCardIds) {
+      const plannedFiles = await getCardPlannedFiles(supabase, cardId);
+      const hasApproved = plannedFiles.some(
+        (f) => (f as { status?: string }).status === "approved"
+      );
+      if (!hasApproved) {
+        return {
+          success: false,
+          validationErrors: [
+            `Card ${cardId} has no approved planned files. Build requires at least one approved planned file per targeted card.`,
+          ],
+        };
+      }
     }
 
     // Parse and validate run payload (create schema omits id - DB generates)

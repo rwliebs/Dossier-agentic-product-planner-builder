@@ -120,7 +120,7 @@ Submit planning actions. Validates, applies, and persists. Rejects on first fail
   "actions": [
     {
       "id": "uuid (optional)",
-      "action_type": "createWorkflow|createActivity|createStep|createCard|updateCard|...",
+      "action_type": "createWorkflow|createActivity|createStep|createCard|updateCard|reorderCard|linkContextArtifact|upsertCardPlannedFile|approveCardPlannedFile|upsertCardKnowledgeItem|setCardKnowledgeStatus",
       "target_ref": {},
       "payload": {}
     }
@@ -130,7 +130,23 @@ Submit planning actions. Validates, applies, and persists. Rejects on first fail
 
 **Response:** `201` — `{ "applied": number, "results": [...] }` | `422` — Action rejected
 
-**Supported action types:** `createWorkflow`, `createActivity`, `createStep`, `createCard`, `updateCard`. Code-generation intents are rejected.
+**Supported action types:**
+
+| Action | Description |
+|--------|-------------|
+| `createWorkflow` | Create a new workflow in the project |
+| `createActivity` | Create a workflow activity |
+| `createStep` | Create a step within an activity |
+| `createCard` | Create a card in a step or activity |
+| `updateCard` | Update card title, description, status, or priority |
+| `reorderCard` | Move card to new step/position |
+| `linkContextArtifact` | Link a context artifact to a card |
+| `upsertCardPlannedFile` | Create or update a planned file for a card |
+| `approveCardPlannedFile` | Approve or revert a planned file |
+| `upsertCardKnowledgeItem` | Create or update a requirement, fact, assumption, or question |
+| `setCardKnowledgeStatus` | Set status (draft/approved/rejected) on a knowledge item |
+
+Code-generation intents are rejected.
 
 ---
 

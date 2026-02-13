@@ -211,14 +211,14 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
         body: JSON.stringify({ actions: pendingActions }),
       });
       const data = await res.json();
-      if (res.ok && data.status === 'success') {
+      if (res.ok && (data.applied ?? 0) > 0) {
         setPendingPreview(null);
         setPendingActions([]);
         setPendingErrors([]);
         onPlanningApplied?.();
-        addMessage('agent', `Applied ${data.applied_count ?? pendingActions.length} change(s).`);
+        addMessage('agent', `Applied ${data.applied ?? pendingActions.length} change(s).`);
       } else {
-        addMessage('agent', data.message ?? 'Failed to apply changes.');
+        addMessage('agent', data.message ?? data.details?.validation?.[0] ?? 'Failed to apply changes.');
       }
     } catch {
       addMessage('agent', 'Failed to apply changes. Try again.');

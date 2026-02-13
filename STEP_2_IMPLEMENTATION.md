@@ -154,7 +154,16 @@ Each action type has a dedicated handler that mutates state deterministically:
 - `applyCreateStep`: Creates step under activity
 - `applyCreateCard`: Creates card under activity/step
 - `applyUpdateCard`: Updates card properties
-- `applyReorderCard`: Moves card position
+- `applyReorderCard`: Moves card position and/or step (updates `step_id` and `position` from payload)
+
+```typescript
+// applyReorderCard: Updates card with new_position and optionally new_step_id
+state.cards.set(target_ref.card_id, {
+  ...card,
+  step_id: payload.new_step_id !== undefined ? payload.new_step_id : card.step_id,
+  position: payload.new_position,
+});
+```
 - `applyLinkContextArtifact`: Links artifact to card
 - `applyUpsertCardPlannedFile`: Creates or updates planned file
 - `applyApproveCardPlannedFile`: Updates planned file status

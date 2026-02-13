@@ -644,8 +644,13 @@ export default function DossierPage() {
             status: appMode === 'ideation' ? 'planning' : 'active',
             collaborators: ['You', 'AI Agent'],
           }}
+          projectId={process.env.NEXT_PUBLIC_DEFAULT_PROJECT_ID}
           isIdeationMode={appMode === 'ideation'}
           onIdeationComplete={handleIdeationComplete}
+          onPlanningApplied={() => {
+            setAgentStatus('reviewing');
+            // TODO: Refetch map from API when Step 5 frontend migration is complete
+          }}
         />
 
         {/* Center - Iteration Blocks or Empty State */}

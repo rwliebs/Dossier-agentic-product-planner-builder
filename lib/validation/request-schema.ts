@@ -1,0 +1,123 @@
+/**
+ * Zod schemas for API request payload validation.
+ * Reuses domain schemas where applicable; adds request-specific shapes.
+ */
+
+import * as z from "zod";
+import {
+  projectSchema,
+  planningActionTypeSchema,
+  artifactTypeSchema,
+  plannedFileActionSchema,
+  plannedFileKindSchema,
+  plannedFileStatusSchema,
+  knowledgeItemStatusSchema,
+  knowledgeItemSourceSchema,
+  cardStatusSchema,
+} from "@/lib/schemas";
+
+// Project create/update
+export const createProjectSchema = z.object({
+  name: z.string().min(1),
+  repo_url: z.string().url().nullable().optional(),
+  default_branch: z.string().min(1).optional(),
+});
+
+export const updateProjectSchema = z.object({
+  name: z.string().min(1).optional(),
+  repo_url: z.string().url().nullable().optional(),
+  default_branch: z.string().min(1).optional(),
+});
+
+// Action submission
+export const submitActionsSchema = z.object({
+  actions: z.array(z.object({
+    id: z.string().uuid().optional(),
+    action_type: planningActionTypeSchema,
+    target_ref: z.record(z.unknown()).default({}),
+    payload: z.record(z.unknown()).default({}),
+  })),
+});
+
+// Context artifact create/update
+export const createArtifactSchema = z.object({
+  name: z.string().min(1),
+  type: artifactTypeSchema,
+  title: z.string().nullable().optional(),
+  content: z.string().nullable().optional(),
+  uri: z.string().nullable().optional(),
+  locator: z.string().nullable().optional(),
+  mime_type: z.string().nullable().optional(),
+  integration_ref: z.record(z.unknown()).nullable().optional(),
+}).refine(
+  (d) => d.content || d.uri || d.integration_ref,
+  { message: "At least one of content, uri, or integration_ref is required" }
+);
+
+export const updateArtifactSchema = z.object({
+  name: z.string().min(1).optional(),
+  type: artifactTypeSchema.optional(),
+  title: z.string().nullable().optional(),
+  content: z.string().nullable().optional(),
+  uri: z.string().nullable().optional(),
+  locator: z.string().nullable().optional(),
+  mime_type: z.string().nullable().optional(),
+  integration_ref: z.record(z.unknown()).nullable().optional(),
+});
+
+// Link artifact to card
+export const linkArtifactSchema = z.object({
+  context_artifact_id: z.string().uuid(),
+  usage_hint: z.string().nullable().optional(),
+});
+
+// Knowledge item create
+const knowledgeItemCreateBase = z.object({
+  text: z.string().min(1),
+  status: knowledgeItemStatusSchema.optional(),
+  source: knowledgeItemSourceSchema,
+  confidence: z.number().min(0).max(1).nullable().optional(),
+  position: z.number().int().nonnegative().optional(),
+});
+
+export const createRequirementSchema = knowledgeItemCreateBase;
+export const createFactSchema = knowledgeItemCreateBase.extend({
+  evidence_source: z.string().nullable().optional(),
+});
+export const createAssumptionSchema = knowledgeItemCreateBase;
+export const createQuestionSchema = knowledgeItemCreateBase;
+
+// Knowledge item update
+export const updateKnowledgeItemSchema = z.object({
+  text: z.string().min(1).optional(),
+  status: knowledgeItemStatusSchema.optional(),
+  confidence: z.number().min(0).max(1).nullable().optional(),
+  position: z.number().int().nonnegative().optional(),
+});
+
+// Planned file create/update
+export const createPlannedFileSchema = z.object({
+  logical_file_name: z.string().min(1),
+  module_hint: z.string().nullable().optional(),
+  artifact_kind: plannedFileKindSchema,
+  action: plannedFileActionSchema,
+  intent_summary: z.string().min(1),
+  contract_notes: z.string().nullable().optional(),
+  status: plannedFileStatusSchema.optional(),
+  position: z.number().int().nonnegative().optional(),
+});
+
+export const updatePlannedFileSchema = z.object({
+  logical_file_name: z.string().min(1).optional(),
+  module_hint: z.string().nullable().optional(),
+  artifact_kind: plannedFileKindSchema.optional(),
+  action: plannedFileActionSchema.optional(),
+  intent_summary: z.string().min(1).optional(),
+  contract_notes: z.string().nullable().optional(),
+  status: plannedFileStatusSchema.optional(),
+  position: z.number().int().nonnegative().optional(),
+});
+
+export const approvePlannedFileSchema = z.object({
+  status: z.literal("approved"),
+});

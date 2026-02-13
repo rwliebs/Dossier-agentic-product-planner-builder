@@ -76,6 +76,24 @@ describe("Action Validation", () => {
       expect(errors.length).toBeGreaterThan(0);
       expect(errors[0].code).toBe("invalid_schema");
     });
+
+    it("rejects updateCard with null title, status, or priority", () => {
+      const action: PlanningAction = {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        project_id: projectId,
+        action_type: "updateCard",
+        target_ref: { card_id: cardId },
+        payload: {
+          title: null,
+          status: null,
+          priority: null,
+        },
+      };
+
+      const errors = validateActionSchema(action);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].code).toBe("invalid_schema");
+    });
   });
 
   describe("Referential Integrity", () => {
@@ -153,6 +171,7 @@ describe("Action Validation", () => {
         title: "Test Card",
         status: "todo",
         priority: 1,
+        position: 0,
       });
 
       state.contextArtifacts.set(artifactId, {

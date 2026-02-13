@@ -5,6 +5,4 @@
 
 export * from "./slice-a";
 export * from "./slice-b";
-
-// Future slices
-// export * from "./slice-c"; // execution, checks, approval, audit
+export * from "./slice-c";

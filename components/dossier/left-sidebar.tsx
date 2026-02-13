@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronUp, BookOpen, Bot, User, Send, Loader2, Github, Check, FolderOpen, Folder, FileCode, ChevronRight, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ChatPreviewPanel } from '@/components/dossier/chat-preview-panel';
 
 interface ProjectInfo {
   name: string;
@@ -30,13 +31,30 @@ interface FileNode {
   children?: FileNode[];
 }
 
+interface ChatPreviewResponse {
+  status: "success" | "error";
+  actions: Array<{ id: string; action_type: string; target_ref: unknown; payload: unknown }>;
+  preview: {
+    added: { workflows: string[]; activities: string[]; steps: string[]; cards: string[] };
+    modified: { cards: string[]; artifacts: string[] };
+    reordered: string[];
+    summary: string;
+  } | null;
+  errors?: Array<{ action: unknown; reason: string }>;
+  metadata?: { tokens: number; model: string };
+}
+
 interface LeftSidebarProps {
   isCollapsed: boolean;
   onToggle: (collapsed: boolean) => void;
   project: ProjectInfo;
+  /** When provided, chat uses planning LLM API. Required for real planning. */
+  projectId?: string;
   // Ideation/chat props
   isIdeationMode?: boolean;
   onIdeationComplete?: (request: string) => void;
+  /** Called when user accepts preview and actions are applied (map should refresh) */
+  onPlanningApplied?: () => void;
 }
 
 const initialQuestions: ClarifyingQuestion[] = [
@@ -86,7 +104,7 @@ function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: 
   );
 }
 
-export function LeftSidebar({ isCollapsed, onToggle, project, isIdeationMode = false, onIdeationComplete }: LeftSidebarProps) {
+export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeationMode = false, onIdeationComplete, onPlanningApplied }: LeftSidebarProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['overview', 'chat', 'github'])
   );
@@ -99,6 +117,12 @@ export function LeftSidebar({ isCollapsed, onToggle, project, isIdeationMode = f
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userIdea, setUserIdea] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Planning LLM state
+  const [pendingPreview, setPendingPreview] = useState<ChatPreviewResponse['preview'] | null>(null);
+  const [pendingActions, setPendingActions] = useState<ChatPreviewResponse['actions']>([]);
+  const [pendingErrors, setPendingErrors] = useState<ChatPreviewResponse['errors']>([]);
+  const [isApplying, setIsApplying] = useState(false);
   
   // GitHub state
   const [githubConnected, setGithubConnected] = useState(false);
@@ -123,12 +147,42 @@ export function LeftSidebar({ isCollapsed, onToggle, project, isIdeationMode = f
     setTimeout(() => addMessage('agent', initialQuestions[index].question), 400);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!input.trim()) return;
     const text = input.trim();
     addMessage('user', text);
     setInput('');
     setIsThinking(true);
+
+    if (projectId) {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text }),
+        });
+        const data = (await res.json()) as ChatPreviewResponse;
+        if (!res.ok) {
+          addMessage('agent', data.message ?? 'Planning service error. Try again.');
+          return;
+        }
+        setPendingActions(data.actions ?? []);
+        setPendingPreview(data.preview ?? null);
+        setPendingErrors(data.errors ?? []);
+        if (data.preview) {
+          addMessage('agent', data.preview.summary);
+        } else if (data.errors?.length) {
+          addMessage('agent', `${data.errors.length} action(s) could not be applied. Check the preview.`);
+        } else {
+          addMessage('agent', 'No changes suggested. Try rephrasing your request.');
+        }
+      } catch (e) {
+        addMessage('agent', 'Planning service unavailable. Check your connection.');
+      } finally {
+        setIsThinking(false);
+      }
+      return;
+    }
 
     if (phase === 'input') {
       setUserIdea(text);
@@ -145,6 +199,38 @@ export function LeftSidebar({ isCollapsed, onToggle, project, isIdeationMode = f
         setTimeout(() => askQuestion(currentQuestionIndex + 1), 400);
       }, 800);
     }
+  };
+
+  const handleAcceptPreview = async () => {
+    if (!projectId || pendingActions.length === 0) return;
+    setIsApplying(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/actions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actions: pendingActions }),
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'success') {
+        setPendingPreview(null);
+        setPendingActions([]);
+        setPendingErrors([]);
+        onPlanningApplied?.();
+        addMessage('agent', `Applied ${data.applied_count ?? pendingActions.length} change(s).`);
+      } else {
+        addMessage('agent', data.message ?? 'Failed to apply changes.');
+      }
+    } catch {
+      addMessage('agent', 'Failed to apply changes. Try again.');
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  const handleCancelPreview = () => {
+    setPendingPreview(null);
+    setPendingActions([]);
+    setPendingErrors([]);
   };
 
   const handleQuickAnswer = (answer: string) => {
@@ -295,6 +381,15 @@ export function LeftSidebar({ isCollapsed, onToggle, project, isIdeationMode = f
                   <div className="h-5 w-5 rounded-full bg-secondary flex items-center justify-center"><Bot className="h-2.5 w-2.5" /></div>
                   <div className="bg-secondary rounded px-2 py-1.5"><Loader2 className="h-3 w-3 animate-spin" /></div>
                 </div>
+              )}
+              {pendingPreview && (
+                <ChatPreviewPanel
+                  preview={pendingPreview}
+                  errors={pendingErrors}
+                  onAccept={handleAcceptPreview}
+                  onCancel={handleCancelPreview}
+                  isApplying={isApplying}
+                />
               )}
               <div ref={messagesEndRef} />
             </div>

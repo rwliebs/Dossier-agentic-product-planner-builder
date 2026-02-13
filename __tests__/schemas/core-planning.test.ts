@@ -59,6 +59,7 @@ describe("slice A schema contracts", () => {
       title: "Create story map card",
       status: "todo",
       priority: 1,
+      position: 0,
     });
 
     expect(card.status).toBe("todo");

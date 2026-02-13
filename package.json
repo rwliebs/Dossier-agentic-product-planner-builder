@@ -10,9 +10,11 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e:adaptive": "vitest run __tests__/e2e/adaptive-flows.test.ts",
+    "test:db": "vitest run __tests__/database/",
     "start": "next start"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.74.0",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",

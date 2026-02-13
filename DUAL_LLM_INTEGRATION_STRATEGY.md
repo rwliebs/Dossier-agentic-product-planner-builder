@@ -324,6 +324,7 @@ This schema is the implementation contract for Phase 1+ APIs, storage, and UI wi
   - `description` (text, nullable)
   - `status` (`card_status`, required)
   - `priority` (int, required)
+  - `position` (int, required)
   - `workflow_label_key` (text, nullable, fk `WorkflowLabel.key`)
   - `version_label_key` (text, nullable, fk `VersionLabel.key`)
   - `quick_answer` (text, nullable)

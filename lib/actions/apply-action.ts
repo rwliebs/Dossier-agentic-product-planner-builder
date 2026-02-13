@@ -181,6 +181,7 @@ function applyCreateCard(
     description: payload.description || null,
     status: payload.status,
     priority: payload.priority,
+    position: payload.position,
   });
 
   return { success: true, newState: state };
@@ -204,14 +205,15 @@ function applyUpdateCard(
     };
   }
 
+  // Use ?? so null/undefined are treated as "keep existing"; Card schema
+  // requires title, status, priority to be non-null.
   state.cards.set(target_ref.card_id, {
     ...card,
-    title: payload.title !== undefined ? payload.title : card.title,
+    title: payload.title ?? card.title,
     description:
       payload.description !== undefined ? payload.description : card.description,
-    status: payload.status !== undefined ? payload.status : card.status,
-    priority:
-      payload.priority !== undefined ? payload.priority : card.priority,
+    status: payload.status ?? card.status,
+    priority: payload.priority ?? card.priority,
   });
 
   return { success: true, newState: state };
@@ -237,6 +239,8 @@ function applyReorderCard(
 
   state.cards.set(target_ref.card_id, {
     ...card,
+    step_id: payload.new_step_id !== undefined ? payload.new_step_id : card.step_id,
+    position: payload.new_position,
   });
 
   return { success: true, newState: state };
@@ -323,10 +327,11 @@ function applyApproveCardPlannedFile(
     };
   }
 
-  files[fileIndex] = {
-    ...files[fileIndex],
-    status: payload.status,
-  };
+  // Immutable array update to preserve immutability contract with shallow clone
+  const updated = files.map((f, i) =>
+    i === fileIndex ? { ...f, status: payload.status } : f,
+  );
+  state.cardPlannedFiles.set(target_ref.card_id, updated);
 
   return { success: true, newState: state };
 }
@@ -448,35 +453,57 @@ function applySetCardKnowledgeStatus(
   const payload = action.payload as SetCardKnowledgeStatusPayload;
   const target_ref = action.target_ref as { card_id: string };
 
-  // Attempt to find and update the knowledge item in any of the lists
+  // Attempt to find and update the knowledge item in any of the lists.
+  // Use immutable array updates (new array + new object) to avoid mutating
+  // shared references from shallow clone, preserving the immutability contract.
   for (const [cardId, requirements] of state.cardRequirements) {
-    const item = requirements.find((r) => r.id === payload.knowledge_item_id);
-    if (item) {
-      item.status = payload.status;
+    const itemIndex = requirements.findIndex(
+      (r) => r.id === payload.knowledge_item_id,
+    );
+    if (itemIndex >= 0) {
+      const updated = requirements.map((r, i) =>
+        i === itemIndex ? { ...r, status: payload.status } : r,
+      );
+      state.cardRequirements.set(cardId, updated);
       return { success: true, newState: state };
     }
   }
 
   for (const [cardId, facts] of state.cardFacts) {
-    const item = facts.find((f) => f.id === payload.knowledge_item_id);
-    if (item) {
-      item.status = payload.status;
+    const itemIndex = facts.findIndex(
+      (f) => f.id === payload.knowledge_item_id,
+    );
+    if (itemIndex >= 0) {
+      const updated = facts.map((f, i) =>
+        i === itemIndex ? { ...f, status: payload.status } : f,
+      );
+      state.cardFacts.set(cardId, updated);
       return { success: true, newState: state };
     }
   }
 
   for (const [cardId, assumptions] of state.cardAssumptions) {
-    const item = assumptions.find((a) => a.id === payload.knowledge_item_id);
-    if (item) {
-      item.status = payload.status;
+    const itemIndex = assumptions.findIndex(
+      (a) => a.id === payload.knowledge_item_id,
+    );
+    if (itemIndex >= 0) {
+      const updated = assumptions.map((a, i) =>
+        i === itemIndex ? { ...a, status: payload.status } : a,
+      );
+      state.cardAssumptions.set(cardId, updated);
       return { success: true, newState: state };
     }
   }
 
   for (const [cardId, questions] of state.cardQuestions) {
-    const item = questions.find((q) => q.id === payload.knowledge_item_id);
-    if (item) {
-      item.status = payload.status;
+    const itemIndex = questions.findIndex(
+      (q) => q.id === payload.knowledge_item_id,
+    );
+    if (itemIndex >= 0) {
+      const updated = questions.map((q, i) =>
+        i === itemIndex ? { ...q, status: payload.status } : q,
+      );
+      state.cardQuestions.set(cardId, updated);
       return { success: true, newState: state };
     }
   }

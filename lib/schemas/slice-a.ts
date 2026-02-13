@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod";
 
 export const cardStatusSchema = z.enum([
   "todo",
@@ -81,6 +81,7 @@ export const cardSchema = z.object({
   description: z.string().nullable().optional(),
   status: cardStatusSchema,
   priority: z.number().int(),
+  position: z.number().int(),
 });
 
 export const planningActionSchema = z.object({

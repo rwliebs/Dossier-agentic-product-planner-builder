@@ -116,6 +116,91 @@ describe("Action Application (Mutations)", () => {
     });
   });
 
+  describe("Reorder Card", () => {
+    it("updates card position and step_id when reordering", () => {
+      initialState.activities.set(activityId, {
+        id: activityId,
+        workflow_id: workflowId,
+        title: "Planning",
+        position: 0,
+      });
+      initialState.steps.set(stepId, {
+        id: stepId,
+        workflow_activity_id: activityId,
+        title: "Step 1",
+        position: 0,
+      });
+      initialState.cards.set(cardId, {
+        id: cardId,
+        workflow_activity_id: activityId,
+        step_id: null,
+        title: "Card",
+        status: "todo",
+        priority: 1,
+        position: 0,
+      });
+
+      const action: PlanningAction = {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        project_id: projectId,
+        action_type: "reorderCard",
+        target_ref: { card_id: cardId },
+        payload: {
+          new_position: 2,
+          new_step_id: stepId,
+        },
+      };
+
+      const result = applyAction(action, initialState);
+      expect(result.success).toBe(true);
+
+      const reorderedCard = result.newState!.cards.get(cardId);
+      expect(reorderedCard!.position).toBe(2);
+      expect(reorderedCard!.step_id).toBe(stepId);
+    });
+
+    it("keeps step_id when new_step_id is omitted", () => {
+      initialState.activities.set(activityId, {
+        id: activityId,
+        workflow_id: workflowId,
+        title: "Planning",
+        position: 0,
+      });
+      initialState.steps.set(stepId, {
+        id: stepId,
+        workflow_activity_id: activityId,
+        title: "Step 1",
+        position: 0,
+      });
+      initialState.cards.set(cardId, {
+        id: cardId,
+        workflow_activity_id: activityId,
+        step_id: stepId,
+        title: "Card",
+        status: "todo",
+        priority: 1,
+        position: 0,
+      });
+
+      const action: PlanningAction = {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        project_id: projectId,
+        action_type: "reorderCard",
+        target_ref: { card_id: cardId },
+        payload: {
+          new_position: 1,
+        },
+      };
+
+      const result = applyAction(action, initialState);
+      expect(result.success).toBe(true);
+
+      const reorderedCard = result.newState!.cards.get(cardId);
+      expect(reorderedCard!.position).toBe(1);
+      expect(reorderedCard!.step_id).toBe(stepId);
+    });
+  });
+
   describe("Update Card", () => {
     it("updates card title and status", () => {
       initialState.cards.set(cardId, {
@@ -124,6 +209,7 @@ describe("Action Application (Mutations)", () => {
         title: "Old Title",
         status: "todo",
         priority: 1,
+        position: 0,
       });
 
       const action: PlanningAction = {
@@ -156,6 +242,7 @@ describe("Action Application (Mutations)", () => {
         title: "Design",
         status: "todo",
         priority: 1,
+        position: 0,
       });
 
       initialState.contextArtifacts.set(artifactId, {
@@ -194,6 +281,7 @@ describe("Action Application (Mutations)", () => {
         title: "Auth Component",
         status: "todo",
         priority: 1,
+        position: 0,
       });
 
       const action: PlanningAction = {
@@ -230,6 +318,7 @@ describe("Action Application (Mutations)", () => {
         title: "Auth",
         status: "todo",
         priority: 1,
+        position: 0,
       });
 
       initialState.cardPlannedFiles.set(cardId, [
@@ -274,6 +363,7 @@ describe("Action Application (Mutations)", () => {
         title: "API Design",
         status: "todo",
         priority: 1,
+        position: 0,
       });
 
       const action: PlanningAction = {
@@ -327,6 +417,86 @@ describe("Action Application (Mutations)", () => {
 
       const requirements = result.newState!.cardRequirements.get(cardId);
       expect(requirements![0].status).toBe("approved");
+    });
+
+    it("does not mutate original state when changing knowledge item status", () => {
+      const requirementId = "88888888-8888-4888-8888-888888888888";
+      const originalStatus = "draft";
+
+      initialState.cardRequirements.set(cardId, [
+        {
+          id: requirementId,
+          card_id: cardId,
+          text: "Support pagination",
+          status: originalStatus,
+          source: "user",
+          confidence: null,
+          position: 0,
+        },
+      ]);
+
+      const action: PlanningAction = {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        project_id: projectId,
+        action_type: "setCardKnowledgeStatus",
+        target_ref: { card_id: cardId },
+        payload: {
+          knowledge_item_id: requirementId,
+          status: "approved",
+        },
+      };
+
+      const result = applyAction(action, initialState);
+      expect(result.success).toBe(true);
+
+      // Original state must be unchanged (immutability)
+      const originalRequirements = initialState.cardRequirements.get(cardId);
+      expect(originalRequirements![0].status).toBe(originalStatus);
+    });
+
+    it("does not mutate original state when previewActionBatch runs setCardKnowledgeStatus", () => {
+      const requirementId = "88888888-8888-4888-8888-888888888888";
+      const originalStatus = "draft";
+
+      initialState.cards.set(cardId, {
+        id: cardId,
+        workflow_activity_id: activityId,
+        title: "API Design",
+        status: "todo",
+        priority: 1,
+        position: 0,
+      });
+
+      initialState.cardRequirements.set(cardId, [
+        {
+          id: requirementId,
+          card_id: cardId,
+          text: "Support pagination",
+          status: originalStatus,
+          source: "user",
+          confidence: null,
+          position: 0,
+        },
+      ]);
+
+      const action: PlanningAction = {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        project_id: projectId,
+        action_type: "setCardKnowledgeStatus",
+        target_ref: { card_id: cardId },
+        payload: {
+          knowledge_item_id: requirementId,
+          status: "approved",
+        },
+      };
+
+      const previews = previewActionBatch([action], initialState);
+      expect(previews).toBeDefined();
+      expect(previews!.length).toBe(1);
+
+      // Original state must be unchanged after dry-run preview (immutability contract)
+      const originalRequirements = initialState.cardRequirements.get(cardId);
+      expect(originalRequirements![0].status).toBe(originalStatus);
     });
   });
 });

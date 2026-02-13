@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod";
 import {
   cardStatusSchema,
   planningActionTypeSchema,
@@ -75,12 +75,13 @@ export const createCardTargetRefSchema = z.object({
 // ============================================================================
 // updateCard: Update card properties (title, description, status, priority)
 // ============================================================================
-
+// title, status, priority: optional (omit to keep current) but when provided
+// must be non-null to satisfy Card schema. description may be null to clear.
 export const updateCardPayloadSchema = z.object({
-  title: z.string().min(1).nullable().optional(),
+  title: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
-  status: cardStatusSchema.nullable().optional(),
-  priority: z.number().int().nonnegative().nullable().optional(),
+  status: cardStatusSchema.optional(),
+  priority: z.number().int().nonnegative().optional(),
 });
 
 export const updateCardTargetRefSchema = z.object({

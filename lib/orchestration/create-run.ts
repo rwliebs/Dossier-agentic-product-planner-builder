@@ -75,7 +75,7 @@ export async function createRun(
     // Validate run input against policy
     const inputValidation = validateRunInputAgainstPolicy(
       input.run_input_snapshot,
-      policy as { required_checks: string[]; forbidden_paths?: string[] | null }
+      policy
     );
     if (!inputValidation.valid) {
       return {

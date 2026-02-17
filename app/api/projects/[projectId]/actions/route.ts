@@ -1,7 +1,12 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getProject, getPlanningActionsByProject } from "@/lib/supabase/queries";
-import { applyAction } from "@/lib/supabase/mutations";
+import {
+  getProject,
+  getPlanningActionsByProject,
+  getPlanningActionsByIdempotencyKey,
+  incrementProjectActionSequence,
+} from "@/lib/supabase/queries";
+import { pipelineApply } from "@/lib/supabase/mutations";
 import {
   json,
   validationError,
@@ -10,7 +15,6 @@ import {
   internalError,
 } from "@/lib/api/response-helpers";
 import { submitActionsSchema } from "@/lib/validation/request-schema";
-import { TABLES } from "@/lib/supabase/queries";
 
 type RouteParams = { params: Promise<{ projectId: string }> };
 
@@ -55,60 +59,93 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return notFoundError("Project not found");
     }
 
-    const results: Array<{
-      id: string;
-      action_type: string;
-      validation_status: "accepted" | "rejected";
-      rejection_reason?: string;
-      applied_at?: string;
-    }> = [];
+    const idempotencyKey = (body as { idempotency_key?: string }).idempotency_key as
+      | string
+      | undefined;
+    const expectedSequence = (body as { expected_sequence?: number }).expected_sequence as
+      | number
+      | undefined;
 
-    for (const action of parsed.data.actions) {
-      const actionId = action.id ?? crypto.randomUUID();
-      const actionRecord = {
-        ...action,
-        id: actionId,
-        project_id: projectId,
-      };
-
-      const result = await applyAction(supabase, projectId, actionRecord);
-
-      const now = new Date().toISOString();
-      const validationStatus = result.applied ? "accepted" : "rejected";
-
-      const { error: insertError } = await supabase.from(TABLES.planning_actions).insert({
-        id: actionId,
-        project_id: projectId,
-        action_type: action.action_type,
-        target_ref: action.target_ref ?? {},
-        payload: action.payload ?? {},
-        validation_status: validationStatus,
-        rejection_reason: result.rejectionReason ?? null,
-        applied_at: result.applied ? now : null,
-      });
-
-      if (insertError) {
-        console.error("Failed to persist action record:", insertError);
-        return internalError("Failed to persist action");
-      }
-
-      results.push({
-        id: actionId,
-        action_type: action.action_type,
-        validation_status: validationStatus,
-        rejection_reason: result.rejectionReason,
-        applied_at: result.applied ? now : undefined,
-      });
-
-      if (!result.applied) {
-        return actionRejectedError(
-          result.rejectionReason ?? "Action rejected",
-          { [action.action_type]: [result.rejectionReason ?? "Unknown"] }
+    if (expectedSequence !== undefined) {
+      const currentSeq = (project as { action_sequence?: number }).action_sequence ?? 0;
+      if (currentSeq !== expectedSequence) {
+        return json(
+          {
+            error: "Concurrent modification",
+            message: `Expected action_sequence ${expectedSequence}, got ${currentSeq}`,
+            current_sequence: currentSeq,
+          },
+          409
         );
       }
     }
 
-    return json({ applied: results.length, results }, 201);
+    if (idempotencyKey) {
+      try {
+        const existing = await getPlanningActionsByIdempotencyKey(
+          supabase,
+          projectId,
+          idempotencyKey
+        );
+        if (existing.length > 0) {
+          return json(
+            {
+              applied: existing.filter((r) => r.validation_status === "accepted").length,
+              results: existing.map((r) => ({
+                id: r.id,
+                action_type: r.action_type,
+                validation_status: r.validation_status,
+                rejection_reason: r.rejection_reason,
+                applied_at: r.applied_at,
+              })),
+              idempotent: true,
+            },
+            200
+          );
+        }
+      } catch {
+        // idempotency_key column may not exist yet; proceed without idempotency
+      }
+    }
+
+    const result = await pipelineApply(supabase, projectId, parsed.data.actions, {
+      idempotencyKey,
+    });
+
+    if (result.failedAt !== undefined) {
+      const failed = result.results[result.failedAt];
+      return actionRejectedError(
+        result.rejectionReason ?? "Action rejected",
+        { [failed?.action_type ?? "unknown"]: [result.rejectionReason ?? "Unknown"] }
+      );
+    }
+
+    if (expectedSequence !== undefined) {
+      try {
+        const newSeq = await incrementProjectActionSequence(
+          supabase,
+          projectId,
+          expectedSequence
+        );
+        if (newSeq === null) {
+          return json(
+            {
+              error: "Concurrent modification",
+              message: "Sequence increment failed; another client may have applied",
+            },
+            409
+          );
+        }
+        return json(
+          { applied: result.applied, results: result.results, action_sequence: newSeq },
+          201
+        );
+      } catch {
+        // action_sequence column may not exist; return without it
+      }
+    }
+
+    return json({ applied: result.applied, results: result.results }, 201);
   } catch (err) {
     console.error("POST /api/projects/[projectId]/actions error:", err);
     return internalError();

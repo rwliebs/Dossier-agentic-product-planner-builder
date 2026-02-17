@@ -31,16 +31,28 @@ interface FileNode {
   children?: FileNode[];
 }
 
+function normalizePreviewErrors(
+  errs: string[] | Array<{ action: unknown; reason: string }> | undefined
+): Array<{ action: unknown; reason: string }> | undefined {
+  if (!errs?.length) return undefined;
+  const first = errs[0];
+  if (typeof first === 'object' && first !== null && 'reason' in first) {
+    return errs as Array<{ action: unknown; reason: string }>;
+  }
+  return (errs as string[]).map((msg) => ({ action: null as unknown, reason: msg }));
+}
+
 interface ChatPreviewResponse {
-  status: "success" | "error";
-  actions: Array<{ id: string; action_type: string; target_ref: unknown; payload: unknown }>;
-  preview: {
+  status?: "success" | "error";
+  message?: string;
+  actions?: Array<{ id: string; action_type: string; target_ref: unknown; payload: unknown }>;
+  preview?: {
     added: { workflows: string[]; activities: string[]; steps: string[]; cards: string[] };
     modified: { cards: string[]; artifacts: string[] };
     reordered: string[];
     summary: string;
   } | null;
-  errors?: Array<{ action: unknown; reason: string }>;
+  errors?: string[] | Array<{ action: unknown; reason: string }>;
   metadata?: { tokens: number; model: string };
 }
 
@@ -202,7 +214,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
   };
 
   const handleAcceptPreview = async () => {
-    if (!projectId || pendingActions.length === 0) return;
+    if (!projectId || !pendingActions?.length) return;
     setIsApplying(true);
     try {
       const res = await fetch(`/api/projects/${projectId}/actions`, {
@@ -216,7 +228,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
         setPendingActions([]);
         setPendingErrors([]);
         onPlanningApplied?.();
-        addMessage('agent', `Applied ${data.applied ?? pendingActions.length} change(s).`);
+        addMessage('agent', `Applied ${data.applied ?? (pendingActions?.length ?? 0)} change(s).`);
       } else {
         addMessage('agent', data.message ?? data.details?.validation?.[0] ?? 'Failed to apply changes.');
       }
@@ -385,7 +397,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
               {pendingPreview && (
                 <ChatPreviewPanel
                   preview={pendingPreview}
-                  errors={pendingErrors}
+                  errors={normalizePreviewErrors(pendingErrors)}
                   onAccept={handleAcceptPreview}
                   onCancel={handleCancelPreview}
                   isApplying={isApplying}

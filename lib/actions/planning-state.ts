@@ -4,6 +4,6 @@ export { createEmptyPlanningState, clonePlanningState } from "@/lib/schemas/plan
 export type { PlanningState, ValidationError, ValidationResult } from "@/lib/schemas/planning-state";
 export { validateAction } from "./validate-action";
 export { applyAction } from "./apply-action";
-export type { MutationResult, ImmutableMutationRecord } from "./apply-action";
+export type { MutationResult } from "./apply-action";
 export { previewAction, applyActionBatch, previewActionBatch } from "./preview-action";
 export type { PreviewDelta, BatchMutationResult } from "./preview-action";

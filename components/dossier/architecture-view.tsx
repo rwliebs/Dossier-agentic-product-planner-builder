@@ -1,32 +1,52 @@
 'use client';
 
+import { useMemo } from 'react';
 import { ArchitectureCanvas } from './architecture-canvas';
 import { ArchitectureLegend } from './architecture-legend';
-import type { Iteration, CodeFile } from './types';
+import type { MapSnapshot, EpicLike, CodeFile, MapCard, DataFlow } from '@/lib/types/ui';
+
+const EPIC_COLORS: EpicLike['color'][] = ['yellow', 'blue', 'purple', 'green', 'orange', 'pink'];
+
+function snapshotToEpics(snapshot: MapSnapshot): EpicLike[] {
+  return snapshot.workflows.map((wf, i) => ({
+    id: wf.id,
+    title: wf.title,
+    color: EPIC_COLORS[i % EPIC_COLORS.length],
+    activities: wf.activities.map((act) => ({
+      id: act.id,
+      epicId: wf.id,
+      title: act.title,
+      cards: [
+        ...act.steps.flatMap((s) => s.cards),
+        ...act.cards,
+      ].sort((a, b) => a.priority - b.priority),
+    })),
+  }));
+}
 
 interface ArchitectureViewProps {
-  iteration: Iteration;
+  snapshot: MapSnapshot;
   onUpdateFileDescription?: (fileId: string, description: string) => void;
   onFileClick?: (file: CodeFile) => void;
 }
 
-export function ArchitectureView({ 
-  iteration,
+export function ArchitectureView({
+  snapshot,
   onUpdateFileDescription,
   onFileClick,
 }: ArchitectureViewProps) {
-  const codeFiles = iteration.codeFiles || [];
-  const dataFlows = iteration.dataFlows || [];
-
-  // Flatten all cards from all epics
-  const allCards = iteration.epics.flatMap((epic) =>
-    epic.activities.flatMap((activity) => activity.cards)
+  const epics = useMemo(() => snapshotToEpics(snapshot), [snapshot]);
+  const codeFiles: CodeFile[] = []; // TODO: from snapshot or project when API provides
+  const dataFlows: DataFlow[] = [];
+  const allCards: MapCard[] = useMemo(
+    () => epics.flatMap((epic) => epic.activities.flatMap((a) => a.cards)),
+    [epics]
   );
 
   if (codeFiles.length === 0) {
     return (
       <div className="flex items-center justify-center h-96 text-muted-foreground">
-        <p>No architecture data available for this iteration.</p>
+        <p>No architecture data available.</p>
       </div>
     );
   }
@@ -38,7 +58,7 @@ export function ArchitectureView({
         codeFiles={codeFiles}
         dataFlows={dataFlows}
         cards={allCards}
-        epics={iteration.epics}
+        epics={epics}
         onUpdateFileDescription={onUpdateFileDescription}
         onFileClick={onFileClick}
       />

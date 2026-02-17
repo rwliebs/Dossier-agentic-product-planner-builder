@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -15,39 +15,23 @@ import {
   X,
   Copy,
   ExternalLink,
-  MessageSquare,
-  Bot,
-  User,
-  Send,
-  Loader2,
-  Sparkles,
+  Play,
 } from "lucide-react";
-import type { ContextDoc, CodeFile } from "./types";
-
-interface Message {
-  id: string;
-  role: 'user' | 'agent';
-  content: string;
-  timestamp: Date;
-}
+import type { ContextArtifact } from "@/lib/types/ui";
+import type { CodeFileForPanel } from "./implementation-card";
+import { useProjectFiles, type FileNode } from "@/lib/hooks/use-project-files";
+import { useOrchestrationRuns } from "@/lib/hooks/use-orchestration-runs";
+import { useRunDetail } from "@/lib/hooks/use-run-detail";
 
 interface RightPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  activeDoc: ContextDoc | null;
-  activeFile: CodeFile | null;
-  activeTab: "files" | "terminal" | "docs" | "chat";
-  onTabChange: (tab: "files" | "terminal" | "docs" | "chat") => void;
-  // Chat/ideation props
-  isIdeationMode?: boolean;
-  onIdeationComplete?: (request: string) => void;
-}
-
-interface FileNode {
-  name: string;
-  type: "file" | "folder";
-  children?: FileNode[];
-  path: string;
+  activeDoc: ContextArtifact | null;
+  activeFile: CodeFileForPanel | null;
+  activeTab: "files" | "terminal" | "docs" | "chat" | "runs";
+  onTabChange: (tab: "files" | "terminal" | "docs" | "chat" | "runs") => void;
+  /** When set, files tab shows live project file tree from planned files */
+  projectId?: string;
 }
 
 const mockFileTree: FileNode[] = [
@@ -99,18 +83,6 @@ const mockFileTree: FileNode[] = [
   { name: "tsconfig.json", type: "file", path: "/tsconfig.json" },
 ];
 
-const terminalLines = [
-  { type: "input", content: "$ npm run dev" },
-  { type: "output", content: "ready - started server on 0.0.0.0:3000" },
-  { type: "output", content: "info  - Loaded env from .env.local" },
-  { type: "input", content: "$ git status" },
-  { type: "output", content: "On branch main" },
-  { type: "output", content: "Changes not staged for commit:" },
-  { type: "output", content: "  modified:   src/components/Header.tsx" },
-  { type: "output", content: "  modified:   src/api/auth.ts" },
-  { type: "input", content: "$ _" },
-];
-
 function FileTreeNode({
   node,
   depth = 0,
@@ -160,6 +132,111 @@ function FileTreeNode({
   );
 }
 
+const statusBadgeClass: Record<string, string> = {
+  queued: "bg-slate-100 text-slate-700",
+  running: "bg-blue-100 text-blue-700",
+  completed: "bg-green-100 text-green-800",
+  failed: "bg-red-100 text-red-800",
+};
+
+interface RunDetailPanelProps {
+  runId: string;
+  projectId?: string;
+  runDetail: {
+    run: { status: string };
+    assignments: Array<{ id: string; card_id: string; status: string }>;
+    checks: Array<{ check_type: string; status: string }>;
+    approvals: Array<{ approval_type: string; status: string }>;
+  } | null;
+  detailLoading: boolean;
+  onApprove: (runId: string, type: "create_pr" | "merge_pr") => void;
+  onRetry: (runId: string) => void;
+}
+
+function RunDetailPanel({
+  runId,
+  projectId,
+  runDetail,
+  detailLoading,
+  onApprove,
+  onRetry,
+}: RunDetailPanelProps) {
+  const isForThisRun = runDetail?.run && (runDetail.run as { id?: string }).id === runId;
+  if (detailLoading || !runDetail || !isForThisRun) {
+    return (
+      <div className="mt-2 pt-2 border-t border-border text-[10px] text-muted-foreground">
+        Loading…
+      </div>
+    );
+  }
+  const { run, assignments, checks, approvals } = runDetail;
+  const allChecksPassed =
+    checks.length > 0 && checks.every((c) => c.status === "passed");
+  const hasCreatePrApproval = approvals.some(
+    (a) => a.approval_type === "create_pr" && a.status !== "rejected"
+  );
+  const hasMergeApproval = approvals.some(
+    (a) => a.approval_type === "merge_pr" && a.status !== "rejected"
+  );
+
+  return (
+    <div className="mt-2 pt-2 border-t border-border space-y-2">
+      <div className="text-[10px]">
+        <div className="font-mono text-muted-foreground mb-1">Assignments</div>
+        {assignments.map((a) => (
+          <div key={a.id} className="flex gap-2">
+            <span className="text-muted-foreground">{a.card_id.slice(0, 8)}…</span>
+            <span className={statusBadgeClass[a.status] ?? ""}>{a.status}</span>
+          </div>
+        ))}
+      </div>
+      <div className="text-[10px]">
+        <div className="font-mono text-muted-foreground mb-1">Checks</div>
+        {checks.map((c) => (
+          <div key={c.check_type} className="flex gap-2">
+            <span>{c.check_type}</span>
+            <span className={statusBadgeClass[c.status] ?? ""}>{c.status}</span>
+          </div>
+        ))}
+      </div>
+      {projectId && (
+        <div className="flex flex-wrap gap-1">
+          {run.status === "failed" && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 text-[10px]"
+              onClick={() => onRetry(runId)}
+            >
+              Retry
+            </Button>
+          )}
+          {allChecksPassed && !hasCreatePrApproval && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 text-[10px]"
+              onClick={() => onApprove(runId, "create_pr")}
+            >
+              Approve PR Creation
+            </Button>
+          )}
+          {allChecksPassed && hasCreatePrApproval && !hasMergeApproval && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 text-[10px]"
+              onClick={() => onApprove(runId, "merge_pr")}
+            >
+              Approve Merge
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function RightPanel({
   isOpen,
   onClose,
@@ -167,7 +244,51 @@ export function RightPanel({
   activeFile,
   activeTab,
   onTabChange,
+  projectId,
 }: RightPanelProps) {
+  const { data: projectFiles, loading: filesLoading } = useProjectFiles(projectId);
+  const { data: runs, loading: runsLoading } = useOrchestrationRuns(projectId, { limit: 20 });
+  const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+  const { data: runDetail, loading: detailLoading, refetch: refetchDetail } = useRunDetail(
+    projectId,
+    expandedRunId ?? undefined
+  );
+  const fileTree = projectFiles && projectFiles.length > 0 ? projectFiles : mockFileTree;
+
+  const handleApprove = useCallback(
+    async (runId: string, approvalType: "create_pr" | "merge_pr") => {
+      if (!projectId) return;
+      try {
+        const res = await fetch(`/api/projects/${projectId}/orchestration/approvals`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ run_id: runId, approval_type: approvalType, requested_by: "user" }),
+        });
+        if (res.ok) refetchDetail();
+      } catch {
+        /* ignore */
+      }
+    },
+    [projectId, refetchDetail]
+  );
+
+  const handleRetry = useCallback(
+    async (runId: string) => {
+      if (!projectId) return;
+      try {
+        const res = await fetch(`/api/projects/${projectId}/orchestration/runs/${runId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "queued" }),
+        });
+        if (res.ok) refetchDetail();
+      } catch {
+        /* ignore */
+      }
+    },
+    [projectId, refetchDetail]
+  );
+
   if (!isOpen) return null;
 
   return (
@@ -202,6 +323,15 @@ export function RightPanel({
             <FileText className="h-3 w-3 mr-1" />
             Docs
           </Button>
+          <Button
+            variant={activeTab === "runs" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 px-2.5 text-[10px] uppercase tracking-wider"
+            onClick={() => onTabChange("runs")}
+          >
+            <Play className="h-3 w-3 mr-1" />
+            Runs
+          </Button>
         </div>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClose}>
           <X className="h-3.5 w-3.5" />
@@ -217,11 +347,15 @@ export function RightPanel({
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
                   <GitBranch className="h-3 w-3" />
                   <span>main</span>
-                  <span className="text-foreground/40">•</span>
-                  <span>2 modified</span>
+                  {filesLoading && projectId && (
+                    <>
+                      <span className="text-foreground/40">•</span>
+                      <span>Loading…</span>
+                    </>
+                  )}
                 </div>
               </div>
-              {mockFileTree.map((node) => (
+              {fileTree.map((node) => (
                 <FileTreeNode key={node.path} node={node} />
               ))}
             </div>
@@ -239,22 +373,87 @@ export function RightPanel({
                 <div className="mt-4 text-green-400">$ _</div>
               </>
             ) : (
-              <>
-                {terminalLines.map((line, i) => (
-                  <div
-                    key={i}
-                    className={`leading-relaxed ${
-                      line.type === "input"
-                        ? "text-foreground"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {line.content}
-                  </div>
-                ))}
-              </>
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center text-muted-foreground">
+                  <Terminal className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-xs">Select a file to view code</p>
+                  <p className="text-[10px] mt-1 opacity-75">or run a build to see output</p>
+                </div>
+              </div>
             )}
           </div>
+        )}
+
+        {activeTab === "runs" && (
+          <ScrollArea className="h-full">
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-foreground">
+                  Build Runs
+                </h3>
+                {runsLoading && (
+                  <span className="text-[10px] text-muted-foreground">Loading…</span>
+                )}
+              </div>
+              {runs && runs.length > 0 ? (
+                <div className="space-y-2">
+                  {runs.map((run) => (
+                    <div
+                      key={run.id}
+                      className="border border-border rounded p-3 text-xs space-y-1"
+                    >
+                      <button
+                        type="button"
+                        className="w-full text-left"
+                        onClick={() =>
+                          setExpandedRunId(expandedRunId === run.id ? null : run.id)
+                        }
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[10px] text-muted-foreground">
+                            {run.id.slice(0, 8)}…
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded ${
+                              statusBadgeClass[run.status] ?? "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {run.status}
+                          </span>
+                        </div>
+                        <div className="text-muted-foreground">
+                          {run.scope} • {run.trigger_type}
+                        </div>
+                        {run.created_at && (
+                          <div className="text-[10px] text-muted-foreground">
+                            {new Date(run.created_at).toLocaleString()}
+                          </div>
+                        )}
+                      </button>
+                      {expandedRunId === run.id && (
+                        <RunDetailPanel
+                          runId={run.id}
+                          projectId={projectId}
+                          runDetail={runDetail}
+                          detailLoading={detailLoading}
+                          onApprove={handleApprove}
+                          onRetry={handleRetry}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Play className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-xs">No runs yet</p>
+                  <p className="text-[10px] mt-1 opacity-75">
+                    Trigger a build from a card or Build All
+                  </p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
         )}
 
         {activeTab === "docs" && (
@@ -263,7 +462,7 @@ export function RightPanel({
               <div className="p-4 space-y-3">
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h3 className="font-mono font-bold text-sm text-foreground">{activeDoc.title}</h3>
+                    <h3 className="font-mono font-bold text-sm text-foreground">{activeDoc.title ?? activeDoc.name}</h3>
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
                       {activeDoc.type}
                     </p>

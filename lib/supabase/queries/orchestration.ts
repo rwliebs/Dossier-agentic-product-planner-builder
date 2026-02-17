@@ -99,6 +99,19 @@ export async function getCardAssignment(
   return data;
 }
 
+export async function updateCardAssignmentStatus(
+  supabase: SupabaseClient,
+  assignmentId: string,
+  status: string
+) {
+  const { error } = await supabase
+    .from(ORCHESTRATION_TABLES.card_assignments)
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", assignmentId);
+
+  if (error) throw error;
+}
+
 export async function getRunChecksByRun(
   supabase: SupabaseClient,
   runId: string
@@ -181,4 +194,32 @@ export async function getPullRequestCandidate(
 
   if (error) throw error;
   return data;
+}
+
+export async function getAgentExecutionsByAssignment(
+  supabase: SupabaseClient,
+  assignmentId: string
+) {
+  const { data, error } = await supabase
+    .from(ORCHESTRATION_TABLES.agent_executions)
+    .select("*")
+    .eq("assignment_id", assignmentId)
+    .order("started_at", { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getAgentCommitsByAssignment(
+  supabase: SupabaseClient,
+  assignmentId: string
+) {
+  const { data, error } = await supabase
+    .from(ORCHESTRATION_TABLES.agent_commits)
+    .select("*")
+    .eq("assignment_id", assignmentId)
+    .order("committed_at", { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
 }

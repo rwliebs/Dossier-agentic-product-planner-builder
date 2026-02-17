@@ -1,87 +1,90 @@
 'use client';
 
 import { useState } from 'react';
-import { ActivityColumn } from './activity-column';
-import type { Epic, ContextDoc, CodeFile } from './types';
-import { MessageSquare, Bot, Clock } from 'lucide-react'; // Importing the undeclared variables
+import { ActivityColumn, type ActivityColumnProps } from './activity-column';
+import type { MapWorkflow, ContextArtifact, CardRequirement, CardKnownFact, CardAssumption, CardQuestion, CardPlannedFile } from '@/lib/types/ui';
+import type { CodeFileForPanel } from './implementation-card';
 
-interface StoryMapCanvasProps {
-  epics: Epic[];
-  projectContext: ContextDoc; // Declaring projectContext in the props
-  expandedCardId?: string | null;
-  onExpandCard?: (cardId: string | null) => void;
-  onCardAction?: (cardId: string, action: string) => void;
+export interface StoryMapCanvasProps {
+  workflows: MapWorkflow[];
+  expandedCardId: string | null;
+  onExpandCard: (cardId: string | null) => void;
+  onCardAction: (cardId: string, action: string) => void;
   onUpdateCardDescription?: (cardId: string, description: string) => void;
   onUpdateQuickAnswer?: (cardId: string, quickAnswer: string) => void;
-  onSelectDoc?: (doc: ContextDoc) => void;
-  onSelectFile?: (file: CodeFile) => void;
-  codeFiles?: CodeFile[];
+  onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
+  onBuildCard?: (cardId: string) => void;
+  onSelectDoc?: (doc: ContextArtifact) => void;
+  onSelectFile?: (file: CodeFileForPanel) => void;
+  codeFiles?: CodeFileForPanel[];
+  getCardKnowledge?: (cardId: string) => {
+    requirements?: CardRequirement[];
+    contextArtifacts?: ContextArtifact[];
+    plannedFiles?: CardPlannedFile[];
+    facts?: CardKnownFact[];
+    assumptions?: CardAssumption[];
+    questions?: CardQuestion[];
+    quickAnswer?: string | null;
+  } | undefined;
 }
 
 export function StoryMapCanvas({
-  epics,
-  projectContext, // Using the declared projectContext
+  workflows,
   expandedCardId: controlledExpandedCardId,
   onExpandCard: controlledOnExpandCard,
   onCardAction,
   onUpdateCardDescription,
   onUpdateQuickAnswer,
+  onApprovePlannedFile,
+  onBuildCard,
   onSelectDoc,
   onSelectFile,
   codeFiles,
+  getCardKnowledge,
 }: StoryMapCanvasProps) {
   const [uncontrolledExpandedCardId, setUncontrolledExpandedCardId] = useState<string | null>(null);
-
-  // Use controlled or uncontrolled state
   const expandedCardId = controlledExpandedCardId ?? uncontrolledExpandedCardId;
   const handleExpandCard = controlledOnExpandCard ?? setUncontrolledExpandedCardId;
 
-  const handleCardAction = (cardId: string, action: string) => {
-    onCardAction?.(cardId, action);
-  };
-
-  // Flatten all activities from all epics into a single horizontal flow
-  // Each activity knows which epic it belongs to for labeling
-  const allActivities = epics.flatMap((epic) =>
-    epic.activities.map((activity) => ({
-      ...activity,
-      epicTitle: epic.title,
-      epicId: epic.id,
+  const allActivities = workflows.flatMap((wf) =>
+    wf.activities.map((act) => ({
+      ...act,
+      workflowTitle: wf.title,
+      workflowId: wf.id,
     }))
   );
 
   return (
     <div className="flex-1 overflow-x-auto overflow-y-auto bg-background">
-      {/* Horizontal Flow Header - User Journey */}
       <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-3">
         <div className="flex items-center gap-3 text-xs font-mono">
           <span className="text-muted-foreground uppercase tracking-widest">User Journey</span>
           <span className="text-foreground">→</span>
         </div>
       </div>
-      
-      {/* Single Horizontal Row - All Activities */}
+
       <div className="flex gap-6 p-6 min-w-max">
         {allActivities.map((activity, index) => (
           <div key={activity.id} className="flex items-start gap-6">
             <div className="flex flex-col">
-              {/* Epic Label above activity */}
               <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-2 px-1">
-                {activity.epicTitle}
+                {(activity as { workflowTitle?: string }).workflowTitle}
               </div>
               <ActivityColumn
                 activity={activity}
                 expandedCardId={expandedCardId}
-                onExpandCard={handleExpandCard}
-                onCardAction={handleCardAction}
+                onExpandCard={(id) => handleExpandCard(id)}
+                onCardAction={onCardAction}
                 onUpdateCardDescription={onUpdateCardDescription}
                 onUpdateQuickAnswer={onUpdateQuickAnswer}
+                onApprovePlannedFile={onApprovePlannedFile}
+                onBuildCard={onBuildCard}
                 onSelectDoc={onSelectDoc}
                 onSelectFile={onSelectFile}
                 codeFiles={codeFiles}
+                getCardKnowledge={getCardKnowledge as ActivityColumnProps['getCardKnowledge']}
               />
             </div>
-            {/* Arrow between activities */}
             {index < allActivities.length - 1 && (
               <div className="flex items-center h-24 text-muted-foreground/50">
                 <span className="text-lg">→</span>

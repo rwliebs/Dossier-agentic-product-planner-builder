@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
-import { planningActionSchema } from "@/lib/schemas/slice-a";
+import { planningActionTypeSchema, planningActionSchema } from "@/lib/schemas/slice-a";
 
 export interface ParseResult {
   actions: PlanningAction[];
@@ -85,7 +85,10 @@ function normalizeAction(obj: Record<string, unknown>): PlanningAction {
       : typeof targetRef.project_id === "string"
         ? targetRef.project_id
         : "";
-  const action_type = obj.action_type as string;
+  const rawActionType = obj.action_type as string;
+  const action_type = planningActionTypeSchema.safeParse(rawActionType).success
+    ? (rawActionType as PlanningAction["action_type"])
+    : "updateCard"; // fallback for unknown types
   const payload = (obj.payload ?? {}) as Record<string, unknown>;
 
   return {

@@ -113,8 +113,8 @@ function applyCreateWorkflow(
   action: PlanningAction,
   state: PlanningState,
 ): MutationResult {
-  const payload = action.payload as CreateWorkflowPayload;
-  const workflowId = uuidv4();
+  const payload = action.payload as CreateWorkflowPayload & { id?: string };
+  const workflowId = payload.id ?? uuidv4();
 
   state.workflows.set(workflowId, {
     id: workflowId,
@@ -132,9 +132,9 @@ function applyCreateActivity(
   action: PlanningAction,
   state: PlanningState,
 ): MutationResult {
-  const payload = action.payload as CreateActivityPayload;
+  const payload = action.payload as CreateActivityPayload & { id?: string };
   const target_ref = action.target_ref as { workflow_id: string };
-  const activityId = uuidv4();
+  const activityId = payload.id ?? uuidv4();
 
   state.activities.set(activityId, {
     id: activityId,
@@ -151,9 +151,9 @@ function applyCreateStep(
   action: PlanningAction,
   state: PlanningState,
 ): MutationResult {
-  const payload = action.payload as CreateStepPayload;
+  const payload = action.payload as CreateStepPayload & { id?: string };
   const target_ref = action.target_ref as { workflow_activity_id: string };
-  const stepId = uuidv4();
+  const stepId = payload.id ?? uuidv4();
 
   state.steps.set(stepId, {
     id: stepId,
@@ -169,9 +169,9 @@ function applyCreateCard(
   action: PlanningAction,
   state: PlanningState,
 ): MutationResult {
-  const payload = action.payload as CreateCardPayload;
+  const payload = action.payload as CreateCardPayload & { id?: string };
   const target_ref = action.target_ref as { workflow_activity_id: string };
-  const cardId = uuidv4();
+  const cardId = payload.id ?? uuidv4();
 
   state.cards.set(cardId, {
     id: cardId,
@@ -214,6 +214,8 @@ function applyUpdateCard(
       payload.description !== undefined ? payload.description : card.description,
     status: payload.status ?? card.status,
     priority: payload.priority ?? card.priority,
+    quick_answer:
+      payload.quick_answer !== undefined ? payload.quick_answer : card.quick_answer,
   });
 
   return { success: true, newState: state };

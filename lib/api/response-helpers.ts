@@ -14,7 +14,7 @@ const HTTP_STATUS: Record<ApiErrorCode, number> = {
 };
 
 export function json<T>(data: T, status = 200): Response {
-  return Response.json(data, {
+  return new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json",
@@ -33,7 +33,7 @@ export function errorResponse(
     message,
     ...(details && { details }),
   };
-  return Response.json(body, {
+  return new Response(JSON.stringify(body), {
     status,
     headers: {
       "Content-Type": "application/json",

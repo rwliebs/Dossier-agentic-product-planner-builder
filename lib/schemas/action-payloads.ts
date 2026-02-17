@@ -82,6 +82,7 @@ export const updateCardPayloadSchema = z.object({
   description: z.string().nullable().optional(),
   status: cardStatusSchema.optional(),
   priority: z.number().int().nonnegative().optional(),
+  quick_answer: z.string().nullable().optional(),
 });
 
 export const updateCardTargetRefSchema = z.object({

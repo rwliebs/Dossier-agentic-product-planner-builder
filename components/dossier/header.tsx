@@ -7,9 +7,11 @@ interface DossierHeaderProps {
   viewMode: 'functionality' | 'architecture';
   onViewModeChange: (mode: 'functionality' | 'architecture') => void;
   agentStatus: 'idle' | 'building' | 'reviewing';
+  onBuildAll?: (workflowId: string) => void;
+  firstWorkflowId?: string | null;
 }
 
-export function Header({ viewMode, onViewModeChange, agentStatus }: DossierHeaderProps) {
+export function Header({ viewMode, onViewModeChange, agentStatus, onBuildAll, firstWorkflowId }: DossierHeaderProps) {
   const statusColors = {
     idle: 'text-muted-foreground',
     building: 'text-green-400 animate-pulse',
@@ -71,10 +73,15 @@ export function Header({ viewMode, onViewModeChange, agentStatus }: DossierHeade
             <Button variant="outline" size="sm" className="h-8 gap-2 bg-transparent">
               <Settings className="h-3 w-3" />
             </Button>
-            <Button className="h-8 gap-2 bg-primary text-primary-foreground">
-              <Zap className="h-3 w-3" />
-              <span className="text-xs uppercase tracking-widest font-mono">Build All</span>
-            </Button>
+            {onBuildAll && firstWorkflowId && (
+              <Button
+                className="h-8 gap-2 bg-primary text-primary-foreground"
+                onClick={() => onBuildAll(firstWorkflowId)}
+              >
+                <Zap className="h-3 w-3" />
+                <span className="text-xs uppercase tracking-widest font-mono">Build All</span>
+              </Button>
+            )}
           </div>
         </div>
       </div>

@@ -28,6 +28,7 @@ export interface MapCard {
   description: string | null;
   status: string;
   priority: number;
+  quick_answer?: string | null;
   build_state: string | null;
   last_built_at: string | null;
   last_build_ref: string | null;
@@ -140,6 +141,7 @@ function normalizeCard(row: Record<string, unknown>): MapCard {
     description: (row.description as string) ?? null,
     status: row.status as string,
     priority: (row.priority as number) ?? 0,
+    quick_answer: (row.quick_answer as string) ?? null,
     build_state: (row.build_state as string) ?? null,
     last_built_at: (row.last_built_at as string) ?? null,
     last_build_ref: (row.last_build_ref as string) ?? null,

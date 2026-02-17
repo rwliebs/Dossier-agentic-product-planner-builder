@@ -36,6 +36,30 @@ export async function getProject(
   return data;
 }
 
+/**
+ * Increment project action_sequence iff current value matches expected.
+ * Returns new sequence or null if mismatch (concurrent modification).
+ */
+export async function incrementProjectActionSequence(
+  supabase: SupabaseClient,
+  projectId: string,
+  expectedSequence: number
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from(TABLES.projects)
+    .update({
+      action_sequence: expectedSequence + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", projectId)
+    .eq("action_sequence", expectedSequence)
+    .select("action_sequence")
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? (data.action_sequence as number) : null;
+}
+
 export async function listProjects(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from(TABLES.projects)
@@ -128,6 +152,23 @@ export async function getPlanningActionsByProject(
     .eq("project_id", projectId)
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Check idempotency: return existing results if this key was already processed. */
+export async function getPlanningActionsByIdempotencyKey(
+  supabase: SupabaseClient,
+  projectId: string,
+  idempotencyKey: string
+) {
+  const { data, error } = await supabase
+    .from(TABLES.planning_actions)
+    .select("id, action_type, validation_status, rejection_reason, applied_at")
+    .eq("project_id", projectId)
+    .eq("idempotency_key", idempotencyKey)
+    .order("created_at", { ascending: true });
 
   if (error) throw error;
   return data ?? [];
@@ -289,4 +330,34 @@ export async function getCardIdsByWorkflow(
   }
 
   return [...new Set(cardIds)];
+}
+
+/** Get all card IDs in a project (for project-scope queries). */
+export async function getCardIdsByProject(
+  supabase: SupabaseClient,
+  projectId: string
+): Promise<string[]> {
+  const workflows = await getWorkflowsByProject(supabase, projectId);
+  const cardIds: string[] = [];
+  for (const wf of workflows) {
+    const ids = await getCardIdsByWorkflow(supabase, wf.id);
+    cardIds.push(...ids);
+  }
+  return [...new Set(cardIds)];
+}
+
+/** Get all planned files for a project (across all cards). */
+export async function getPlannedFilesByProject(
+  supabase: SupabaseClient,
+  projectId: string
+) {
+  const cardIds = await getCardIdsByProject(supabase, projectId);
+  if (cardIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from(TABLES.card_planned_files)
+    .select("*")
+    .in("card_id", cardIds)
+    .order("position", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
 }

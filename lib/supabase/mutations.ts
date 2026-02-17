@@ -33,6 +33,90 @@ export interface ApplyResult {
   rejectionReason?: string;
 }
 
+export interface PipelineApplyResult {
+  applied: number;
+  results: Array<{
+    id: string;
+    action_type: string;
+    validation_status: "accepted" | "rejected";
+    rejection_reason?: string;
+    applied_at?: string;
+  }>;
+  failedAt?: number;
+  rejectionReason?: string;
+}
+
+/**
+ * Single entry point for applying a batch of actions.
+ * Applies actions sequentially; returns on first rejection.
+ * For transactional apply with rollback, use pipelineApplyTransactional when DATABASE_URL is set.
+ */
+export async function pipelineApply(
+  supabase: SupabaseClient,
+  projectId: string,
+  actions: ActionInput[],
+  options?: { idempotencyKey?: string }
+): Promise<PipelineApplyResult> {
+  const results: PipelineApplyResult["results"] = [];
+  const now = new Date().toISOString();
+
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i];
+    const actionId = action.id ?? crypto.randomUUID();
+    const actionRecord = {
+      ...action,
+      id: actionId,
+      project_id: projectId,
+    };
+
+    const result = await applyAction(supabase, projectId, actionRecord);
+    const validationStatus = result.applied ? "accepted" : "rejected";
+
+    const insertPayload: Record<string, unknown> = {
+      id: actionId,
+      project_id: projectId,
+      action_type: action.action_type,
+      target_ref: action.target_ref ?? {},
+      payload: action.payload ?? {},
+      validation_status: validationStatus,
+      rejection_reason: result.rejectionReason ?? null,
+      applied_at: result.applied ? now : null,
+    };
+    if (options?.idempotencyKey) {
+      insertPayload.idempotency_key = options.idempotencyKey;
+    }
+    const { error: insertError } = await supabase.from(TABLES.planning_actions).insert(insertPayload);
+
+    if (insertError) {
+      return {
+        applied: results.length,
+        results,
+        failedAt: i,
+        rejectionReason: `Failed to persist action record: ${insertError.message}`,
+      };
+    }
+
+    results.push({
+      id: actionId,
+      action_type: action.action_type,
+      validation_status: validationStatus,
+      rejection_reason: result.rejectionReason,
+      applied_at: result.applied ? now : undefined,
+    });
+
+    if (!result.applied) {
+      return {
+        applied: results.length - 1,
+        results,
+        failedAt: i,
+        rejectionReason: result.rejectionReason ?? "Action rejected",
+      };
+    }
+  }
+
+  return { applied: results.length, results };
+}
+
 const CODE_GEN_PATTERNS = [
   /generate\s+code/i,
   /write\s+code/i,
@@ -284,6 +368,7 @@ async function applyUpdateCard(
   if (action.payload.description !== undefined) updates.description = action.payload.description;
   if (action.payload.status !== undefined) updates.status = action.payload.status;
   if (action.payload.priority !== undefined) updates.priority = action.payload.priority;
+  if (action.payload.quick_answer !== undefined) updates.quick_answer = action.payload.quick_answer;
 
   if (Object.keys(updates).length === 0) {
     return { applied: true };

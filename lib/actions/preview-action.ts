@@ -86,7 +86,7 @@ export function previewAction(
       delta.updated_ids.push(
         (action.target_ref as Record<string, unknown>).card_id as string,
       );
-      delta.summary = `${action.payload.item_type}: ${action.payload.text.substring(0, 50)}...`;
+      delta.summary = `${action.payload.item_type}: ${String((action.payload as { text?: string }).text ?? '').substring(0, 50)}...`;
       break;
 
     case "setCardKnowledgeStatus":

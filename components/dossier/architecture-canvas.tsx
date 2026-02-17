@@ -2,13 +2,13 @@
 
 import { useCallback, useMemo } from 'react';
 import { FileNode } from './file-node';
-import type { CodeFile, DataFlow, Card, CardStatus, EpicColor, Epic } from './types';
+import type { CodeFile, DataFlow, MapCard, CardStatus, EpicColor, EpicLike } from '@/lib/types/ui';
 
 interface ArchitectureCanvasProps {
   codeFiles: CodeFile[];
   dataFlows: DataFlow[];
-  cards: Card[];
-  epics: Epic[];
+  cards: MapCard[];
+  epics: EpicLike[];
   onUpdateFileDescription?: (fileId: string, description: string) => void;
   onFileClick?: (file: CodeFile) => void;
 }
@@ -30,13 +30,13 @@ export function ArchitectureCanvas({
   const cardMetadataMap = useMemo(() => {
     const map = new Map<
       string,
-      { status: CardStatus; epicColor?: EpicColor }
+      { status: CardStatus | string; epicColor?: EpicColor }
     >();
 
     epics.forEach((epic) => {
       epic.activities.forEach((activity) => {
         activity.cards.forEach((card) => {
-          map.set(card.id, { status: card.status, epicColor: epic.color });
+          map.set(card.id, { status: card.status as CardStatus, epicColor: epic.color });
         });
       });
     });
@@ -168,12 +168,17 @@ export function ArchitectureCanvas({
         {/* Render file nodes */}
         {codeFiles.map((file) => {
           const position = filePositions[file.id];
+          const CARD_STATUSES: CardStatus[] = ['todo', 'active', 'questions', 'review', 'production'];
           const statuses = file.cardIds
-            .map((cardId) => ({
-              cardId,
-              status: cardMetadataMap.get(cardId)?.status || 'todo',
-              epicColor: cardMetadataMap.get(cardId)?.epicColor,
-            }))
+            .map((cardId) => {
+              const raw = cardMetadataMap.get(cardId)?.status || 'todo';
+              const status = CARD_STATUSES.includes(raw as CardStatus) ? (raw as CardStatus) : 'todo';
+              return {
+                cardId,
+                status,
+                epicColor: cardMetadataMap.get(cardId)?.epicColor,
+              };
+            })
             .filter((s) => s);
 
           return (

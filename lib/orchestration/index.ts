@@ -46,3 +46,16 @@ export {
   type ResolvePullRequestCandidateInput,
   type ResolvePullRequestCandidateResult,
 } from "./resolve-pull-request-candidate";
+export {
+  createAgenticFlowClient,
+  createMockAgenticFlowClient,
+  type AgenticFlowClient,
+  type DispatchPayload,
+  type DispatchResult,
+  type ExecutionStatus,
+} from "./agentic-flow-client";
+export { dispatchAssignment, type DispatchAssignmentInput, type DispatchAssignmentResult } from "./dispatch";
+export { logEvent, type LogEventInput, type EventType } from "./event-logger";
+export { processWebhook, type WebhookPayload, type WebhookEventType } from "./process-webhook";
+export { triggerBuild, type TriggerBuildInput, type TriggerBuildResult } from "./trigger-build";
+export { executeRequiredChecks } from "./execute-checks";

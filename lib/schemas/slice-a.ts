@@ -82,6 +82,7 @@ export const cardSchema = z.object({
   status: cardStatusSchema,
   priority: z.number().int(),
   position: z.number().int(),
+  quick_answer: z.string().nullable().optional(),
 });
 
 export const planningActionSchema = z.object({
@@ -97,4 +98,5 @@ export type Workflow = z.infer<typeof workflowSchema>;
 export type WorkflowActivity = z.infer<typeof workflowActivitySchema>;
 export type Step = z.infer<typeof stepSchema>;
 export type Card = z.infer<typeof cardSchema>;
+export type CardStatus = z.infer<typeof cardStatusSchema>;
 export type PlanningAction = z.infer<typeof planningActionSchema>;

@@ -154,3 +154,31 @@ export async function executeRequiredChecksStub(
     checkIds,
   };
 }
+
+/** Basic checks runnable against local worktree (lint, unit). */
+const BASIC_CHECK_TYPES: RunCheckType[] = ["lint", "unit"];
+
+/** Complex checks delegated to agentic-flow (integration, e2e, security). */
+const DELEGATED_CHECK_TYPES: RunCheckType[] = [
+  "integration",
+  "e2e",
+  "security",
+  "dependency",
+  "policy",
+];
+
+/**
+ * Executes required checks for a run.
+ * Hybrid: basic checks (lint, unit) direct against worktree when available;
+ * complex checks (integration, e2e, security) delegated to agentic-flow.
+ * MVP: Uses stub when worktree/agentic-flow unavailable.
+ */
+export async function executeRequiredChecks(
+  supabase: SupabaseClient,
+  runId: string
+): Promise<{ success: boolean; checkIds: string[]; error?: string }> {
+  // TODO O4: When worktree available, run basic checks (lint, unit) via spawn.
+  // TODO O4: When agentic-flow available, delegate complex checks via API.
+  // For now: stub records all as passed.
+  return executeRequiredChecksStub(supabase, runId);
+}

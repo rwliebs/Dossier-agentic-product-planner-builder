@@ -4,7 +4,7 @@ import { useState } from 'react';
 import React from "react"
 
 import { FileText, Code, Zap, Package, Edit2, Check, X } from 'lucide-react';
-import type { CodeFile, CardStatus, EpicColor } from './types';
+import type { CodeFile, CardStatus, EpicColor } from '@/lib/types/ui';
 
 interface FileNodeProps {
   file: CodeFile;

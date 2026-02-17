@@ -1,20 +1,16 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ImplementationCard } from "@/components/dossier/implementation-card";
-import type { Card } from "@/components/dossier/types";
+import type { MapCard } from "@/lib/types/ui";
 
-const card: Card = {
+const card: MapCard = {
   id: "card-1",
-  activityId: "activity-1",
+  workflow_activity_id: "activity-1",
+  step_id: null,
   title: "Lead intake form",
   description: "Capture name and phone",
   status: "active",
   priority: 1,
-  contextDocs: [],
-  requirements: ["Validation"],
-  knownFacts: [],
-  assumptions: [],
-  questions: [],
 };
 
 describe("ImplementationCard", () => {
@@ -29,7 +25,6 @@ describe("ImplementationCard", () => {
         onExpand={onExpand}
         onAction={onAction}
         onUpdateDescription={() => {}}
-        onUpdateQuickAnswer={() => {}}
       />,
     );
 

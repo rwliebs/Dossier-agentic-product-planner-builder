@@ -4,6 +4,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createCardAssignmentInputSchema } from "@/lib/schemas/slice-c";
+import { TABLES } from "@/lib/supabase/queries";
 import {
   getOrchestrationRun,
   getSystemPolicyProfileByProject,
@@ -53,7 +54,7 @@ export async function createAssignment(
 
     // Fetch project for default_branch check
     const { data: project } = await supabase
-      .from("projects")
+      .from(TABLES.projects)
       .select("default_branch")
       .eq("id", run.project_id)
       .maybeSingle();

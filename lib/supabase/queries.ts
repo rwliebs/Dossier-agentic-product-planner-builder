@@ -5,20 +5,21 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** Singular table names (strategy-aligned schema). */
 export const TABLES = {
-  projects: "projects",
-  workflows: "workflows",
-  workflow_activities: "workflow_activities",
-  steps: "steps",
-  cards: "cards",
-  context_artifacts: "context_artifacts",
-  card_context_artifacts: "card_context_artifacts",
-  card_requirements: "card_requirements",
-  card_known_facts: "card_known_facts",
-  card_assumptions: "card_assumptions",
-  card_questions: "card_questions",
-  card_planned_files: "card_planned_files",
-  planning_actions: "planning_actions",
+  projects: "project",
+  workflows: "workflow",
+  workflow_activities: "workflow_activity",
+  steps: "step",
+  cards: "card",
+  context_artifacts: "context_artifact",
+  card_context_artifacts: "card_context_artifact",
+  card_requirements: "card_requirement",
+  card_known_facts: "card_known_fact",
+  card_assumptions: "card_assumption",
+  card_questions: "card_question",
+  card_planned_files: "card_planned_file",
+  planning_actions: "planning_action",
 } as const;
 
 export async function getProject(

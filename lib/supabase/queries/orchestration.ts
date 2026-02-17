@@ -4,16 +4,17 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** Singular table names (strategy-aligned schema). */
 export const ORCHESTRATION_TABLES = {
-  system_policy_profiles: "system_policy_profiles",
-  orchestration_runs: "orchestration_runs",
-  card_assignments: "card_assignments",
-  agent_executions: "agent_executions",
-  agent_commits: "agent_commits",
-  run_checks: "run_checks",
-  pull_request_candidates: "pull_request_candidates",
-  approval_requests: "approval_requests",
-  event_logs: "event_logs",
+  system_policy_profiles: "system_policy_profile",
+  orchestration_runs: "orchestration_run",
+  card_assignments: "card_assignment",
+  agent_executions: "agent_execution",
+  agent_commits: "agent_commit",
+  run_checks: "run_check",
+  pull_request_candidates: "pull_request_candidate",
+  approval_requests: "approval_request",
+  event_logs: "event_log",
 } as const;
 
 export async function getSystemPolicyProfileByProject(

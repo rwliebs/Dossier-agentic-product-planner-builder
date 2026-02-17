@@ -17,16 +17,16 @@ async function isServerAvailable(): Promise<boolean> {
 
 describe("map snapshot API contract", () => {
   it("returns 404 for non-existent project", async () => {
+    if (!(await isServerAvailable())) return;
     const response = await fetch(
       `${BASE_URL}/api/projects/00000000-0000-0000-0000-000000000000/map`
     );
-    if (!(await isServerAvailable())) return;
     expect(response.status).toBe(404);
   });
 
   it("returns map structure for existing project", async () => {
-    const listRes = await fetch(`${BASE_URL}/api/projects`);
-    if (!listRes.ok || !listRes.headers.get("content-type")?.includes("application/json"))
+    const listRes = await fetch(`${BASE_URL}/api/projects`).catch(() => null);
+    if (!listRes?.ok || !listRes?.headers.get("content-type")?.includes("application/json"))
       return;
     const projects = await listRes.json();
     if (!Array.isArray(projects) || projects.length === 0) return;

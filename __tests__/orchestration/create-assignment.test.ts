@@ -22,7 +22,7 @@ describe("createAssignment", () => {
 
   it("returns error when feature_branch equals default_branch", async () => {
     const mockFrom = vi.fn((table: string) => {
-      if (table === "projects") {
+      if (table === "project") {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
@@ -55,7 +55,7 @@ describe("createAssignment", () => {
 
   it("returns error when allowed_paths is empty", async () => {
     const mockFrom = vi.fn((table: string) => {
-      if (table === "projects") {
+      if (table === "project") {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({

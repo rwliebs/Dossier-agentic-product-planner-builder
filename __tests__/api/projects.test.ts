@@ -49,8 +49,8 @@ describe("projects API contract", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "" }),
-    });
-    if (shouldSkip(response)) return;
+    }).catch(() => null);
+    if (!response || shouldSkip(response)) return;
     expect(response.status).toBe(400);
   });
 });

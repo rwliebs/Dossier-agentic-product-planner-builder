@@ -122,10 +122,58 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
   const [pendingActions, setPendingActions] = useState<ChatPreviewResponse['actions']>([]);
   const [pendingErrors, setPendingErrors] = useState<ChatPreviewResponse['errors']>([]);
   const [isApplying, setIsApplying] = useState(false);
+  const [restoredFromStorage, setRestoredFromStorage] = useState(false);
 
-  // Streaming / two-phase state
-  const [populateConfirmWorkflowIds, setPopulateConfirmWorkflowIds] = useState<string[] | null>(null);
-  const [populateOriginalMessage, setPopulateOriginalMessage] = useState<string>('');
+  // Streaming / two-phase state — persisted so a page refresh between scaffold and populate doesn't lose the confirmation
+  const populateStorageKey = projectId ? `dossier_populate_confirm_${projectId}` : null;
+
+  const [populateConfirmWorkflowIds, setPopulateConfirmWorkflowIdsRaw] = useState<string[] | null>(() => {
+    if (typeof window === 'undefined' || !projectId) return null;
+    try {
+      const raw = localStorage.getItem(`dossier_populate_confirm_${projectId}`);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { ids: string[]; message: string };
+      return Array.isArray(parsed.ids) ? parsed.ids : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [populateOriginalMessage, setPopulateOriginalMessageRaw] = useState<string>(() => {
+    if (typeof window === 'undefined' || !projectId) return '';
+    try {
+      const raw = localStorage.getItem(`dossier_populate_confirm_${projectId}`);
+      if (!raw) return '';
+      const parsed = JSON.parse(raw) as { ids: string[]; message: string };
+      return typeof parsed.message === 'string' ? parsed.message : '';
+    } catch {
+      return '';
+    }
+  });
+
+  const setPopulateConfirmWorkflowIds = useCallback((ids: string[] | null) => {
+    setPopulateConfirmWorkflowIdsRaw(ids);
+    if (!populateStorageKey) return;
+    if (ids === null) {
+      localStorage.removeItem(populateStorageKey);
+    }
+    // storage is written together with setPopulateOriginalMessage
+  }, [populateStorageKey]);
+
+  const setPopulateOriginalMessage = useCallback((message: string) => {
+    setPopulateOriginalMessageRaw(message);
+  }, []);
+
+  // Sync both fields to localStorage whenever either changes
+  useEffect(() => {
+    if (!populateStorageKey) return;
+    if (populateConfirmWorkflowIds === null) {
+      localStorage.removeItem(populateStorageKey);
+    } else {
+      localStorage.setItem(populateStorageKey, JSON.stringify({ ids: populateConfirmWorkflowIds, message: populateOriginalMessage }));
+    }
+  }, [populateConfirmWorkflowIds, populateOriginalMessage, populateStorageKey]);
+
   const [isPopulating, setIsPopulating] = useState(false);
   const [populateProgress, setPopulateProgress] = useState<{ current: number; total: number; workflowTitle?: string } | null>(null);
   
@@ -136,6 +184,23 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
   const [draftDesc, setDraftDesc] = useState(project.description ?? '');
   const nameInputRef = useRef<HTMLInputElement>(null);
   const descInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // If populateConfirmWorkflowIds was restored from localStorage (page refresh between scaffold and populate),
+  // synthesize the preview panel so the user can still click Accept.
+  useEffect(() => {
+    if (restoredFromStorage) return;
+    setRestoredFromStorage(true);
+    if (populateConfirmWorkflowIds?.length && pendingPreview === null) {
+      const wfIds = populateConfirmWorkflowIds;
+      setPendingPreview({
+        added: { workflows: wfIds, activities: [], steps: [], cards: [] },
+        modified: { cards: [], artifacts: [] },
+        reordered: [],
+        summary: `Populate ${wfIds.length} workflow(s) with activities and cards?`,
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => { setDraftName(project.name); }, [project.name]);
   useEffect(() => { setDraftDesc(project.description ?? ''); }, [project.description]);
@@ -334,20 +399,24 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
             if (eventType === 'phase_complete') {
               if (data.responseType === 'clarification') {
                 addMessage('agent', agentMessage || 'Could you tell me more about what you want to build?');
-              } else if (data.responseType === 'scaffold_complete' && data.workflow_ids?.length) {
-                addMessage('agent', agentMessage || `Created ${data.workflow_ids.length} workflow(s).`);
-                lastPopulateConfirm = data.workflow_ids;
-                setPopulateConfirmWorkflowIds(data.workflow_ids);
-                setPopulateOriginalMessage(text);
-                const wfIds = Array.isArray(data.workflow_ids) ? data.workflow_ids : [];
-                setPendingPreview({
-                  added: { workflows: wfIds, activities: [], steps: [], cards: [] },
-                  modified: { cards: [], artifacts: [] },
-                  reordered: [],
-                  summary: `Populate ${wfIds.length} workflow(s) with activities and cards?`,
-                });
-                setPendingActions([]);
-                setPendingErrors([]);
+              } else if (data.responseType === 'scaffold_complete') {
+                if (data.workflow_ids?.length) {
+                  addMessage('agent', agentMessage || `Created ${data.workflow_ids.length} workflow(s).`);
+                  lastPopulateConfirm = data.workflow_ids;
+                  setPopulateConfirmWorkflowIds(data.workflow_ids);
+                  setPopulateOriginalMessage(text);
+                  const wfIds = Array.isArray(data.workflow_ids) ? data.workflow_ids : [];
+                  setPendingPreview({
+                    added: { workflows: wfIds, activities: [], steps: [], cards: [] },
+                    modified: { cards: [], artifacts: [] },
+                    reordered: [],
+                    summary: `Populate ${wfIds.length} workflow(s) with activities and cards?`,
+                  });
+                  setPendingActions([]);
+                  setPendingErrors([]);
+                } else {
+                  addMessage('agent', agentMessage || "I wasn't able to generate a structure yet. Could you tell me more about what you want to build?");
+                }
               }
             }
             if (eventType === 'done') {
@@ -373,6 +442,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
       throttledPlanningApplied();
     } finally {
       setIsThinking(false);
+      onPlanningApplied?.();
     }
   };
 

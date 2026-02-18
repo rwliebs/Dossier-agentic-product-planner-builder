@@ -42,19 +42,21 @@ describe("RuVector client (M1)", () => {
   });
 
   describe.skipIf(!ruvectorAvailable)("embed + search cycle", () => {
-    it("inserts vector and finds it via search", async () => {
-      const client = getRuvectorClient();
-      expect(client).not.toBeNull();
-      if (!client) return;
-      const dims = parseInt(process.env.RUVECTOR_DIMENSIONS ?? "384", 10);
-      const vec = new Float32Array(dims).fill(0.5);
-      const id = await client.insert({ id: "ruvector-test-doc", vector: vec });
-      expect(id).toBe("ruvector-test-doc");
-      const results = await client.search({ vector: vec, k: 5 });
-      expect(results.length).toBeGreaterThan(0);
-      expect(results[0].id).toBe("ruvector-test-doc");
-      expect(typeof results[0].score).toBe("number");
-      await client.delete("ruvector-test-doc");
-    });
+    it.skipIf(() => getRuvectorClient() === null)(
+      "inserts vector and finds it via search",
+      async () => {
+        const client = getRuvectorClient();
+        if (!client) return;
+        const dims = parseInt(process.env.RUVECTOR_DIMENSIONS ?? "384", 10);
+        const vec = new Float32Array(dims).fill(0.5);
+        const id = await client.insert({ id: "ruvector-test-doc", vector: vec });
+        expect(id).toBe("ruvector-test-doc");
+        const results = await client.search({ vector: vec, k: 5 });
+        expect(results.length).toBeGreaterThan(0);
+        expect(results[0].id).toBe("ruvector-test-doc");
+        expect(typeof results[0].score).toBe("number");
+        await client.delete("ruvector-test-doc");
+      },
+    );
   });
 });

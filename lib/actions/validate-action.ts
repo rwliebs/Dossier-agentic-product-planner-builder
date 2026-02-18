@@ -1,7 +1,7 @@
 import { PlanningAction, planningActionSchema } from "@/lib/schemas/slice-a";
 import {
-  validatedPlanningActionSchema,
-  ValidatedPlanningAction,
+  payloadSchemaByActionType,
+  targetRefSchemaByActionType,
 } from "@/lib/schemas/action-payloads";
 import {
   PlanningState,
@@ -37,18 +37,36 @@ export function validateActionSchema(action: PlanningAction): ValidationError[] 
     return errors;
   }
 
-  // Check action-specific payload schema
-  try {
-    validatedPlanningActionSchema.parse(action);
-  } catch (error: unknown) {
-    const err = error as { issues?: Array<{ message: string }> };
-    errors.push({
-      code: "invalid_schema",
-      message: `Action payload failed validation for type: ${action.action_type}`,
-      details: {
-        reason: err.issues?.[0]?.message || "Unknown payload error",
-      },
-    });
+  // Check action-specific payload and target_ref (by action_type)
+  const payloadSchema = payloadSchemaByActionType[action.action_type];
+  const targetRefSchema = targetRefSchemaByActionType[action.action_type];
+  if (payloadSchema) {
+    try {
+      payloadSchema.parse(action.payload);
+    } catch (error: unknown) {
+      const err = error as { issues?: Array<{ message: string }> };
+      errors.push({
+        code: "invalid_schema",
+        message: `Action payload failed validation for type: ${action.action_type}`,
+        details: {
+          reason: err.issues?.[0]?.message || "Unknown payload error",
+        },
+      });
+    }
+  }
+  if (targetRefSchema) {
+    try {
+      targetRefSchema.parse(action.target_ref);
+    } catch (error: unknown) {
+      const err = error as { issues?: Array<{ message: string }> };
+      errors.push({
+        code: "invalid_schema",
+        message: `Action target_ref failed validation for type: ${action.action_type}`,
+        details: {
+          reason: err.issues?.[0]?.message || "Unknown target_ref error",
+        },
+      });
+    }
   }
 
   return errors;

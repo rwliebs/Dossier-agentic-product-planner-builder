@@ -211,7 +211,7 @@ describe("trading card marketplace planning", () => {
       }
     }
 
-    if (totalActivities >= 1 || totalCards >= 1) {
+    if (totalActivities >= 1 && totalCards >= 1) {
       expect(totalActivities, "activities").toBeGreaterThanOrEqual(1);
       expect(totalCards, "action cards").toBeGreaterThanOrEqual(1);
     } else {

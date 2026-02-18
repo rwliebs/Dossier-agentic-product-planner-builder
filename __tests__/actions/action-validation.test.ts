@@ -77,7 +77,7 @@ describe("Action Validation", () => {
       expect(errors[0].code).toBe("invalid_schema");
     });
 
-    it("rejects updateCard with null title, status, or priority", () => {
+    it("accepts updateCard with null title, status, or priority (no-change)", () => {
       const action: PlanningAction = {
         id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         project_id: projectId,
@@ -91,8 +91,7 @@ describe("Action Validation", () => {
       };
 
       const errors = validateActionSchema(action);
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].code).toBe("invalid_schema");
+      expect(errors).toHaveLength(0);
     });
   });
 

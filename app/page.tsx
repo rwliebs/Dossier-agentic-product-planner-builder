@@ -59,8 +59,10 @@ export default function DossierPage() {
     projectId || undefined
   );
 
-  const hasContent = (snapshot?.workflows?.length ?? 0) > 0;
-  const appMode = hasContent ? 'active' : 'ideation';
+  // hasContent: true only when activities have been populated (not just scaffolded)
+  const hasContent = snapshot?.workflows?.some((wf) => wf.activities.length > 0) ?? false;
+  // appMode drives which layout to show — active whenever workflows exist so the canvas can render empty-state guidance
+  const appMode = (snapshot?.workflows?.length ?? 0) > 0 ? 'active' : 'ideation';
   const { submit: submitAction } = useSubmitAction(appMode === 'active' ? projectId : undefined);
   const { triggerBuild } = useTriggerBuild(appMode === 'active' ? projectId : undefined);
 

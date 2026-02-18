@@ -88,13 +88,13 @@ export const createCardTargetRefSchema = z.object({
 // ============================================================================
 // updateCard: Update card properties (title, description, status, priority)
 // ============================================================================
-// title, status, priority: optional (omit to keep current) but when provided
-// must be non-null to satisfy Card schema. description may be null to clear.
+// title, status, priority: optional (omit to keep current); null accepted to mean "no change".
+// When provided as non-null, must satisfy Card schema. description may be null to clear.
 export const updateCardPayloadSchema = z.object({
-  title: z.string().min(1).optional(),
+  title: z.string().min(1).nullable().optional(),
   description: z.string().nullable().optional(),
-  status: cardStatusSchema.optional(),
-  priority: z.number().int().nonnegative().optional(),
+  status: cardStatusSchema.nullable().optional(),
+  priority: z.number().int().nonnegative().nullable().optional(),
   quick_answer: z.string().nullable().optional(),
 });
 
@@ -190,6 +190,46 @@ export const setCardKnowledgeStatusPayloadSchema = z.object({
 export const setCardKnowledgeStatusTargetRefSchema = z.object({
   card_id: z.string().uuid(),
 });
+
+// ============================================================================
+// Payload and target_ref by action type (for validation by action_type)
+// ============================================================================
+
+export const payloadSchemaByActionType: Record<
+  z.infer<typeof planningActionTypeSchema>,
+  z.ZodType
+> = {
+  updateProject: updateProjectPayloadSchema,
+  createWorkflow: createWorkflowPayloadSchema,
+  createActivity: createActivityPayloadSchema,
+  createStep: createStepPayloadSchema,
+  createCard: createCardPayloadSchema,
+  updateCard: updateCardPayloadSchema,
+  reorderCard: reorderCardPayloadSchema,
+  linkContextArtifact: linkContextArtifactPayloadSchema,
+  upsertCardPlannedFile: upsertCardPlannedFilePayloadSchema,
+  approveCardPlannedFile: approveCardPlannedFilePayloadSchema,
+  upsertCardKnowledgeItem: upsertCardKnowledgeItemPayloadSchema,
+  setCardKnowledgeStatus: setCardKnowledgeStatusPayloadSchema,
+};
+
+export const targetRefSchemaByActionType: Record<
+  z.infer<typeof planningActionTypeSchema>,
+  z.ZodType
+> = {
+  updateProject: updateProjectTargetRefSchema,
+  createWorkflow: createWorkflowTargetRefSchema,
+  createActivity: createActivityTargetRefSchema,
+  createStep: createStepTargetRefSchema,
+  createCard: createCardTargetRefSchema,
+  updateCard: updateCardTargetRefSchema,
+  reorderCard: reorderCardTargetRefSchema,
+  linkContextArtifact: linkContextArtifactTargetRefSchema,
+  upsertCardPlannedFile: upsertCardPlannedFileTargetRefSchema,
+  approveCardPlannedFile: approveCardPlannedFileTargetRefSchema,
+  upsertCardKnowledgeItem: upsertCardKnowledgeItemTargetRefSchema,
+  setCardKnowledgeStatus: setCardKnowledgeStatusTargetRefSchema,
+};
 
 // ============================================================================
 // Union of all action payloads and target refs

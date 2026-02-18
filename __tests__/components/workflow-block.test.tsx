@@ -46,6 +46,15 @@ const minimalSnapshot: MapSnapshot = {
   ],
 };
 
+const workflowsOnlySnapshot: MapSnapshot = {
+  project: { id: "p2", name: "MapleTCG", repo_url: null, default_branch: "main", description: null },
+  workflows: [
+    { id: "wf-a", project_id: "p2", title: "User Management", description: null, build_state: null, position: 0, activities: [] },
+    { id: "wf-b", project_id: "p2", title: "Card Listings", description: null, build_state: null, position: 1, activities: [] },
+    { id: "wf-c", project_id: "p2", title: "Transactions", description: null, build_state: null, position: 2, activities: [] },
+  ],
+};
+
 describe("WorkflowBlock", () => {
   it("renders implementation map with project name and status counts", () => {
     render(
@@ -93,5 +102,44 @@ describe("WorkflowBlock", () => {
 
     expect(screen.getByText("User Management")).toBeInTheDocument();
     expect(screen.getByText("Login form")).toBeInTheDocument();
+  });
+
+  it("shows empty-state guidance when workflows exist but have no activities", () => {
+    render(
+      <WorkflowBlock
+        snapshot={workflowsOnlySnapshot}
+        viewMode="functionality"
+        expandedCardId={null}
+        onExpandCard={() => {}}
+        onCardAction={() => {}}
+      />
+    );
+
+    // Canvas should not be entirely invisible — show project name
+    expect(screen.getByText("MapleTCG")).toBeInTheDocument();
+
+    // Expected: guidance text prompting user to populate workflows
+    // This fails currently because StoryMapCanvas renders an empty div with no fallback
+    expect(
+      screen.getByText(/populate|add activities|no activities/i)
+    ).toBeInTheDocument();
+  });
+
+  it("lists workflow titles in empty-state so user knows what was scaffolded", () => {
+    render(
+      <WorkflowBlock
+        snapshot={workflowsOnlySnapshot}
+        viewMode="functionality"
+        expandedCardId={null}
+        onExpandCard={() => {}}
+        onCardAction={() => {}}
+      />
+    );
+
+    // Expected: scaffold phase created these workflow titles — they should be visible
+    // even before populate, giving user confidence the scaffold worked
+    expect(screen.getByText("User Management")).toBeInTheDocument();
+    expect(screen.getByText("Card Listings")).toBeInTheDocument();
+    expect(screen.getByText("Transactions")).toBeInTheDocument();
   });
 });

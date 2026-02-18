@@ -36,17 +36,28 @@ function normalizeAction(obj: Record<string, unknown>): PlanningAction {
 }
 
 /**
+ * Extract JSON-serializable text from LLM output that may be wrapped in markdown.
+ */
+function extractJsonText(text: string): string {
+  let s = text.trim();
+  const jsonBlock = /^```(?:json)?\s*([\s\S]*?)```\s*$/;
+  const m = s.match(jsonBlock);
+  if (m) s = m[1].trim();
+  return s;
+}
+
+/**
  * Try to parse a JSON object and extract PlanningAction(s) or message.
  */
 function tryParseObject(
   text: string,
 ): { actions: PlanningAction[]; message?: string; responseType?: string } | null {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
+  const extracted = extractJsonText(text);
+  if (!extracted) return null;
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(trimmed);
+    parsed = JSON.parse(extracted);
   } catch {
     return null;
   }
@@ -104,21 +115,26 @@ export async function* parseActionsFromStream(
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let fullText = "";
+  let emittedAny = false;
 
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      buffer += typeof value === "string" ? value : decoder.decode(value, { stream: true });
+      const chunk = typeof value === "string" ? value : decoder.decode(value, { stream: true });
+      buffer += chunk;
+      fullText += chunk;
 
-      // Process complete lines (NDJSON)
+      // Process complete lines (NDJSON: one JSON object per line)
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? ""; // Keep incomplete line in buffer
 
       for (const line of lines) {
         const result = tryParseObject(line);
         if (result) {
+          emittedAny = true;
           if (result.responseType) {
             yield { type: "response_type", responseType: result.responseType as "clarification" | "actions" | "mixed" };
           }
@@ -132,10 +148,26 @@ export async function* parseActionsFromStream(
       }
     }
 
-    // Process remaining buffer (might be wrapper format in one chunk)
-    if (buffer.trim()) {
+    // Try remaining buffer (single line), then full text (pretty-printed or markdown-wrapped)
+    if (!emittedAny && buffer.trim()) {
       const result = tryParseObject(buffer);
-      if (result) {
+      if (result && result.actions.length > 0) {
+        emittedAny = true;
+        if (result.responseType) {
+          yield { type: "response_type", responseType: result.responseType as "clarification" | "actions" | "mixed" };
+        }
+        if (result.message) {
+          yield { type: "message", message: result.message };
+        }
+        for (const action of result.actions) {
+          yield { type: "action", action };
+        }
+      }
+    }
+    if (!emittedAny && fullText.trim()) {
+      const result = tryParseObject(fullText);
+      if (result && (result.actions.length > 0 || result.responseType)) {
+        emittedAny = true;
         if (result.responseType) {
           yield { type: "response_type", responseType: result.responseType as "clarification" | "actions" | "mixed" };
         }

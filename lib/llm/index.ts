@@ -6,11 +6,14 @@ export {
 export {
   buildPlanningSystemPrompt,
   buildPlanningUserMessage,
+  buildConversationMessages,
   serializeMapStateForPrompt,
+  type ConversationMessage,
 } from "./planning-prompt";
 export {
   parsePlanningResponse,
   type ParseResult,
+  type ResponseType,
 } from "./parse-planning-response";
 export {
   validatePlanningOutput,

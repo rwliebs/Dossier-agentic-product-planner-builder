@@ -20,6 +20,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e:adaptive": "vitest run __tests__/e2e/adaptive-flows.test.ts",
+    "test:planning": "PLANNING_MOCK_ALLOWED=1 vitest run __tests__/api/chat-stream-mock.test.ts __tests__/lib/llm/stream-action-parser.test.ts",
+    "test:planning:e2e": "vitest run __tests__/e2e/trading-card-marketplace-planning.test.ts",
     "test:db": "vitest run __tests__/db/",
     "start": "next start",
     "dossier": "node bin/dossier.mjs"

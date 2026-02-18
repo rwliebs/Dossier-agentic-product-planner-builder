@@ -194,8 +194,8 @@ export default function DossierPage() {
   }, [refetch]);
 
   const handleProjectUpdate = useCallback(
-    async (updates: { name?: string; description?: string | null }) => {
-      if (!projectId) return;
+    async (updates: { name?: string; description?: string | null; repo_url?: string | null; default_branch?: string }) => {
+      if (!projectId) return false;
       try {
         const res = await fetch(`/api/projects/${projectId}`, {
           method: 'PATCH',
@@ -203,8 +203,9 @@ export default function DossierPage() {
           body: JSON.stringify(updates),
         });
         if (res.ok) refetch();
+        return res.ok;
       } catch {
-        // silently fail — the sidebar will revert on next refetch
+        return false;
       }
     },
     [projectId, refetch]
@@ -231,6 +232,7 @@ export default function DossierPage() {
             name: snapshot?.project?.name ?? 'Dossier',
             description: snapshot?.project?.description ?? null,
             status: appMode === 'ideation' ? 'planning' : 'active',
+            repo_url: snapshot?.project?.repo_url ?? null,
           }}
           projectId={projectId || undefined}
           onPlanningApplied={() => {

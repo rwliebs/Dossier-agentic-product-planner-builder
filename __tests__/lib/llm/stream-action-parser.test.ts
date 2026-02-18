@@ -45,6 +45,48 @@ describe("parseActionsFromStream", () => {
     expect(message).toBe("Here you go");
   });
 
+  it("parses wrapper format without trailing newline (streaming)", async () => {
+    const actions: unknown[] = [];
+    const pid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    const json = `{"type":"actions","message":"OK","actions":[{"id":"b2c3d4e5-f6a7-8901-bcde-f12345678901","project_id":"${pid}","action_type":"updateProject","target_ref":{"project_id":"${pid}"},"payload":{"name":"Test","description":"A test project"}},{"id":"c3d4e5f6-a7b8-9012-cdef-123456789012","project_id":"${pid}","action_type":"createWorkflow","target_ref":{"project_id":"${pid}"},"payload":{"title":"W1","position":0}}]}`;
+    const stream = await streamFromStrings([json]);
+
+    for await (const result of parseActionsFromStream(stream)) {
+      if (result.type === "action") actions.push(result.action);
+    }
+
+    expect(actions.length).toBe(2);
+    expect((actions[0] as { action_type?: string }).action_type).toBe("updateProject");
+    expect((actions[1] as { action_type?: string }).action_type).toBe("createWorkflow");
+  });
+
+  it("parses JSON wrapped in markdown code block", async () => {
+    const actions: unknown[] = [];
+    const pid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    const json = "```json\n" + `{"type":"actions","actions":[{"id":"b2c3d4e5-f6a7-8901-bcde-f12345678901","project_id":"${pid}","action_type":"createWorkflow","target_ref":{"project_id":"${pid}"},"payload":{"title":"W1","position":0}}]}` + "\n```";
+    const stream = await streamFromStrings([json]);
+
+    for await (const result of parseActionsFromStream(stream)) {
+      if (result.type === "action") actions.push(result.action);
+    }
+
+    expect(actions.length).toBe(1);
+  });
+
+  it("parses when streamed token-by-token (no newlines)", async () => {
+    const pid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    const json = `{"type":"actions","actions":[{"id":"b2c3d4e5-f6a7-8901-bcde-f12345678901","project_id":"${pid}","action_type":"createWorkflow","target_ref":{"project_id":"${pid}"},"payload":{"title":"W1","position":0}}]}`;
+    const chunks = json.split("").map((c) => c);
+    const stream = await streamFromStrings(chunks);
+
+    const actions: unknown[] = [];
+    for await (const result of parseActionsFromStream(stream)) {
+      if (result.type === "action") actions.push(result.action);
+    }
+
+    expect(actions.length).toBe(1);
+  });
+
   it("yields done at end", async () => {
     const results: string[] = [];
     const stream = await streamFromStrings(['{"type":"clarification","message":"Tell me more","actions":[]}\n']);

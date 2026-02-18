@@ -67,7 +67,7 @@ export async function POST(
     );
   }
 
-  const { message, mode, workflow_id } = parsed.data;
+  const { message, mode, workflow_id, mock_response } = parsed.data;
 
   let db;
   try {
@@ -118,12 +118,45 @@ export async function POST(
       };
 
       try {
-        const llmStream = await claudeStreamingRequest({
-          systemPrompt,
-          userMessage,
-        });
+        const useMock =
+          process.env.PLANNING_MOCK_ALLOWED === "1" &&
+          typeof mock_response === "string" &&
+          mock_response.length > 0;
+
+        let rawLlmOutput = "";
+        const llmStreamRaw = useMock
+          ? null
+          : await claudeStreamingRequest({
+              systemPrompt,
+              userMessage,
+            });
+        const llmStream = useMock
+          ? new ReadableStream<string>({
+              start(ctrl) {
+                ctrl.enqueue(mock_response!);
+                ctrl.close();
+              },
+            })
+          : (() => {
+              const [parseBranch, logBranch] = llmStreamRaw!.tee();
+              const reader = logBranch.getReader();
+              const decoder = new TextDecoder();
+              (async () => {
+                try {
+                  while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    rawLlmOutput += typeof value === "string" ? value : decoder.decode(value);
+                  }
+                } catch {
+                  /* ignore */
+                }
+              })();
+              return parseBranch;
+            })();
 
         let currentState = state;
+        let actionCount = 0;
 
         for await (const result of parseActionsFromStream(llmStream)) {
           if (result.type === "response_type") {
@@ -182,6 +215,7 @@ export async function POST(
             continue;
           }
 
+          actionCount++;
           emit("action", {
             action: actionWithProjectId,
             applied: applyResult.applied,
@@ -189,6 +223,20 @@ export async function POST(
 
           const newState = await fetchMapSnapshot(db, projectId);
           if (newState) currentState = newState;
+        }
+
+        const shouldLogRaw =
+          !useMock &&
+          rawLlmOutput &&
+          (process.env.PLANNING_DEBUG === "1" || (mode === "scaffold" && actionCount === 0));
+        if (shouldLogRaw) {
+          console.log(
+            "[planning] LLM raw output",
+            actionCount === 0 ? "(0 actions parsed)" : "",
+            ":\n",
+            rawLlmOutput.slice(0, 4000),
+            rawLlmOutput.length > 4000 ? "\n...(truncated)" : "",
+          );
         }
 
         if (mode === "scaffold") {

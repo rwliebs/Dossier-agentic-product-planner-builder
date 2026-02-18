@@ -5,6 +5,7 @@ import {
   claudePlanningRequest,
   parsePlanningResponse,
   validatePlanningOutput,
+  type ConversationMessage,
 } from "@/lib/llm";
 import { buildPreviewFromActions } from "@/lib/llm/build-preview-response";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
@@ -14,10 +15,13 @@ import { chatRequestSchema } from "@/lib/validation/request-schema";
 
 export interface ChatRequest {
   message: string;
+  conversationHistory?: ConversationMessage[];
 }
 
 export interface ChatResponse {
   status: "success" | "error";
+  responseType: "clarification" | "actions" | "mixed";
+  message?: string;
   actions: PlanningAction[];
   preview: {
     added: { workflows: string[]; activities: string[]; steps: string[]; cards: string[] };
@@ -70,7 +74,7 @@ export async function POST(
     });
     return validationError("Invalid request body", details);
   }
-  const message = parsed.data.message;
+  const { message, conversationHistory } = parsed.data;
 
   let db;
   try {
@@ -98,6 +102,7 @@ export async function POST(
       userRequest: message,
       mapSnapshot: state,
       linkedArtifacts,
+      conversationHistory: conversationHistory as ConversationMessage[],
     });
   } catch (e) {
     const err = e instanceof Error ? e.message : "Planning service error";
@@ -106,7 +111,7 @@ export async function POST(
     let userMessage: string;
     if (err.includes("ANTHROPIC_API_KEY")) {
       userMessage = "Planning LLM not configured. Set ANTHROPIC_API_KEY.";
-    } else if (err.includes("timed out")) {
+    } else if (err.includes("timed out") || err.includes("aborted")) {
       userMessage = "Planning request timed out. Try again.";
     } else if (err.includes("credit balance") || err.includes("billing")) {
       userMessage =
@@ -129,6 +134,28 @@ export async function POST(
 
   const parseResult = parsePlanningResponse(llmResponse.text);
 
+  // For clarification-only responses, return early with the message
+  if (parseResult.responseType === "clarification" && parseResult.actions.length === 0) {
+    const response: ChatResponse = {
+      status: "success",
+      responseType: "clarification",
+      message: parseResult.message,
+      actions: [],
+      preview: null,
+      metadata: {
+        tokens: llmResponse.usage.inputTokens + llmResponse.usage.outputTokens,
+        model: llmResponse.model,
+      },
+    };
+    return json(response);
+  }
+
+  if (parseResult.actions.length === 0 && !parseResult.message) {
+    console.error("[chat] Parse returned 0 actions and no message. Confidence:", parseResult.confidence);
+    console.error("[chat] Parse error:", parseResult.parseError);
+    console.error("[chat] Raw LLM text (first 2000 chars):", llmResponse.text.slice(0, 2000));
+  }
+
   const projectIdValue = state.project.id;
   const actionsWithProjectId = parseResult.actions.map((a) => {
     const targetRef = a.target_ref as Record<string, unknown>;
@@ -144,10 +171,17 @@ export async function POST(
 
   const { valid, rejected } = validatePlanningOutput(actionsWithProjectId, state);
 
+  if (rejected.length > 0) {
+    console.error(`[chat] ${rejected.length} actions rejected:`, rejected.map(r => `${r.action.action_type}: ${r.reason}`));
+  }
+  console.log(`[chat] Parsed: ${parseResult.actions.length} actions, Valid: ${valid.length}, Rejected: ${rejected.length}, Type: ${parseResult.responseType}`);
+
   const preview = buildPreviewFromActions(valid, state);
 
   const response: ChatResponse = {
     status: valid.length > 0 || rejected.length === 0 ? "success" : "error",
+    responseType: parseResult.responseType,
+    message: parseResult.message,
     actions: valid,
     preview,
     errors:

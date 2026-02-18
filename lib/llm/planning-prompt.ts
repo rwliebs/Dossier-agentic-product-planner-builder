@@ -142,18 +142,22 @@ export function buildScaffoldSystemPrompt(): string {
 
 ## Your Task
 Given a user's product idea, generate ONLY:
-1. An updateProject action (set project name and description)
+1. An updateProject action (REQUIRED — MUST be first) to set project name and description
 2. createWorkflow actions for each major user workflow
 
 Do NOT generate createActivity, createStep, or createCard actions. Those will be generated separately for each workflow.
 
+## updateProject is REQUIRED
+You MUST include exactly one updateProject action as the first action in the actions array. Use the user's idea to derive a short project name and a 1-2 sentence description.
+
 ## When to ask clarifying questions
-- The user's FIRST message is vague (e.g. "build me an app", "I want a marketplace")
+- The user's message is very vague (e.g. "build me an app", "I want something cool")
 - Critical info missing: who are the users? what's the core value?
 - Respond with: { "type": "clarification", "message": "Your questions...", "actions": [] }
 
-## When to generate workflows
-- You have enough context to identify 3-8 major workflows
+## When to generate workflows (prefer this when the idea is clear)
+- The user describes a product with domain (e.g. trading cards, MTG, marketplace) and users (buyers, sellers) — generate workflows
+- You can identify 3-8 major workflows from the description
 - Each workflow should represent a distinct user journey or capability area
 - Keep workflow titles concise (2-4 words) and descriptions brief (1-2 sentences)
 
@@ -170,6 +174,19 @@ Allowed action types: updateProject, createWorkflow only.
 - target_ref: { "project_id": "<project_id>" }
 - payload: { "title": "Workflow Title", "description": "Brief description", "position": 0 }
 - Use position 0, 1, 2, ... for ordering
+
+## Example (trading card marketplace)
+\`\`\`json
+{
+  "type": "actions",
+  "message": "Creating structure for a Canadian MTG trading card marketplace.",
+  "actions": [
+    {"id": "uuid-1", "project_id": "<project_id>", "action_type": "updateProject", "target_ref": {"project_id": "<project_id>"}, "payload": {"name": "MTG Card Marketplace", "description": "A marketplace for Canadian buyers and sellers of Magic: The Gathering cards."}},
+    {"id": "uuid-2", "project_id": "<project_id>", "action_type": "createWorkflow", "target_ref": {"project_id": "<project_id>"}, "payload": {"title": "Browse & Search", "description": "Discover and search for cards", "position": 0}},
+    {"id": "uuid-3", "project_id": "<project_id>", "action_type": "createWorkflow", "target_ref": {"project_id": "<project_id>"}, "payload": {"title": "Buying & Selling", "description": "List, purchase, and manage transactions", "position": 1}}
+  ]
+}
+\`\`\`
 
 ## Critical Constraints
 1. NEVER generate activities, steps, or cards
@@ -236,7 +253,8 @@ export function buildScaffoldUserMessage(
     }
     message += "\n";
   }
-  message += `## User Request\n${userRequest}\n\n## Your Response\nOutput ONLY the JSON object (updateProject + createWorkflow actions):`;
+  const projectId = mapSnapshot.project.id;
+  message += `## User Request\n${userRequest}\n\n## Your Response\nOutput ONLY the JSON object (updateProject + createWorkflow actions). Use project_id "${projectId}" in all target_ref and project_id fields.`;
   return message;
 }
 

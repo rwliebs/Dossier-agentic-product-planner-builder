@@ -42,7 +42,7 @@ If **NO**: I will request the user to provide more information or clarify the ex
 
 Read:
 
-- /Users/richardliebrecht/PYE/pye/docs/Architecture/SYSTEM_ARCHITECTURE_CONSOLIDATED.md
+- /docs/SYSTEM_ARCHITECTURE_CONSOLIDATED.md
 - code files that are directly impacted by the current task
 - Types and/or Pydantic Models
 

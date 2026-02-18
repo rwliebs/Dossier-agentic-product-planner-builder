@@ -1,18 +1,18 @@
 /**
- * Webhook processing for agentic-flow callbacks.
+ * Webhook processing for claude-flow callbacks.
  * Handles: execution_started, commit_created, execution_completed, execution_failed.
  * Updates records, triggers checks on completion.
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbAdapter } from "@/lib/db/adapter";
 import {
   getCardAssignment,
   getOrchestrationRun,
   getAgentExecutionsByAssignment,
-  ORCHESTRATION_TABLES,
 } from "@/lib/supabase/queries/orchestration";
 import { logEvent } from "./event-logger";
 import { executeRequiredChecks } from "./execute-checks";
+import { harvestBuildLearnings } from "@/lib/memory/harvest";
 
 export type WebhookEventType =
   | "execution_started"
@@ -35,6 +35,8 @@ export interface WebhookPayload {
     branch: string;
     message: string;
   };
+  /** Learnings from swarm memory (when real claude-flow wired). Empty = harvest no-op. */
+  learnings?: string[];
 }
 
 export interface ProcessWebhookResult {
@@ -46,12 +48,12 @@ export interface ProcessWebhookResult {
  * Finds the most recent agent_execution for an assignment (by assignment_id or execution_id).
  */
 async function findAgentExecution(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   assignmentId: string,
   executionId?: string
 ) {
   const executions = await getAgentExecutionsByAssignment(
-    supabase,
+    db,
     assignmentId
   );
   if (executions.length === 0) return null;
@@ -65,21 +67,21 @@ async function findAgentExecution(
 }
 
 /**
- * Processes an agentic-flow webhook event.
+ * Processes a claude-flow webhook event.
  */
 export async function processWebhook(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   payload: WebhookPayload
 ): Promise<ProcessWebhookResult> {
   const { event_type, assignment_id } = payload;
 
-  const assignment = await getCardAssignment(supabase, assignment_id);
+  const assignment = await getCardAssignment(db, assignment_id);
   if (!assignment) {
     return { success: false, error: "Assignment not found" };
   }
 
   const run = await getOrchestrationRun(
-    supabase,
+    db,
     (assignment as { run_id: string }).run_id
   );
   if (!run) {
@@ -90,7 +92,7 @@ export async function processWebhook(
   const runId = (run as { id: string }).id;
 
   const agentExec = await findAgentExecution(
-    supabase,
+    db,
     assignment_id,
     payload.execution_id
   );
@@ -98,19 +100,16 @@ export async function processWebhook(
   switch (event_type) {
     case "execution_started": {
       if (agentExec) {
-        await supabase
-          .from(ORCHESTRATION_TABLES.agent_executions)
-          .update({
-            status: "running",
-            started_at: payload.started_at ?? new Date().toISOString(),
-          })
-          .eq("id", (agentExec as { id: string }).id);
+        await db.updateAgentExecution((agentExec as { id: string }).id, {
+          status: "running",
+          started_at: payload.started_at ?? new Date().toISOString(),
+        });
       }
-      await logEvent(supabase, {
+      await logEvent(db, {
         project_id: projectId,
         run_id: runId,
         event_type: "execution_started",
-        actor: "agentic-flow",
+        actor: "claude-flow",
         payload: { assignment_id, execution_id: payload.execution_id },
       });
       break;
@@ -118,7 +117,7 @@ export async function processWebhook(
 
     case "commit_created": {
       if (payload.commit && agentExec) {
-        await supabase.from(ORCHESTRATION_TABLES.agent_commits).insert({
+        await db.insertAgentCommit({
           assignment_id,
           sha: payload.commit.sha,
           branch: payload.commit.branch,
@@ -126,11 +125,11 @@ export async function processWebhook(
           committed_at: new Date().toISOString(),
         });
       }
-      await logEvent(supabase, {
+      await logEvent(db, {
         project_id: projectId,
         run_id: runId,
         event_type: "commit_created",
-        actor: "agentic-flow",
+        actor: "claude-flow",
         payload: {
           assignment_id,
           commit: payload.commit,
@@ -141,29 +140,22 @@ export async function processWebhook(
 
     case "execution_completed": {
       if (agentExec) {
-        await supabase
-          .from(ORCHESTRATION_TABLES.agent_executions)
-          .update({
-            status: "completed",
-            ended_at: payload.ended_at ?? new Date().toISOString(),
-            summary: payload.summary ?? null,
-            error: null,
-          })
-          .eq("id", (agentExec as { id: string }).id);
-      }
-      await supabase
-        .from(ORCHESTRATION_TABLES.card_assignments)
-        .update({
+        await db.updateAgentExecution((agentExec as { id: string }).id, {
           status: "completed",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", assignment_id);
+          ended_at: payload.ended_at ?? new Date().toISOString(),
+          summary: payload.summary ?? null,
+          error: null,
+        });
+      }
+      await db.updateCardAssignment(assignment_id, {
+        status: "completed",
+      });
 
-      await logEvent(supabase, {
+      await logEvent(db, {
         project_id: projectId,
         run_id: runId,
         event_type: "execution_completed",
-        actor: "agentic-flow",
+        actor: "claude-flow",
         payload: {
           assignment_id,
           summary: payload.summary,
@@ -171,55 +163,55 @@ export async function processWebhook(
       });
 
       // Trigger checks on completion
-      const checkResult = await executeRequiredChecks(supabase, runId);
+      const checkResult = await executeRequiredChecks(db, runId);
       if (!checkResult.success) {
         console.warn(
           `Webhook: checks failed for run ${runId}:`,
           checkResult.error
         );
       }
+
+      // Harvest build learnings into memory (M4.5)
+      const cardId = (assignment as { card_id: string }).card_id;
+      await harvestBuildLearnings(db, {
+        assignmentId: assignment_id,
+        runId,
+        cardId,
+        projectId,
+        workflowId: (run as { workflow_id?: string }).workflow_id ?? null,
+        learnings: payload.learnings ?? [],
+      });
       break;
     }
 
     case "execution_failed": {
       if (agentExec) {
-        await supabase
-          .from(ORCHESTRATION_TABLES.agent_executions)
-          .update({
-            status: "failed",
-            ended_at: payload.ended_at ?? new Date().toISOString(),
-            summary: payload.summary ?? null,
-            error: payload.error ?? null,
-          })
-          .eq("id", (agentExec as { id: string }).id);
-      }
-      await supabase
-        .from(ORCHESTRATION_TABLES.card_assignments)
-        .update({
+        await db.updateAgentExecution((agentExec as { id: string }).id, {
           status: "failed",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", assignment_id);
+          ended_at: payload.ended_at ?? new Date().toISOString(),
+          summary: payload.summary ?? null,
+          error: payload.error ?? null,
+        });
+      }
+      await db.updateCardAssignment(assignment_id, {
+        status: "failed",
+      });
 
-      await logEvent(supabase, {
+      await logEvent(db, {
         project_id: projectId,
         run_id: runId,
         event_type: "execution_failed",
-        actor: "agentic-flow",
+        actor: "claude-flow",
         payload: {
           assignment_id,
           error: payload.error,
         },
       });
 
-      await supabase
-        .from(ORCHESTRATION_TABLES.orchestration_runs)
-        .update({
-          status: "failed",
-          ended_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", runId);
+      await db.updateOrchestrationRun(runId, {
+        status: "failed",
+        ended_at: new Date().toISOString(),
+      });
       break;
     }
 

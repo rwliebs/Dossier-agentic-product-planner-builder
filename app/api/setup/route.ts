@@ -1,19 +1,10 @@
 /**
- * Saves API keys to .env.local.
+ * Saves API keys to ~/.dossier/config.
  * Merges with existing file; preserves other vars and comments.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, readFile } from "fs/promises";
-import { join } from "path";
-import { existsSync } from "fs";
-
-function escapeValue(v: string): string {
-  if (v.includes(" ") || v.includes("#") || v.includes('"')) {
-    return `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-  }
-  return v;
-}
+import { writeConfigFile, getConfigPath } from "@/lib/config/data-dir";
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,41 +19,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const projectRoot = process.cwd();
-    const envPath = join(projectRoot, ".env.local");
-
     const updates: Record<string, string> = {};
     if (anthropicApiKey) updates.ANTHROPIC_API_KEY = anthropicApiKey;
     if (githubToken) updates.GITHUB_TOKEN = githubToken;
 
-    let lines: string[] = [];
-    const seen = new Set<string>();
+    writeConfigFile(updates);
 
-    if (existsSync(envPath)) {
-      const content = await readFile(envPath, "utf-8");
-      for (const line of content.split("\n")) {
-        let replaced = false;
-        for (const [key, value] of Object.entries(updates)) {
-          if (line.startsWith(`${key}=`)) {
-            lines.push(`${key}=${escapeValue(value)}`);
-            seen.add(key);
-            replaced = true;
-            break;
-          }
-        }
-        if (!replaced) lines.push(line);
-      }
-    }
-
+    // Also inject into current process so middleware picks them up without restart
     for (const [key, value] of Object.entries(updates)) {
-      if (!seen.has(key)) lines.push(`${key}=${escapeValue(value)}`);
+      process.env[key] = value;
     }
-
-    await writeFile(envPath, lines.join("\n") + (lines.length ? "\n" : ""), { mode: 0o600 });
 
     return NextResponse.json({
       success: true,
-      message: "Keys saved. Restart the app for changes to take effect.",
+      configPath: getConfigPath(),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to save";

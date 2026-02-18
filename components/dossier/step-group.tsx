@@ -16,6 +16,7 @@ export interface StepGroupProps {
   onSelectFile?: (file: CodeFileForPanel) => void;
   codeFiles?: CodeFileForPanel[];
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
+  getCardKnowledgeLoading?: (cardId: string) => boolean;
 }
 
 export function StepGroup({
@@ -31,6 +32,7 @@ export function StepGroup({
   onSelectFile,
   codeFiles = [],
   getCardKnowledge,
+  getCardKnowledgeLoading,
 }: StepGroupProps) {
   const sortedCards = [...step.cards].sort((a, b) => a.priority - b.priority);
 
@@ -63,6 +65,7 @@ export function StepGroup({
               assumptions={k?.assumptions}
               questions={k?.questions}
               quickAnswer={k?.quickAnswer}
+              knowledgeLoading={getCardKnowledgeLoading?.(card.id)}
             />
           );
         })}

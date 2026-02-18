@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { triggerBuild } from "@/lib/orchestration/trigger-build";
 import { json, validationError, notFoundError, internalError } from "@/lib/api/response-helpers";
 import { BUILD_ORCHESTRATOR } from "@/lib/feature-flags";
+import { triggerBuildRequestSchema } from "@/lib/validation/request-schema";
 
 export async function POST(
   request: NextRequest,
@@ -16,30 +17,21 @@ export async function POST(
       );
     }
     const { projectId } = await params;
-    const body = await request.json().catch(() => ({}));
+    const rawBody = await request.json().catch(() => ({}));
+    const parsed = triggerBuildRequestSchema.safeParse(rawBody);
 
-    const {
-      scope,
-      workflow_id,
-      card_id,
-      trigger_type,
-      initiated_by,
-    } = body;
-
-    if (!scope || !initiated_by) {
-      return validationError(
-        "Missing required fields: scope, initiated_by"
-      );
-    }
-
-    if (scope === "workflow" && !workflow_id) {
-      return validationError("workflow_id required when scope=workflow");
-    }
-    if (scope === "card" && !card_id) {
-      return validationError("card_id required when scope=card");
+    if (!parsed.success) {
+      const details: Record<string, string[]> = {};
+      parsed.error.errors.forEach((e) => {
+        const path = e.path.join(".") || "body";
+        if (!details[path]) details[path] = [];
+        details[path].push(e.message);
+      });
+      return validationError("Invalid request body", details);
     }
 
     const db = getDb();
+    const { scope, workflow_id, card_id, trigger_type, initiated_by } = parsed.data;
     const result = await triggerBuild(db, {
       project_id: projectId,
       scope,

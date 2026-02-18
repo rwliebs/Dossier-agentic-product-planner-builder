@@ -47,8 +47,8 @@ Dossier runs as a standalone Next.js application on the developer's machine. All
 | **3** | **Database Abstraction Layer** | **Done** | **2-3** | **Yes** |
 | 4 | Memory Plane (RuVector local) | In progress (M1–M3, M2 done) | 3-4 | Yes |
 | 5 | Orchestration Execution (local claude-flow) | In progress (5/9 backend done) | 1-2 | Yes |
-| 6 | Hardening & Go-Live | Not started | 2-3 | Partially |
-| **7** | **Distribution & Packaging** | **Not started** | **1** | **Yes** |
+| 6 | Hardening & Go-Live | Done (10d–10i, 10k) | 2-3 | Yes |
+| **7** | **Distribution & Packaging** | **Done** | **1** | **Yes** |
 
 **Total estimated: 8-11 days parallel, 14-18 days sequential.**
 
@@ -368,16 +368,16 @@ The following are **simplified**:
 
 ### Tasks
 
-| ID | Task | Details |
-|----|------|---------|
-| 10a | E2E planning flow | Stagehand or Playwright: create project → chat → preview → accept → verify map → refresh → verify persistence. |
-| 10b | E2E build flow | Stagehand or Playwright: approve planned file → Build → verify run → checks → approval → PR candidate. |
-| 10d | Error boundaries | MapErrorBoundary, ChatErrorBoundary, generic ErrorBoundary. User-facing messages for validation/server errors. |
-| 10e | Loading states | MapSkeleton, CardSkeleton, ChatSkeleton, RunStatusSkeleton replacing text-only indicators. |
-| 10f | Feature flags | `lib/feature-flags.ts` — PLANNING_LLM, BUILD_ORCHESTRATOR, MEMORY_PLANE. Gate behavior per flag. |
-| 10h | Security audit (lite) | Zod on all inputs, no secrets in responses, immutable run snapshots verified, API key stored safely (env var only, never logged). |
-| 10i | Performance | Batch queries in fetchMapSnapshot (join-based instead of N+1 loops). SQLite makes this simpler (single process, no network). |
-| 10k | Go-live gate | Must-pass: error boundaries, feature flags, security audit. Should-pass: E2E flows (often fragile), loading states, N+1 fixed. |
+| ID | Task | Details | Status |
+|----|------|---------|--------|
+| 10a | E2E planning flow | Stagehand or Playwright: create project → chat → preview → accept → verify map → refresh → verify persistence. | ⏳ Deferred (should-pass) |
+| 10b | E2E build flow | Stagehand or Playwright: approve planned file → Build → verify run → checks → approval → PR candidate. | ⏳ Deferred (should-pass) |
+| 10d | Error boundaries | MapErrorBoundary, ChatErrorBoundary, generic ErrorBoundary. User-facing messages for validation/server errors. | ✅ Done |
+| 10e | Loading states | MapSkeleton, CardSkeleton, ChatSkeleton, RunStatusSkeleton replacing text-only indicators. | ✅ Done |
+| 10f | Feature flags | `lib/feature-flags.ts` — PLANNING_LLM, BUILD_ORCHESTRATOR, MEMORY_PLANE. Gate behavior per flag. | ✅ Done |
+| 10h | Security audit (lite) | Zod on all inputs, no secrets in responses, immutable run snapshots verified, API key stored safely (env var only, never logged). | ✅ Done |
+| 10i | Performance | Batch queries in fetchMapSnapshot (join-based instead of N+1 loops). SQLite makes this simpler (single process, no network). | ✅ Done |
+| 10k | Go-live gate | Must-pass: error boundaries, feature flags, security audit. Should-pass: E2E flows (often fragile), loading states, N+1 fixed. | ✅ Met |
 
 ### Removed Tasks (Self-Deploy Pivot)
 
@@ -395,11 +395,11 @@ The following are **simplified**:
 
 ### Exit Criteria
 
-- Error boundaries catch and display failures gracefully
-- Feature flags control progressive feature rollout
-- No API key or sensitive data leaks in responses or logs
-- Map snapshot queries are batched (no N+1)
-- (Should-pass) E2E tests cover idea → map → build → approval flow — useful but not blocking; E2E tests are often fragile
+- [x] Error boundaries catch and display failures gracefully
+- [x] Feature flags control progressive feature rollout
+- [x] No API key or sensitive data leaks in responses or logs
+- [x] Map snapshot queries are batched (no N+1)
+- [ ] (Should-pass) E2E tests cover idea → map → build → approval flow — deferred; E2E tests are often fragile
 
 ---
 
@@ -411,21 +411,25 @@ Dossier currently requires Supabase cloud + Vercel to run. For self-deploy, it n
 
 ### Tasks
 
-| ID | Task | Details |
-|----|------|---------|
-| P1 | Standalone build | Add `output: 'standalone'` to `next.config.mjs`. Verify the standalone build runs without Vercel. |
-| P2 | CLI entry point | `bin/dossier.js` — starts the standalone Next.js server, auto-creates SQLite DB on first run, opens browser. Register as `bin` in `package.json`. |
-| P3 | First-run setup | On first `npx dossier`, run migrations, create default project, print setup instructions (API key, GitHub token). |
-| P4 | `.env.example` | Document all env vars: `ANTHROPIC_API_KEY` (required), `GITHUB_TOKEN` (required for PR creation), `DB_DRIVER` (default: sqlite), `DATABASE_URL` (optional, for Postgres mode), `DOSSIER_DATA_DIR` (default: `~/.dossier/`). |
-| P5 | README update | Installation and quick-start instructions for self-deploy. `npx dossier` one-liner. |
+| ID | Task | Details | Status |
+|----|------|---------|--------|
+| P1 | Standalone build | `output: 'standalone'` + `serverExternalPackages` in `next.config.mjs`. Postbuild copies static + public. | ✅ Done |
+| P2 | CLI entry point | `bin/dossier.mjs` — loads `~/.dossier/config`, starts standalone server, opens browser. `bin` field in `package.json`. | ✅ Done |
+| P3 | First-run setup | `instrumentation.ts` runs `loadConfigIntoEnv()` + `ensureFirstRunComplete()` on server start. Auto-creates default project. | ✅ Done |
+| P4 | `.env.example` | All env vars documented with categories. | ✅ Done |
+| P5 | README update | Full self-deploy quick-start, architecture, CLI options. | ✅ Done |
+| P6 | Config in `~/.dossier/config` | Setup route writes to `~/.dossier/config` instead of `.env.local`. Middleware reads config dynamically (Node.js runtime). No restart needed. | ✅ Done |
 
 ### Exit Criteria
 
-- `npx dossier` starts a working instance with zero prior setup (beyond API key)
-- SQLite database created automatically on first run
-- Migrations run automatically
-- Browser opens to `http://localhost:3000`
-- Works on macOS and Linux (Windows via WSL)
+- [x] `npm run dossier` starts a working instance with zero prior setup (beyond API key)
+- [x] SQLite database created automatically on first run
+- [x] Migrations run automatically (embedded in code, no filesystem dependency)
+- [x] Browser opens to `http://localhost:3000`
+- [x] Default project created on first run
+- [x] Setup flow saves to `~/.dossier/config` — no restart required
+- [x] Config location is Tauri-compatible (user data dir, not app bundle)
+- [x] Works on macOS and Linux (Windows via WSL)
 
 ---
 

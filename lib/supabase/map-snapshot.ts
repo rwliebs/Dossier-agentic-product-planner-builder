@@ -14,12 +14,11 @@ import {
 import {
   getProject,
   getWorkflowsByProject,
-  getActivitiesByWorkflow,
-  getStepsByActivity,
-  getCardsByStep,
-  getCardsByActivity,
+  getActivitiesByProject,
+  getStepsByProject,
+  getCardsByProject,
   getArtifactsByProject,
-  getCardContextArtifacts,
+  getCardContextLinksByProject,
 } from "./queries";
 
 /**
@@ -42,7 +41,16 @@ export async function fetchMapSnapshot(
 
   const state = createEmptyPlanningState(project);
 
-  const workflows = await getWorkflowsByProject(db, projectId);
+  const [workflows, activities, steps, cards, artifacts, cardContextLinks] =
+    await Promise.all([
+      getWorkflowsByProject(db, projectId),
+      getActivitiesByProject(db, projectId),
+      getStepsByProject(db, projectId),
+      getCardsByProject(db, projectId),
+      getArtifactsByProject(db, projectId),
+      getCardContextLinksByProject(db, projectId),
+    ]);
+
   for (const w of workflows ?? []) {
     const workflow: Workflow = {
       id: w.id,
@@ -55,73 +63,41 @@ export async function fetchMapSnapshot(
     state.workflows.set(w.id, workflow);
   }
 
-  for (const w of workflows ?? []) {
-    const activities = await getActivitiesByWorkflow(db, w.id as string);
-    for (const a of activities ?? []) {
-      const activity: WorkflowActivity = {
-        id: a.id,
-        workflow_id: a.workflow_id,
-        title: a.title,
-        color: a.color ?? null,
-        position: a.position,
-      };
-      state.activities.set(a.id, activity);
-    }
+  for (const a of activities ?? []) {
+    const activity: WorkflowActivity = {
+      id: a.id,
+      workflow_id: a.workflow_id,
+      title: a.title,
+      color: a.color ?? null,
+      position: a.position,
+    };
+    state.activities.set(a.id, activity);
   }
 
-  const allActivities = Array.from(state.activities.values());
-  for (const a of allActivities) {
-    const steps = await getStepsByActivity(db, a.id);
-    for (const s of steps ?? []) {
-      const step: Step = {
-        id: s.id,
-        workflow_activity_id: s.workflow_activity_id,
-        title: s.title,
-        position: s.position,
-      };
-      state.steps.set(s.id, step);
-    }
+  for (const s of steps ?? []) {
+    const step: Step = {
+      id: s.id,
+      workflow_activity_id: s.workflow_activity_id,
+      title: s.title,
+      position: s.position,
+    };
+    state.steps.set(s.id, step);
   }
 
-  for (const a of allActivities) {
-    const stepsInActivity = Array.from(state.steps.values()).filter(
-      (s) => s.workflow_activity_id === a.id,
-    );
-    for (const s of stepsInActivity) {
-      const cards = await getCardsByStep(db, s.id);
-      for (const c of cards ?? []) {
-        const card: Card = {
-          id: c.id,
-          workflow_activity_id: c.workflow_activity_id,
-          step_id: c.step_id ?? null,
-          title: c.title,
-          description: c.description ?? null,
-          status: c.status,
-          priority: c.priority,
-          position: c.position,
-        };
-        state.cards.set(c.id, card);
-      }
-    }
-    const cardsWithoutStep = await getCardsByActivity(db, a.id);
-    for (const c of cardsWithoutStep ?? []) {
-      if (!state.cards.has(c.id)) {
-        const card: Card = {
-          id: c.id,
-          workflow_activity_id: c.workflow_activity_id,
-          step_id: null,
-          title: c.title,
-          description: c.description ?? null,
-          status: c.status,
-          priority: c.priority,
-          position: c.position,
-        };
-        state.cards.set(c.id, card);
-      }
-    }
+  for (const c of cards ?? []) {
+    const card: Card = {
+      id: c.id,
+      workflow_activity_id: c.workflow_activity_id,
+      step_id: c.step_id ?? null,
+      title: c.title,
+      description: c.description ?? null,
+      status: c.status,
+      priority: c.priority,
+      position: c.position,
+    };
+    state.cards.set(c.id, card);
   }
 
-  const artifacts = await getArtifactsByProject(db, projectId);
   for (const art of artifacts ?? []) {
     const artifact: ContextArtifact = {
       id: art.id,
@@ -141,14 +117,12 @@ export async function fetchMapSnapshot(
     state.contextArtifacts.set(art.id, artifact);
   }
 
-  for (const card of state.cards.values()) {
-    const links = await getCardContextArtifacts(db, card.id);
-    const artifactIds = new Set(
-      (links ?? []).map((l) => l.context_artifact_id),
-    );
-    if (artifactIds.size > 0) {
-      state.cardContextLinks.set(card.id, artifactIds);
+  for (const link of cardContextLinks ?? []) {
+    const cardId = link.card_id;
+    if (!state.cardContextLinks.has(cardId)) {
+      state.cardContextLinks.set(cardId, new Set());
     }
+    state.cardContextLinks.get(cardId)!.add(link.context_artifact_id);
   }
 
   return state;

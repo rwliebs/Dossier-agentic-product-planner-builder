@@ -1,9 +1,19 @@
 {
-  "name": "my-v0-project",
+  "name": "dossier",
   "version": "0.1.0",
-  "private": true,
+  "description": "AI-native product craft platform — plan workflows, orchestrate multi-agent builds, ship iteratively",
+  "bin": {
+    "dossier": "./bin/dossier.mjs"
+  },
+  "files": [
+    "bin/",
+    ".next/standalone/",
+    ".next/static/",
+    "public/"
+  ],
   "scripts": {
-    "build": "next build",
+    "build": "next build && npm run postbuild",
+    "postbuild": "cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public",
     "dev": "next dev",
     "lint": "eslint .",
     "test": "vitest run",
@@ -11,7 +21,8 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e:adaptive": "vitest run __tests__/e2e/adaptive-flows.test.ts",
     "test:db": "vitest run __tests__/db/",
-    "start": "next start"
+    "start": "next start",
+    "dossier": "node bin/dossier.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",

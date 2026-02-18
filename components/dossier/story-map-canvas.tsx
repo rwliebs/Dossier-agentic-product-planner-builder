@@ -18,6 +18,7 @@ export interface StoryMapCanvasProps {
   onSelectFile?: (file: CodeFileForPanel) => void;
   codeFiles?: CodeFileForPanel[];
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
+  getCardKnowledgeLoading?: (cardId: string) => boolean;
 }
 
 export function StoryMapCanvas({
@@ -33,6 +34,7 @@ export function StoryMapCanvas({
   onSelectFile,
   codeFiles,
   getCardKnowledge,
+  getCardKnowledgeLoading,
 }: StoryMapCanvasProps) {
   const [uncontrolledExpandedCardId, setUncontrolledExpandedCardId] = useState<string | null>(null);
   const expandedCardId = controlledExpandedCardId ?? uncontrolledExpandedCardId;
@@ -75,6 +77,7 @@ export function StoryMapCanvas({
                 onSelectFile={onSelectFile}
                 codeFiles={codeFiles}
                 getCardKnowledge={getCardKnowledge as ActivityColumnProps['getCardKnowledge']}
+                getCardKnowledgeLoading={getCardKnowledgeLoading}
               />
             </div>
             {index < allActivities.length - 1 && (

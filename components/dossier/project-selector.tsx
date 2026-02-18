@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ChevronDown, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useProjects } from '@/lib/hooks/use-projects';
 import type { Project } from '@/lib/types/ui';
 
@@ -52,7 +53,7 @@ export function ProjectSelector({
         onClick={() => setOpen(!open)}
       >
         {loading ? (
-          <span className="text-muted-foreground">Loading…</span>
+          <Skeleton className="h-4 w-24 rounded" />
         ) : selectedProject ? (
           <>
             <span className="truncate max-w-[140px]">{selectedProject.name}</span>

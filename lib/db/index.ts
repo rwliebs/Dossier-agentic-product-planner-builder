@@ -7,27 +7,9 @@
 
 import type { DbAdapter } from "./adapter";
 import { createSqliteAdapter } from "./sqlite-adapter";
-import * as path from "path";
-import * as fs from "fs";
+import { getSqlitePath } from "@/lib/config/data-dir";
 
 let _adapter: DbAdapter | null = null;
-
-function getDataDir(): string {
-  const env = process.env.DOSSIER_DATA_DIR;
-  if (env) return env;
-  const home = process.env.HOME ?? process.env.USERPROFILE ?? ".";
-  return path.join(home, ".dossier");
-}
-
-function getSqlitePath(): string {
-  const dir = getDataDir();
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-  } catch {
-    // ignore
-  }
-  return path.join(dir, "dossier.db");
-}
 
 export function getDb(): DbAdapter {
   if (_adapter) return _adapter;
@@ -39,14 +21,12 @@ export function getDb(): DbAdapter {
     if (!url) {
       throw new Error("DB_DRIVER=postgres requires DATABASE_URL to be set");
     }
-    // Postgres adapter - stub for now, throws
     throw new Error(
       "Postgres adapter not yet implemented. Use DB_DRIVER=sqlite (default) for local development."
     );
   }
 
-  const dbPath = process.env.SQLITE_PATH ?? getSqlitePath();
-  _adapter = createSqliteAdapter(dbPath);
+  _adapter = createSqliteAdapter(getSqlitePath());
   return _adapter;
 }
 

@@ -121,3 +121,67 @@ export const updatePlannedFileSchema = z.object({
 export const approvePlannedFileSchema = z.object({
   status: z.literal("approved"),
 });
+
+// Chat request
+export const chatRequestSchema = z.object({
+  message: z.string().min(1, "Message is required").transform((s) => s.trim()),
+});
+
+// Orchestration: create run (POST body; project_id from params)
+export const createRunRequestSchema = z
+  .object({
+    scope: z.enum(["workflow", "card"]),
+    workflow_id: z.string().uuid().nullable().optional(),
+    card_id: z.string().uuid().nullable().optional(),
+    trigger_type: z.enum(["card", "workflow", "manual"]).optional(),
+    initiated_by: z.string().min(1),
+    repo_url: z.string().url(),
+    base_branch: z.string().min(1),
+    run_input_snapshot: z.record(z.unknown()),
+    worktree_root: z.string().nullable().optional(),
+  })
+  .refine(
+    (d) => {
+      if (d.scope === "workflow") return d.workflow_id != null && d.card_id == null;
+      if (d.scope === "card") return d.card_id != null;
+      return true;
+    },
+    { message: "scope=workflow requires workflow_id; scope=card requires card_id" }
+  );
+
+// Orchestration: create assignment (POST body; run_id from params)
+export const createAssignmentRequestSchema = z.object({
+  card_id: z.string().uuid(),
+  agent_role: z.enum(["planner", "coder", "reviewer", "integrator", "tester"]),
+  agent_profile: z.string().min(1),
+  feature_branch: z.string().min(1),
+  worktree_path: z.string().nullable().optional(),
+  allowed_paths: z.array(z.string()).min(1),
+  forbidden_paths: z.array(z.string()).nullable().optional(),
+  assignment_input_snapshot: z.record(z.unknown()).optional(),
+});
+
+// Orchestration: trigger build (POST body; project_id from params)
+export const triggerBuildRequestSchema = z
+  .object({
+    scope: z.enum(["workflow", "card"]),
+    workflow_id: z.string().uuid().nullable().optional(),
+    card_id: z.string().uuid().nullable().optional(),
+    trigger_type: z.enum(["card", "workflow", "manual"]).optional(),
+    initiated_by: z.string().min(1),
+  })
+  .refine(
+    (d) => {
+      if (d.scope === "workflow") return d.workflow_id != null && d.card_id == null;
+      if (d.scope === "card") return d.card_id != null;
+      return true;
+    },
+    { message: "scope=workflow requires workflow_id; scope=card requires card_id" }
+  );
+
+// Orchestration: create approval request (POST body)
+export const createApprovalRequestSchema = z.object({
+  run_id: z.string().uuid(),
+  approval_type: z.enum(["create_pr", "merge_pr"]),
+  requested_by: z.string().min(1),
+});

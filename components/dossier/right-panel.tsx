@@ -23,6 +23,7 @@ import { useProjectFiles, type FileNode } from "@/lib/hooks/use-project-files";
 import { useOrchestrationRuns } from "@/lib/hooks/use-orchestration-runs";
 import { useRunDetail } from "@/lib/hooks/use-run-detail";
 import { RunStatusSkeleton } from "./run-status-skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface RightPanelProps {
   isOpen: boolean;
@@ -302,14 +303,24 @@ export function RightPanel({
                   {filesLoading && projectId && (
                     <>
                       <span className="text-foreground/40">•</span>
-                      <span>Loading…</span>
+                      <Skeleton className="h-3 w-16 rounded" />
                     </>
                   )}
                 </div>
               </div>
-              {fileTree.map((node) => (
-                <FileTreeNode key={node.path} node={node} />
-              ))}
+              {filesLoading && projectId ? (
+                <div className="space-y-1 px-3 py-2">
+                  <Skeleton className="h-6 w-32 rounded" />
+                  <Skeleton className="h-6 w-40 rounded ml-3" />
+                  <Skeleton className="h-6 w-36 rounded ml-3" />
+                  <Skeleton className="h-6 w-28 rounded ml-6" />
+                  <Skeleton className="h-6 w-24 rounded" />
+                </div>
+              ) : (
+                fileTree.map((node) => (
+                  <FileTreeNode key={node.path} node={node} />
+                ))
+              )}
             </div>
           </ScrollArea>
         )}

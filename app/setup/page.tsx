@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { KeyRound, Github, Loader2 } from 'lucide-react';
+import { KeyRound, Github, Loader2, CheckCircle2 } from 'lucide-react';
 
 export default function SetupPage() {
   const router = useRouter();
@@ -13,16 +13,18 @@ export default function SetupPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [missingKeys, setMissingKeys] = useState<string[]>([]);
+  const [configPath, setConfigPath] = useState('~/.dossier/config');
 
   useEffect(() => {
     fetch('/api/setup/status')
       .then((r) => r.json())
-      .then((data: { needsSetup: boolean; missingKeys: string[] }) => {
+      .then((data: { needsSetup: boolean; missingKeys: string[]; configPath?: string }) => {
         if (!data.needsSetup) {
           router.replace('/');
           return;
         }
         setMissingKeys(data.missingKeys ?? []);
+        if (data.configPath) setConfigPath(data.configPath);
       })
       .catch(() => setMissingKeys(['ANTHROPIC_API_KEY', 'GITHUB_TOKEN']));
   }, [router]);
@@ -48,7 +50,9 @@ export default function SetupPage() {
         setError(data.error ?? 'Failed to save');
         return;
       }
+      if (data.configPath) setConfigPath(data.configPath);
       setSuccess(true);
+      setTimeout(() => router.replace('/'), 1500);
     } catch {
       setError('Failed to save');
     } finally {
@@ -62,8 +66,8 @@ export default function SetupPage() {
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">Dossier Setup</h1>
           <p className="text-muted-foreground text-sm">
-            Enter your API keys to enable planning and build features. Keys are saved to{' '}
-            <code className="text-xs bg-muted px-1 rounded">.env.local</code> in your project.
+            Enter your API keys to get started. Keys are saved to{' '}
+            <code className="text-xs bg-muted px-1 rounded">{configPath}</code>.
           </p>
         </div>
 
@@ -84,7 +88,10 @@ export default function SetupPage() {
                 autoComplete="off"
               />
               <p className="text-xs text-muted-foreground">
-                Required for planning LLM and claude-flow builds.
+                Get yours at{' '}
+                <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="underline">
+                  console.anthropic.com
+                </a>
               </p>
             </div>
           )}
@@ -105,7 +112,11 @@ export default function SetupPage() {
                 autoComplete="off"
               />
               <p className="text-xs text-muted-foreground">
-                Required for pushing branches and creating PRs in your project repo.
+                Create at{' '}
+                <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="underline">
+                  github.com/settings/tokens
+                </a>
+                {' '}with <code className="bg-muted px-1 rounded">repo</code> scope
               </p>
             </div>
           )}
@@ -115,20 +126,21 @@ export default function SetupPage() {
           )}
 
           {success && (
-            <p className="text-sm text-green-600 dark:text-green-500">
-              Keys saved. Restart the app (stop and run <code className="bg-muted px-1 rounded">npm run dev</code> again) for changes to take effect.
-            </p>
+            <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-500">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Keys saved. Redirecting&hellip;</span>
+            </div>
           )}
 
           <Button
             type="submit"
-            disabled={loading || (!anthropicApiKey && !githubToken)}
+            disabled={loading || success || (!anthropicApiKey && !githubToken)}
             className="w-full"
           >
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Saving…
+                Saving&hellip;
               </>
             ) : (
               'Save and continue'
@@ -137,8 +149,7 @@ export default function SetupPage() {
         </form>
 
         <p className="text-xs text-muted-foreground text-center">
-          Keys are stored in <code className="bg-muted px-1 rounded">.env.local</code> and never
-          sent to any server except Anthropic and GitHub.
+          Keys are stored locally and never sent to any server except Anthropic and GitHub.
         </p>
       </div>
     </div>

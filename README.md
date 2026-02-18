@@ -1,84 +1,98 @@
-# Dossier: the end-to-end platform for AI-native product craft
+# Dossier
 
+**The dashboard for orchestrating end-to-end builds with multiple agents.**
 
-## The Pain Point: actually building and shipping from idea to production
+Plan workflows from ideas. Set precise agent context per feature. Trigger multi-agent builds. Review, test, and ship iteratively.
 
-Going beyond vibe coding? Features and products get complicated, fast. 
-- Agent context windows are limited. Long prompts and large codebases cause hallucinations and errors.
-- Updating or adding code in one area breaks another. Frustration mounts, timelines stretch.
-- There's no room for user feedback in a one-shot prompt. Your process must be flexible to iterate.
-- Trying to use multiple agents? The challenge is bigger than worktree management - it's setting clear boundaries and context.
+## Quick Start
 
-  
+### Prerequisites
 
-## The Root Cause: humans out of the loop
+- **Node.js 18+** — [nodejs.org](https://nodejs.org/)
+- **Anthropic API key** — [console.anthropic.com](https://console.anthropic.com/)
+- **GitHub token** (for PR creation) — [github.com/settings/tokens](https://github.com/settings/tokens) with `repo` scope
 
-Too much context + too little observability when you try to one-shot a feature or product.
-- It will take you dozens or hundreds of chats to build, all relying on your memory and organization
-- Use plan mode? You're still shipping and changing too much code without involving humans or users. Overbuilds lead to breakage.
-- You're building the PRD. You should be building the user workflow - that's the value. But you can't observe it in action.
-- Without careful boundaries set in each agent's context, running multiple agents risks breaking the codebase
+### Install and Run
 
+```bash
+git clone https://github.com/your-org/dossier.git
+cd dossier
+npm install
+npm run build
+npm run dossier
+```
 
-## The Goal: help builders iterate their way to great products, supported by a team of agents
+Your browser opens to `http://localhost:3000`. On first run, you'll be guided through API key setup.
 
-*AI-enpowered product builders (entrepreneurs, product managers, designers and engineers) can easily iterate toward product-grade features and products with price control over agent context throughout planning and execution, across the whole product
+### Development Mode
 
+```bash
+npm run dev
+```
 
+Starts Next.js in development mode with hot reload on port 3000.
 
-## The Solution: the dashboard for orchestrating end-to-end builds with multiple agents
+## How It Works
 
-The dashboard for end-to-end, multi-agent AI-native building.
-1. Work with an agent to build out the workflow from an idea.
-2. Shape and prioritize features by click, drag and drop - no long chats
-3. Priceley set agent context for each feature build: tests, architecture, design guidance, mockups and more
-4. Trigger a team of agents to build piece by piece or release by release - each with clear boundaries
-5. Review, test and track progress as the feature or product takes shape
+1. **Describe your idea** — Chat with the planning agent to generate an implementation roadmap
+2. **Shape the plan** — Review workflows, activities, and cards on the story map canvas
+3. **Set context** — Approve planned files, add requirements, answer questions per card
+4. **Build** — Trigger agents to build card-by-card with precise boundaries
+5. **Review** — Monitor runs, approve PRs, iterate
 
+## Architecture
 
+Dossier runs as a standalone Next.js app on your machine. All data stays local.
 
-## What's different? Focus on quality, observability and context control
+```
+~/.dossier/
+  config       ← API keys and settings
+  dossier.db   ← SQLite database
+  ruvector/    ← Vector embeddings (future)
+```
 
-Current multi-agent orchestrators help run things faster. Dossier will help product builders achieve production-quality by planning and targeting precise builds and updates across multiple rounds of iteration and multiple agents. Build for product minds.
+| Component | Technology |
+|-----------|-----------|
+| UI + API | Next.js (React 19) |
+| Database | SQLite (via better-sqlite3) |
+| Planning LLM | Anthropic Claude |
+| Build agents | claude-flow (local, in-process) |
+| Embeddings | RuVector (local WASM) |
 
+## Configuration
 
+API keys can be set via the web setup at `/setup` or by editing `~/.dossier/config` directly:
 
-## Why not use planning mode in Cursor or Claude Code?
+```
+ANTHROPIC_API_KEY=sk-ant-...
+GITHUB_TOKEN=ghp_...
+```
 
-- Forget reviewing long text-based plans. Plans are structured and visual.
-- Easy to customize context per build
-- Clear division of duties between multiple agents working in the same repo simultaneously
+See [`.env.example`](.env.example) for all available options.
 
+### Environment Variable Precedence
 
+1. `process.env` (shell environment / `.env.local`)
+2. `~/.dossier/config`
 
-## Why not use Linear or Jira for planning?
+## CLI Options
 
-- Too much bloat left over from tracking long development cycles and large teams.
-- A ticket does not equal agent context. Tests, markdowns, visuals, directories and files, agent rules - agents need links, not just instructions.
+```bash
+npm run dossier                  # Start on port 3000
+npm run dossier -- --port 8080   # Custom port
+npm run dossier -- --no-open     # Don't open browser
+npm run dossier -- --help        # Show help
+```
 
+## Development
 
+```bash
+npm run dev          # Dev server with hot reload
+npm run build        # Production build
+npm test             # Run tests
+npm run lint         # Lint
+```
 
-## Stage: Prototype https://v0-ai-orchestration-interface.vercel.app/
+## License
 
-This is super early, visual-only to validate the concept.
-
-
-### What you'll see now:
-- A snapshot of the interface - what an agent would help you plan from an idea.
-- Dashboard built like a user story map: user workflows broken down into user actions, with features attached to each action.
-- Preview ways to set context per feature, trigger builds, review code and context documents
-
-
-
-### What I need:
-- Feedback to round out the workflow. Feature ideas to get you from concept to production, with each step covered.
-
-
-
-## Next Phases
-- Add workflow generator (idea > plan)
-- Connect GitHub for code and doc management
-- Connect to agent CLIs for building
-
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/richardliebrecht-gmailcoms-projects/v0-ai-orchestration-interface)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/si3HJmvNhXd)
+Private — not yet published.

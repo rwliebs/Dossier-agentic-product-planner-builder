@@ -6,6 +6,7 @@ import {
   getCardAssignmentsByRun,
 } from "@/lib/supabase/queries/orchestration";
 import { json, notFoundError, validationError, internalError } from "@/lib/api/response-helpers";
+import { createAssignmentRequestSchema } from "@/lib/validation/request-schema";
 
 export async function GET(
   _request: NextRequest,
@@ -34,30 +35,17 @@ export async function POST(
 ) {
   try {
     const { runId } = await params;
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parsed = createAssignmentRequestSchema.safeParse(rawBody);
 
-    const {
-      card_id,
-      agent_role,
-      agent_profile,
-      feature_branch,
-      worktree_path,
-      allowed_paths,
-      forbidden_paths,
-      assignment_input_snapshot,
-    } = body;
-
-    if (
-      !card_id ||
-      !agent_role ||
-      !agent_profile ||
-      !feature_branch ||
-      !allowed_paths ||
-      !Array.isArray(allowed_paths)
-    ) {
-      return validationError(
-        "Missing required fields: card_id, agent_role, agent_profile, feature_branch, allowed_paths (array)"
-      );
+    if (!parsed.success) {
+      const details: Record<string, string[]> = {};
+      parsed.error.errors.forEach((e) => {
+        const path = e.path.join(".") || "body";
+        if (!details[path]) details[path] = [];
+        details[path].push(e.message);
+      });
+      return validationError("Invalid request body", details);
     }
 
     const db = getDb();
@@ -66,6 +54,7 @@ export async function POST(
       return notFoundError("Orchestration run not found");
     }
 
+    const { card_id, agent_role, agent_profile, feature_branch, worktree_path, allowed_paths, forbidden_paths, assignment_input_snapshot } = parsed.data;
     const result = await createAssignment(db, {
       run_id: runId,
       card_id,

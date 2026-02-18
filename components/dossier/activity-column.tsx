@@ -17,6 +17,7 @@ export interface ActivityColumnProps {
   onSelectFile?: (file: CodeFileForPanel) => void;
   codeFiles?: CodeFileForPanel[];
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
+  getCardKnowledgeLoading?: (cardId: string) => boolean;
 }
 
 export function ActivityColumn({
@@ -32,6 +33,7 @@ export function ActivityColumn({
   onSelectFile,
   codeFiles = [],
   getCardKnowledge,
+  getCardKnowledgeLoading,
 }: ActivityColumnProps) {
   const sortedSteps = [...activity.steps].sort((a, b) => a.position - b.position);
   const activityLevelCards = activity.cards.filter((c) => !c.step_id);
@@ -61,6 +63,7 @@ export function ActivityColumn({
             onSelectFile={onSelectFile}
             codeFiles={codeFiles}
             getCardKnowledge={getCardKnowledge}
+            getCardKnowledgeLoading={getCardKnowledgeLoading}
           />
         ))}
         {sortedActivityCards.map((card) => {
@@ -86,6 +89,7 @@ export function ActivityColumn({
               assumptions={k?.assumptions}
               questions={k?.questions}
               quickAnswer={k?.quickAnswer}
+              knowledgeLoading={getCardKnowledgeLoading?.(card.id)}
             />
           );
         })}

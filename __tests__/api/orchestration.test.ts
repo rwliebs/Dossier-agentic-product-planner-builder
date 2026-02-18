@@ -59,6 +59,9 @@ describe("Orchestration API contracts", () => {
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.message).toContain("run_input_snapshot");
+    expect(body.message).toBeDefined();
+    expect(
+      body.details?.run_input_snapshot ?? body.message?.includes("run_input_snapshot")
+    ).toBeTruthy();
   });
 });

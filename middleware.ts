@@ -1,18 +1,26 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { readConfigFile } from "@/lib/config/data-dir";
+
+export const config = {
+  runtime: "nodejs",
+};
 
 const SETUP_PATH = "/setup";
 
 function needsSetup(): boolean {
-  const anthropic = process.env.ANTHROPIC_API_KEY?.trim();
-  const github = process.env.GITHUB_TOKEN?.trim();
-  return !anthropic || !github;
+  if (process.env.ANTHROPIC_API_KEY?.trim() && process.env.GITHUB_TOKEN?.trim()) {
+    return false;
+  }
+  const cfg = readConfigFile();
+  const hasAnthropic = !!(process.env.ANTHROPIC_API_KEY?.trim() || cfg.ANTHROPIC_API_KEY?.trim());
+  const hasGithub = !!(process.env.GITHUB_TOKEN?.trim() || cfg.GITHUB_TOKEN?.trim());
+  return !hasAnthropic || !hasGithub;
 }
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Never redirect API, static, or setup
   if (pathname.startsWith("/api") || pathname.startsWith("/_next") || pathname.includes(".")) {
     return NextResponse.next();
   }

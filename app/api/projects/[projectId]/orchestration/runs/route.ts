@@ -5,6 +5,7 @@ import {
   listOrchestrationRunsByProject,
 } from "@/lib/supabase/queries/orchestration";
 import { json, validationError, notFoundError, internalError } from "@/lib/api/response-helpers";
+import { createRunRequestSchema } from "@/lib/validation/request-schema";
 
 export async function GET(
   request: NextRequest,
@@ -39,25 +40,21 @@ export async function POST(
 ) {
   try {
     const { projectId } = await params;
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parsed = createRunRequestSchema.safeParse(rawBody);
 
-    const {
-      scope,
-      workflow_id,
-      card_id,
-      trigger_type,
-      initiated_by,
-      repo_url,
-      base_branch,
-      run_input_snapshot,
-      worktree_root,
-    } = body;
-
-    if (!scope || !initiated_by || !repo_url || !base_branch || !run_input_snapshot) {
-      return validationError("Missing required fields: scope, initiated_by, repo_url, base_branch, run_input_snapshot");
+    if (!parsed.success) {
+      const details: Record<string, string[]> = {};
+      parsed.error.errors.forEach((e) => {
+        const path = e.path.join(".") || "body";
+        if (!details[path]) details[path] = [];
+        details[path].push(e.message);
+      });
+      return validationError("Invalid request body", details);
     }
 
     const db = getDb();
+    const { scope, workflow_id, card_id, trigger_type, initiated_by, repo_url, base_branch, run_input_snapshot, worktree_root } = parsed.data;
     const result = await createRun(db, {
       project_id: projectId,
       scope,

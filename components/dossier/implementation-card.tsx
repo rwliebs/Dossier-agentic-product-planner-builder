@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, Edit2, Check, X } from 'lucide-react';
+import { CardSkeleton } from './card-skeleton';
 import type {
   MapCard,
   CardStatus,
@@ -42,6 +43,8 @@ interface ImplementationCardProps {
   assumptions?: CardAssumption[];
   questions?: CardQuestion[];
   quickAnswer?: string | null;
+  /** Show skeleton when expanded and knowledge/planned files are loading */
+  knowledgeLoading?: boolean;
 }
 
 const CARD_STATUS = ['todo', 'active', 'questions', 'review', 'production'] as const;
@@ -110,6 +113,7 @@ export function ImplementationCard({
   assumptions = [],
   questions = [],
   quickAnswer: quickAnswerProp,
+  knowledgeLoading = false,
 }: ImplementationCardProps) {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState(card.description || '');
@@ -236,6 +240,10 @@ export function ImplementationCard({
       {isExpanded && (
         <div className="border-t-2 bg-white/50" onClick={(e) => e.stopPropagation()}>
           <div className="p-4 space-y-4">
+            {knowledgeLoading ? (
+              <CardSkeleton />
+            ) : (
+            <>
             {requirements.length > 0 && (
               <div>
                 <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Requirements</h5>
@@ -384,6 +392,8 @@ export function ImplementationCard({
               </div>
             )}
 
+            </>
+            )}
             <button
               type="button"
               onClick={() => onExpand(card.id)}

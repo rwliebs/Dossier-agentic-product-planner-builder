@@ -34,6 +34,7 @@ interface WorkflowBlockProps {
   onFileClick?: (file: CodeFileForPanel | CodeFile) => void;
   onUpdateFileDescription?: (fileId: string, description: string) => void;
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
+  getCardKnowledgeLoading?: (cardId: string) => boolean;
 }
 
 export function WorkflowBlock({
@@ -51,6 +52,7 @@ export function WorkflowBlock({
   onFileClick,
   onUpdateFileDescription,
   getCardKnowledge,
+  getCardKnowledgeLoading,
 }: WorkflowBlockProps) {
   const allCards = useMemo(() => allCardsFromSnapshot(snapshot), [snapshot]);
   const statusCounts = useMemo(
@@ -110,6 +112,7 @@ export function WorkflowBlock({
             onSelectDoc={onSelectDoc}
             onSelectFile={onFileClick}
             getCardKnowledge={getCardKnowledge}
+            getCardKnowledgeLoading={getCardKnowledgeLoading}
           />
         ) : (
           <ArchitectureView

@@ -8,8 +8,9 @@ import {
 } from "@/lib/llm";
 import { buildPreviewFromActions } from "@/lib/llm/build-preview-response";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
-import { json } from "@/lib/api/response-helpers";
+import { json, validationError } from "@/lib/api/response-helpers";
 import { PLANNING_LLM } from "@/lib/feature-flags";
+import { chatRequestSchema } from "@/lib/validation/request-schema";
 
 export interface ChatRequest {
   message: string;
@@ -52,17 +53,24 @@ export async function POST(
     return json({ status: "error", message: "Project ID required" }, 400);
   }
 
-  let body: ChatRequest;
+  let rawBody: unknown;
   try {
-    body = (await request.json()) as ChatRequest;
+    rawBody = await request.json();
   } catch {
     return json({ status: "error", message: "Invalid JSON body" }, 400);
   }
 
-  const message = body.message?.trim();
-  if (!message) {
-    return json({ status: "error", message: "Message is required" }, 400);
+  const parsed = chatRequestSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    const details: Record<string, string[]> = {};
+    parsed.error.errors.forEach((e) => {
+      const path = e.path.join(".") || "body";
+      if (!details[path]) details[path] = [];
+      details[path].push(e.message);
+    });
+    return validationError("Invalid request body", details);
   }
+  const message = parsed.data.message;
 
   let db;
   try {

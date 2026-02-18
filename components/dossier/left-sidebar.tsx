@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, ChevronUp, BookOpen, Bot, User, Send, Loader2, Github, Check, FolderOpen, Folder, FileCode, ChevronRight, Tag } from 'lucide-react';
+import { ChevronDown, ChevronUp, BookOpen, Bot, User, Send, Github, Check, FolderOpen, Folder, FileCode, ChevronRight, Tag } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ChatSkeleton } from './chat-skeleton';
 import { Button } from '@/components/ui/button';
 import { ChatPreviewPanel } from '@/components/dossier/chat-preview-panel';
 import { useProjectFiles, type FileNode } from '@/lib/hooks/use-project-files';
@@ -387,10 +389,16 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
                 </div>
               ))}
               {isThinking && (
-                <div className="flex gap-2">
-                  <div className="h-5 w-5 rounded-full bg-secondary flex items-center justify-center"><Bot className="h-2.5 w-2.5" /></div>
-                  <div className="bg-secondary rounded px-2 py-1.5"><Loader2 className="h-3 w-3 animate-spin" /></div>
-                </div>
+                messages.length === 0 ? (
+                  <ChatSkeleton />
+                ) : (
+                  <div className="flex gap-2">
+                    <div className="h-5 w-5 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                      <Bot className="h-2.5 w-2.5" />
+                    </div>
+                    <Skeleton className="h-12 w-48 rounded-lg shrink-0" />
+                  </div>
+                )
               )}
               {pendingPreview && (
                 <ChatPreviewPanel

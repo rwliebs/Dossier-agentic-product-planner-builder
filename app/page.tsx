@@ -55,13 +55,20 @@ export default function DossierPage() {
   const { triggerBuild } = useTriggerBuild(appMode === 'active' ? projectId : undefined);
 
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
-  const { data: cardKnowledge } = useCardKnowledge(
+  const { data: cardKnowledge, loading: cardKnowledgeLoading } = useCardKnowledge(
     appMode === 'active' ? projectId : undefined,
     expandedCardId ?? undefined
   );
-  const { data: cardPlannedFiles } = useCardPlannedFiles(
+  const { data: cardPlannedFiles, loading: cardPlannedFilesLoading } = useCardPlannedFiles(
     appMode === 'active' ? projectId : undefined,
     expandedCardId ?? undefined
+  );
+  const cardKnowledgeLoadingState = cardKnowledgeLoading || cardPlannedFilesLoading;
+
+  const getCardKnowledgeLoading = useCallback(
+    (cardId: string): boolean =>
+      cardId === expandedCardId && cardKnowledgeLoadingState,
+    [expandedCardId, cardKnowledgeLoadingState]
   );
 
   const getCardKnowledge = useCallback(
@@ -309,6 +316,7 @@ export default function DossierPage() {
                     }}
                     onUpdateFileDescription={handleUpdateFileDescription}
                     getCardKnowledge={getCardKnowledge}
+                    getCardKnowledgeLoading={getCardKnowledgeLoading}
                   />
                   </MapErrorBoundary>
                 )}

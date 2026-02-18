@@ -69,6 +69,8 @@ interface LeftSidebarProps {
   onToggle: (collapsed: boolean) => void;
   project: ProjectInfo;
   projectId?: string;
+  /** Controlled width in pixels for the expanded sidebar */
+  width?: number;
   /** Called when user accepts preview and actions are applied (map should refresh) */
   onPlanningApplied?: () => void;
   /** Called when user edits the project name, description, or repo link. May return a Promise that resolves to true if the update succeeded. */
@@ -101,7 +103,7 @@ function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: 
   );
 }
 
-export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlanningApplied, onProjectUpdate }: LeftSidebarProps) {
+export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, onPlanningApplied, onProjectUpdate }: LeftSidebarProps) {
   const { data: projectFiles } = useProjectFiles(projectId);
   const contextFileTree = projectFiles && projectFiles.length > 0 ? projectFiles : [];
 
@@ -504,7 +506,10 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
   }
 
   return (
-    <div className="w-64 border-r border-grid-line bg-background overflow-y-auto flex flex-col">
+    <div
+      className="border-r border-grid-line bg-background overflow-y-auto flex flex-col"
+      style={{ width: width ?? 256, flexShrink: 0 }}
+    >
       {/* Header — editable project name & description */}
       <div className="p-4 border-b border-grid-line">
         <div className="flex items-start justify-between gap-2 mb-3">

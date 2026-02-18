@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from '@/components/dossier/header';
 import { LeftSidebar } from '@/components/dossier/left-sidebar';
 import { WorkflowBlock } from '@/components/dossier/workflow-block';
@@ -111,6 +111,55 @@ export default function DossierPage() {
   const [rightPanelTab, setRightPanelTab] = useState<'files' | 'terminal' | 'docs' | 'chat' | 'runs'>('files');
   const [selectedDoc, setSelectedDoc] = useState<ContextArtifact | null>(null);
   const [selectedFile, setSelectedFile] = useState<CodeFileForPanel | null>(null);
+
+  const LEFT_WIDTH_KEY = 'dossier_left_sidebar_width';
+  const RIGHT_WIDTH_KEY = 'dossier_right_panel_width';
+  const [leftWidth, setLeftWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 256;
+    return Number(localStorage.getItem(LEFT_WIDTH_KEY)) || 256;
+  });
+  const [rightWidth, setRightWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 320;
+    return Number(localStorage.getItem(RIGHT_WIDTH_KEY)) || 320;
+  });
+
+  const dragging = useRef<'left' | 'right' | null>(null);
+  const dragStartX = useRef(0);
+  const dragStartWidth = useRef(0);
+
+  const handleResizeMouseDown = useCallback((side: 'left' | 'right', e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = side;
+    dragStartX.current = e.clientX;
+    dragStartWidth.current = side === 'left' ? leftWidth : rightWidth;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (dragging.current === 'left') {
+        const delta = ev.clientX - dragStartX.current;
+        const next = Math.max(180, Math.min(520, dragStartWidth.current + delta));
+        setLeftWidth(next);
+        localStorage.setItem(LEFT_WIDTH_KEY, String(next));
+      } else if (dragging.current === 'right') {
+        const delta = dragStartX.current - ev.clientX;
+        const next = Math.max(220, Math.min(640, dragStartWidth.current + delta));
+        setRightWidth(next);
+        localStorage.setItem(RIGHT_WIDTH_KEY, String(next));
+      }
+    };
+
+    const onMouseUp = () => {
+      dragging.current = null;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [leftWidth, rightWidth]);
 
   const handleCardAction = useCallback((cardId: string, action: string) => {
     if (action === 'monitor' || action === 'test') {
@@ -230,6 +279,7 @@ export default function DossierPage() {
         <LeftSidebar
           isCollapsed={leftSidebarCollapsed}
           onToggle={setLeftSidebarCollapsed}
+          width={leftSidebarCollapsed ? undefined : leftWidth}
           project={{
             name: snapshot?.project?.name ?? 'Dossier',
             description: snapshot?.project?.description ?? null,
@@ -244,6 +294,14 @@ export default function DossierPage() {
           onProjectUpdate={handleProjectUpdate}
         />
         </ChatErrorBoundary>
+
+        {!leftSidebarCollapsed && (
+          <div
+            className="w-1 flex-shrink-0 bg-transparent hover:bg-primary/40 active:bg-primary/60 cursor-col-resize transition-colors z-10"
+            onMouseDown={(e) => handleResizeMouseDown('left', e)}
+            title="Drag to resize"
+          />
+        )}
 
         <div className="flex-1 flex flex-col overflow-hidden bg-background">
           {appMode === 'ideation' ? (
@@ -349,15 +407,23 @@ export default function DossierPage() {
         </div>
 
         {rightPanelOpen && (
-          <RightPanel
-            isOpen={rightPanelOpen}
-            onClose={() => setRightPanelOpen(false)}
-            activeDoc={selectedDoc}
-            activeFile={selectedFile}
-            activeTab={rightPanelTab}
-            onTabChange={setRightPanelTab}
-            projectId={appMode === 'active' ? projectId : undefined}
-          />
+          <>
+            <div
+              className="w-1 flex-shrink-0 bg-transparent hover:bg-primary/40 active:bg-primary/60 cursor-col-resize transition-colors z-10"
+              onMouseDown={(e) => handleResizeMouseDown('right', e)}
+              title="Drag to resize"
+            />
+            <RightPanel
+              isOpen={rightPanelOpen}
+              onClose={() => setRightPanelOpen(false)}
+              activeDoc={selectedDoc}
+              activeFile={selectedFile}
+              activeTab={rightPanelTab}
+              onTabChange={setRightPanelTab}
+              projectId={appMode === 'active' ? projectId : undefined}
+              width={rightWidth}
+            />
+          </>
         )}
       </div>
     </div>

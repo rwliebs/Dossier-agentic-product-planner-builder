@@ -34,6 +34,8 @@ interface RightPanelProps {
   onTabChange: (tab: "files" | "terminal" | "docs" | "chat" | "runs") => void;
   /** When set, files tab shows live project file tree from planned files */
   projectId?: string;
+  /** Controlled width in pixels */
+  width?: number;
 }
 
 function FileTreeNode({
@@ -198,6 +200,7 @@ export function RightPanel({
   activeTab,
   onTabChange,
   projectId,
+  width,
 }: RightPanelProps) {
   const { data: projectFiles, loading: filesLoading } = useProjectFiles(projectId);
   const { data: runs, loading: runsLoading } = useOrchestrationRuns(projectId, { limit: 20 });
@@ -245,7 +248,10 @@ export function RightPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="w-80 border-l border-border bg-background flex flex-col">
+    <div
+      className="border-l border-border bg-background flex flex-col"
+      style={{ width: width ?? 320, flexShrink: 0 }}
+    >
       {/* Panel Header */}
       <div className="h-12 border-b border-border flex items-center justify-between px-3">
         <div className="flex items-center gap-1">

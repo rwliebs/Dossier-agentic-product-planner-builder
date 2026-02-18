@@ -2,12 +2,11 @@
  * Create pull request candidate for a run.
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbAdapter } from "@/lib/db/adapter";
 import { createPullRequestCandidateInputSchema } from "@/lib/schemas/slice-c";
 import {
   getOrchestrationRun,
   getPullRequestCandidateByRun,
-  ORCHESTRATION_TABLES,
 } from "@/lib/supabase/queries/orchestration";
 
 export interface CreatePullRequestCandidateInput {
@@ -30,11 +29,11 @@ export interface CreatePullRequestCandidateResult {
  * Only one PR candidate per run (unique constraint).
  */
 export async function createPullRequestCandidate(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   input: CreatePullRequestCandidateInput
 ): Promise<CreatePullRequestCandidateResult> {
   try {
-    const run = await getOrchestrationRun(supabase, input.run_id);
+    const run = await getOrchestrationRun(db, input.run_id);
     if (!run) {
       return {
         success: false,
@@ -42,7 +41,7 @@ export async function createPullRequestCandidate(
       };
     }
 
-    const existing = await getPullRequestCandidateByRun(supabase, input.run_id);
+    const existing = await getPullRequestCandidateByRun(db, input.run_id);
     if (existing) {
       return {
         success: false,
@@ -59,29 +58,18 @@ export async function createPullRequestCandidate(
       status: "not_created",
     });
 
-    const { data: inserted, error } = await supabase
-      .from(ORCHESTRATION_TABLES.pull_request_candidates)
-      .insert({
-        run_id: payload.run_id,
-        base_branch: payload.base_branch,
-        head_branch: payload.head_branch,
-        title: payload.title,
-        description: payload.description,
-        status: payload.status,
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
+    const inserted = await db.insertPullRequestCandidate({
+      run_id: payload.run_id,
+      base_branch: payload.base_branch,
+      head_branch: payload.head_branch,
+      title: payload.title,
+      description: payload.description,
+      status: payload.status,
+    });
 
     return {
       success: true,
-      prCandidateId: inserted?.id,
+      prCandidateId: inserted?.id as string,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

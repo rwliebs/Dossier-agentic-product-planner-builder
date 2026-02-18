@@ -5,7 +5,7 @@ import { Zap } from 'lucide-react';
 import { StoryMapCanvas, type StoryMapCanvasProps } from './story-map-canvas';
 import { ArchitectureView } from './architecture-view';
 import { Button } from '@/components/ui/button';
-import type { MapSnapshot, MapCard, ContextArtifact, CardRequirement, CardKnownFact, CardAssumption, CardQuestion, CardPlannedFile, CodeFile } from '@/lib/types/ui';
+import type { MapSnapshot, MapCard, ContextArtifact, CardKnowledgeForDisplay, CodeFile } from '@/lib/types/ui';
 import type { CodeFileForPanel } from './implementation-card';
 
 const EPIC_COLORS = ['yellow', 'blue', 'purple', 'green', 'orange', 'pink'] as const;
@@ -33,15 +33,7 @@ interface WorkflowBlockProps {
   onSelectDoc?: (doc: ContextArtifact) => void;
   onFileClick?: (file: CodeFileForPanel | CodeFile) => void;
   onUpdateFileDescription?: (fileId: string, description: string) => void;
-  getCardKnowledge?: (cardId: string) => {
-    requirements?: CardRequirement[];
-    contextArtifacts?: ContextArtifact[];
-    plannedFiles?: CardPlannedFile[];
-    facts?: CardKnownFact[];
-    assumptions?: CardAssumption[];
-    questions?: CardQuestion[];
-    quickAnswer?: string | null;
-  } | undefined;
+  getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
 }
 
 export function WorkflowBlock({
@@ -117,7 +109,7 @@ export function WorkflowBlock({
             onBuildCard={onBuildCard}
             onSelectDoc={onSelectDoc}
             onSelectFile={onFileClick}
-            getCardKnowledge={getCardKnowledge as StoryMapCanvasProps['getCardKnowledge']}
+            getCardKnowledge={getCardKnowledge}
           />
         ) : (
           <ArchitectureView

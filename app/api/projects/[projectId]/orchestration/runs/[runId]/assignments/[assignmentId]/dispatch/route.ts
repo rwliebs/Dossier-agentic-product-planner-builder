@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { dispatchAssignment } from "@/lib/orchestration/dispatch";
 import { json, notFoundError, validationError, internalError } from "@/lib/api/response-helpers";
 
@@ -16,8 +16,8 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const actor = (body.actor as string) ?? "system";
 
-    const supabase = await createClient();
-    const result = await dispatchAssignment(supabase, {
+    const db = getDb();
+    const result = await dispatchAssignment(db, {
       assignment_id: assignmentId,
       actor,
     });

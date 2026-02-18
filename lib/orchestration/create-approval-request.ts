@@ -2,12 +2,11 @@
  * Create approval request with pre-checks validation.
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbAdapter } from "@/lib/db/adapter";
 import { createApprovalRequestInputSchema } from "@/lib/schemas/slice-c";
 import {
   getOrchestrationRun,
   getRunChecksByRun,
-  ORCHESTRATION_TABLES,
 } from "@/lib/supabase/queries/orchestration";
 import { validateApprovalGates, type CheckResult } from "./approval-gates";
 
@@ -29,11 +28,11 @@ export interface CreateApprovalRequestResult {
  * Validates that all required checks have passed before creating the request.
  */
 export async function createApprovalRequest(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   input: CreateApprovalRequestInput
 ): Promise<CreateApprovalRequestResult> {
   try {
-    const run = await getOrchestrationRun(supabase, input.run_id);
+    const run = await getOrchestrationRun(db, input.run_id);
     if (!run) {
       return {
         success: false,
@@ -48,7 +47,7 @@ export async function createApprovalRequest(
       "dependency" | "security" | "policy" | "lint" | "unit" | "integration" | "e2e"
     >;
 
-    const checks = await getRunChecksByRun(supabase, input.run_id);
+    const checks = await getRunChecksByRun(db, input.run_id);
     const checkResults: CheckResult[] = checks.map((c) => ({
       check_type: c.check_type as CheckResult["check_type"],
       status: c.status as "passed" | "failed" | "skipped",
@@ -70,28 +69,17 @@ export async function createApprovalRequest(
       requested_at: new Date().toISOString(),
     });
 
-    const { data: inserted, error } = await supabase
-      .from(ORCHESTRATION_TABLES.approval_requests)
-      .insert({
-        run_id: payload.run_id,
-        approval_type: payload.approval_type,
-        status: payload.status,
-        requested_by: payload.requested_by,
-        requested_at: payload.requested_at,
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
+    const inserted = await db.insertApprovalRequest({
+      run_id: payload.run_id,
+      approval_type: payload.approval_type,
+      status: payload.status,
+      requested_by: payload.requested_by,
+      requested_at: payload.requested_at,
+    });
 
     return {
       success: true,
-      approvalId: inserted?.id,
+      approvalId: inserted?.id as string,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { createAssignment } from "@/lib/orchestration";
 import {
   getOrchestrationRun,
@@ -13,14 +13,14 @@ export async function GET(
 ) {
   try {
     const { runId } = await params;
-    const supabase = await createClient();
+    const db = getDb();
 
-    const run = await getOrchestrationRun(supabase, runId);
+    const run = await getOrchestrationRun(db, runId);
     if (!run) {
       return notFoundError("Orchestration run not found");
     }
 
-    const assignments = await getCardAssignmentsByRun(supabase, runId);
+    const assignments = await getCardAssignmentsByRun(db, runId);
     return json({ assignments });
   } catch (err) {
     console.error("GET run assignments error:", err);
@@ -60,13 +60,13 @@ export async function POST(
       );
     }
 
-    const supabase = await createClient();
-    const run = await getOrchestrationRun(supabase, runId);
+    const db = getDb();
+    const run = await getOrchestrationRun(db, runId);
     if (!run) {
       return notFoundError("Orchestration run not found");
     }
 
-    const result = await createAssignment(supabase, {
+    const result = await createAssignment(db, {
       run_id: runId,
       card_id,
       agent_role,

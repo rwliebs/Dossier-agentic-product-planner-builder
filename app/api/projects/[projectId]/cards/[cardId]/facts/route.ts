@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { getCardFacts, verifyCardInProject } from "@/lib/supabase/queries";
 import {
   json,
@@ -8,7 +8,6 @@ import {
   internalError,
 } from "@/lib/api/response-helpers";
 import { createFactSchema } from "@/lib/validation/request-schema";
-import { TABLES } from "@/lib/supabase/queries";
 
 type RouteParams = {
   params: Promise<{ projectId: string; cardId: string }>;
@@ -17,12 +16,12 @@ type RouteParams = {
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { projectId, cardId } = await params;
-    const supabase = await createClient();
+    const db = getDb();
 
-    const inProject = await verifyCardInProject(supabase, cardId, projectId);
+    const inProject = await verifyCardInProject(db, cardId, projectId);
     if (!inProject) return notFoundError("Card not found");
 
-    const items = await getCardFacts(supabase, cardId);
+    const items = await getCardFacts(db, cardId);
     return json(items);
   } catch (err) {
     console.error("GET facts error:", err);
@@ -46,33 +45,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return validationError("Invalid request body", details);
     }
 
-    const supabase = await createClient();
-    const inProject = await verifyCardInProject(supabase, cardId, projectId);
+    const db = getDb();
+    const inProject = await verifyCardInProject(db, cardId, projectId);
     if (!inProject) return notFoundError("Card not found");
 
-    const items = await getCardFacts(supabase, cardId);
+    const items = await getCardFacts(db, cardId);
     const position = parsed.data.position ?? items.length;
 
-    const { data, error } = await supabase
-      .from(TABLES.card_known_facts)
-      .insert({
-        card_id: cardId,
-        text: parsed.data.text,
-        evidence_source: parsed.data.evidence_source ?? null,
-        status: parsed.data.status ?? "draft",
-        source: parsed.data.source,
-        confidence: parsed.data.confidence ?? null,
-        position,
-      })
-      .select()
-      .single();
+    const id = crypto.randomUUID();
+    await db.insertCardFact({
+      id,
+      card_id: cardId,
+      text: parsed.data.text,
+      evidence_source: parsed.data.evidence_source ?? null,
+      status: parsed.data.status ?? "draft",
+      source: parsed.data.source,
+      confidence: parsed.data.confidence ?? null,
+      position,
+    });
 
-    if (error) {
-      console.error("POST fact error:", error);
-      return internalError(error.message);
-    }
-
-    return json(data, 201);
+    const created = (await db.getCardFacts(cardId)).find((r) => (r as { id?: string }).id === id);
+    return json(created ?? { id, card_id: cardId, text: parsed.data.text, evidence_source: parsed.data.evidence_source ?? null, status: parsed.data.status ?? "draft", source: parsed.data.source, confidence: parsed.data.confidence ?? null, position }, 201);
   } catch (err) {
     console.error("POST facts error:", err);
     return internalError();

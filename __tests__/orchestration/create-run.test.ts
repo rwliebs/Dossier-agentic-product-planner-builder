@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createRun } from "@/lib/orchestration";
 import * as orchestrationQueries from "@/lib/supabase/queries/orchestration";
 import * as queries from "@/lib/supabase/queries";
+import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
 
 const projectId = "11111111-1111-1111-1111-111111111111";
 const cardId = "22222222-2222-2222-2222-222222222222";
@@ -22,9 +23,6 @@ const policy = {
 
 vi.mock("@/lib/supabase/queries/orchestration", () => ({
   getSystemPolicyProfileByProject: vi.fn(),
-  ORCHESTRATION_TABLES: {
-    orchestration_runs: "orchestration_runs",
-  },
 }));
 
 vi.mock("@/lib/supabase/queries", () => ({
@@ -40,8 +38,8 @@ describe("createRun", () => {
   it("returns error when no policy exists", async () => {
     vi.mocked(orchestrationQueries.getSystemPolicyProfileByProject).mockResolvedValue(null);
 
-    const mockSupabase = { from: vi.fn() } as never;
-    const result = await createRun(mockSupabase, {
+    const mockDb = createMockDbAdapter();
+    const result = await createRun(mockDb, {
       project_id: projectId,
       scope: "card",
       card_id: cardId,
@@ -58,7 +56,7 @@ describe("createRun", () => {
 
   it("returns validation errors when run_input_snapshot lacks scope target", async () => {
     const result = await createRun(
-      { from: vi.fn() } as never,
+      createMockDbAdapter(),
       {
         project_id: projectId,
         scope: "card",
@@ -78,12 +76,8 @@ describe("createRun", () => {
   it("returns validation error when card has no approved planned files", async () => {
     vi.mocked(queries.getCardPlannedFiles).mockResolvedValue([]);
 
-    const mockFrom = vi.fn();
-    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ single: vi.fn() }) });
-    mockFrom.mockReturnValue({ insert: mockInsert });
-
     const result = await createRun(
-      { from: mockFrom } as never,
+      createMockDbAdapter(),
       {
         project_id: projectId,
         scope: "card",
@@ -105,12 +99,12 @@ describe("createRun", () => {
       { id: "pf-1", card_id: cardId, status: "approved" },
     ] as never);
 
-    const mockSelect = vi.fn().mockResolvedValue({ data: { id: "run-123" }, error: null });
-    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ single: mockSelect }) });
-    const mockFrom = vi.fn().mockReturnValue({ insert: mockInsert });
+    const mockDb = createMockDbAdapter({
+      insertOrchestrationRun: vi.fn().mockResolvedValue({ id: "run-123" }),
+    });
 
     const result = await createRun(
-      { from: mockFrom } as never,
+      mockDb,
       {
         project_id: projectId,
         scope: "card",

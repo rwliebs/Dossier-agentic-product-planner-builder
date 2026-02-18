@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createAssignment } from "@/lib/orchestration";
 import * as orchestrationQueries from "@/lib/supabase/queries/orchestration";
+import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
 
 const run = {
   id: "run-123",
@@ -10,9 +11,6 @@ const run = {
 
 vi.mock("@/lib/supabase/queries/orchestration", () => ({
   getOrchestrationRun: vi.fn(),
-  ORCHESTRATION_TABLES: {
-    card_assignments: "card_assignments",
-  },
 }));
 
 describe("createAssignment", () => {
@@ -21,24 +19,11 @@ describe("createAssignment", () => {
   });
 
   it("returns error when feature_branch equals default_branch", async () => {
-    const mockFrom = vi.fn((table: string) => {
-      if (table === "project") {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              maybeSingle: vi.fn().mockResolvedValue({
-                data: { default_branch: "main" },
-                error: null,
-              }),
-            })),
-          })),
-        };
-      }
-      return {};
+    const mockDb = createMockDbAdapter({
+      getProject: vi.fn().mockResolvedValue({ default_branch: "main" }),
     });
-    const mockSupabase = { from: mockFrom } as never;
 
-    const result = await createAssignment(mockSupabase, {
+    const result = await createAssignment(mockDb, {
       run_id: "run-123",
       card_id: "card-123",
       agent_role: "coder",
@@ -54,24 +39,11 @@ describe("createAssignment", () => {
   });
 
   it("returns error when allowed_paths is empty", async () => {
-    const mockFrom = vi.fn((table: string) => {
-      if (table === "project") {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              maybeSingle: vi.fn().mockResolvedValue({
-                data: { default_branch: "main" },
-                error: null,
-              }),
-            })),
-          })),
-        };
-      }
-      return {};
+    const mockDb = createMockDbAdapter({
+      getProject: vi.fn().mockResolvedValue({ default_branch: "main" }),
     });
-    const mockSupabase = { from: mockFrom } as never;
 
-    const result = await createAssignment(mockSupabase, {
+    const result = await createAssignment(mockDb, {
       run_id: "run-123",
       card_id: "card-123",
       agent_role: "coder",

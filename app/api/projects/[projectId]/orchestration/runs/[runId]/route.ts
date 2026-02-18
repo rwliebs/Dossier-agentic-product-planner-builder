@@ -1,9 +1,6 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import {
-  getOrchestrationRun,
-  ORCHESTRATION_TABLES,
-} from "@/lib/supabase/queries/orchestration";
+import { getDb } from "@/lib/db";
+import { getOrchestrationRun } from "@/lib/supabase/queries/orchestration";
 import { updateOrchestrationRunStatusSchema } from "@/lib/schemas/slice-c";
 import { json, notFoundError, validationError, internalError } from "@/lib/api/response-helpers";
 
@@ -22,9 +19,9 @@ export async function GET(
 ) {
   try {
     const { runId } = await params;
-    const supabase = await createClient();
+    const db = getDb();
 
-    const run = await getOrchestrationRun(supabase, runId);
+    const run = await getOrchestrationRun(db, runId);
     if (!run) {
       return notFoundError("Orchestration run not found");
     }
@@ -51,8 +48,8 @@ export async function PATCH(
       );
     }
 
-    const supabase = await createClient();
-    const existing = await getOrchestrationRun(supabase, runId);
+    const db = getDb();
+    const existing = await getOrchestrationRun(db, runId);
     if (!existing) {
       return notFoundError("Orchestration run not found");
     }
@@ -66,23 +63,14 @@ export async function PATCH(
 
     const updatePayload: Record<string, unknown> = {
       status: parsed.data.status,
-      updated_at: new Date().toISOString(),
     };
     if (parsed.data.started_at) updatePayload.started_at = parsed.data.started_at;
     if (parsed.data.ended_at) updatePayload.ended_at = parsed.data.ended_at;
 
-    const { data, error } = await supabase
-      .from(ORCHESTRATION_TABLES.orchestration_runs)
-      .update(updatePayload)
-      .eq("id", runId)
-      .select()
-      .single();
+    await db.updateOrchestrationRun(runId, updatePayload);
 
-    if (error) {
-      return validationError(error.message);
-    }
-
-    return json({ run: data });
+    const updated = await db.getOrchestrationRun(runId);
+    return json({ run: updated ?? existing });
   } catch (err) {
     console.error("PATCH orchestration run error:", err);
     return internalError();

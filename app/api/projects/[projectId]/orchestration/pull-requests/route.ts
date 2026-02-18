@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { createPullRequestCandidate } from "@/lib/orchestration";
 import { json, validationError, internalError } from "@/lib/api/response-helpers";
 
@@ -15,11 +15,11 @@ export async function GET(
       return validationError("run_id query parameter is required");
     }
 
-    const supabase = await createClient();
+    const db = getDb();
     const { getPullRequestCandidateByRun } = await import(
       "@/lib/supabase/queries/orchestration"
     );
-    const pr = await getPullRequestCandidateByRun(supabase, runId);
+    const pr = await getPullRequestCandidateByRun(db, runId);
 
     return json({ pullRequest: pr });
   } catch (err) {
@@ -42,8 +42,8 @@ export async function POST(
       );
     }
 
-    const supabase = await createClient();
-    const result = await createPullRequestCandidate(supabase, {
+    const db = getDb();
+    const result = await createPullRequestCandidate(db, {
       run_id,
       base_branch,
       head_branch,

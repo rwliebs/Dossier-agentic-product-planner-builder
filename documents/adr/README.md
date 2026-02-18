@@ -19,5 +19,5 @@ This directory stores Architecture Decision Records (ADRs) for Dossier.
 - [0003 - Iterative Schema Rollout (Slice A/B/C)](./0003-iterative-schema-rollout.md)
 - [0004 - No-Auth-First MVP Policy](./0004-no-auth-first-mvp.md)
 - [0005 - Adaptive E2E Strategy with Stagehand](./0005-adaptive-e2e-stagehand.md)
-- [0006 - Build Orchestration via Agentic-Flow](./0006-agentic-flow-execution-plane.md)
+- [0006 - Build Orchestration via Claude-Flow](./0006-claude-flow-execution-plane.md)
 - [0007 - Production Release Gate Requires Auth and RLS](./0007-release-gate-auth-rls-required.md)

@@ -22,6 +22,7 @@ import type { CodeFileForPanel } from "./implementation-card";
 import { useProjectFiles, type FileNode } from "@/lib/hooks/use-project-files";
 import { useOrchestrationRuns } from "@/lib/hooks/use-orchestration-runs";
 import { useRunDetail } from "@/lib/hooks/use-run-detail";
+import { RunStatusSkeleton } from "./run-status-skeleton";
 
 interface RightPanelProps {
   isOpen: boolean;
@@ -33,55 +34,6 @@ interface RightPanelProps {
   /** When set, files tab shows live project file tree from planned files */
   projectId?: string;
 }
-
-const mockFileTree: FileNode[] = [
-  {
-    name: "src",
-    type: "folder",
-    path: "/src",
-    children: [
-      {
-        name: "components",
-        type: "folder",
-        path: "/src/components",
-        children: [
-          { name: "Header.tsx", type: "file", path: "/src/components/Header.tsx" },
-          { name: "Sidebar.tsx", type: "file", path: "/src/components/Sidebar.tsx" },
-          { name: "Card.tsx", type: "file", path: "/src/components/Card.tsx" },
-        ],
-      },
-      {
-        name: "pages",
-        type: "folder",
-        path: "/src/pages",
-        children: [
-          { name: "index.tsx", type: "file", path: "/src/pages/index.tsx" },
-          { name: "dashboard.tsx", type: "file", path: "/src/pages/dashboard.tsx" },
-        ],
-      },
-      {
-        name: "api",
-        type: "folder",
-        path: "/src/api",
-        children: [
-          { name: "auth.ts", type: "file", path: "/src/api/auth.ts" },
-          { name: "users.ts", type: "file", path: "/src/api/users.ts" },
-        ],
-      },
-      { name: "utils.ts", type: "file", path: "/src/utils.ts" },
-    ],
-  },
-  {
-    name: "prisma",
-    type: "folder",
-    path: "/prisma",
-    children: [
-      { name: "schema.prisma", type: "file", path: "/prisma/schema.prisma" },
-    ],
-  },
-  { name: "package.json", type: "file", path: "/package.json" },
-  { name: "tsconfig.json", type: "file", path: "/tsconfig.json" },
-];
 
 function FileTreeNode({
   node,
@@ -164,8 +116,8 @@ function RunDetailPanel({
   const isForThisRun = runDetail?.run && (runDetail.run as { id?: string }).id === runId;
   if (detailLoading || !runDetail || !isForThisRun) {
     return (
-      <div className="mt-2 pt-2 border-t border-border text-[10px] text-muted-foreground">
-        Loading…
+      <div className="mt-2 pt-2 border-t border-border">
+        <RunStatusSkeleton />
       </div>
     );
   }
@@ -253,7 +205,7 @@ export function RightPanel({
     projectId,
     expandedRunId ?? undefined
   );
-  const fileTree = projectFiles && projectFiles.length > 0 ? projectFiles : mockFileTree;
+  const fileTree = projectFiles && projectFiles.length > 0 ? projectFiles : [];
 
   const handleApprove = useCallback(
     async (runId: string, approvalType: "create_pr" | "merge_pr") => {
@@ -391,11 +343,10 @@ export function RightPanel({
                 <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-foreground">
                   Build Runs
                 </h3>
-                {runsLoading && (
-                  <span className="text-[10px] text-muted-foreground">Loading…</span>
-                )}
               </div>
-              {runs && runs.length > 0 ? (
+              {runsLoading && !runs?.length ? (
+                <RunStatusSkeleton />
+              ) : runs && runs.length > 0 ? (
                 <div className="space-y-2">
                   {runs.map((run) => (
                     <div

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { getRunCheck } from "@/lib/supabase/queries/orchestration";
 import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
 
@@ -11,9 +11,9 @@ export async function GET(
 ) {
   try {
     const { checkId } = await params;
-    const supabase = await createClient();
+    const db = getDb();
 
-    const check = await getRunCheck(supabase, checkId);
+    const check = await getRunCheck(db, checkId);
     if (!check) {
       return notFoundError("Run check not found");
     }

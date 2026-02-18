@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { resolveApprovalRequest } from "@/lib/orchestration";
 import { getApprovalRequest } from "@/lib/supabase/queries/orchestration";
 import { json, notFoundError, validationError, internalError } from "@/lib/api/response-helpers";
@@ -10,9 +10,9 @@ export async function GET(
 ) {
   try {
     const { approvalId } = await params;
-    const supabase = await createClient();
+    const db = getDb();
 
-    const approval = await getApprovalRequest(supabase, approvalId);
+    const approval = await getApprovalRequest(db, approvalId);
     if (!approval) {
       return notFoundError("Approval request not found");
     }
@@ -37,13 +37,13 @@ export async function PATCH(
       return validationError("Missing required fields: status, resolved_by");
     }
 
-    const supabase = await createClient();
-    const existing = await getApprovalRequest(supabase, approvalId);
+    const db = getDb();
+    const existing = await getApprovalRequest(db, approvalId);
     if (!existing) {
       return notFoundError("Approval request not found");
     }
 
-    const result = await resolveApprovalRequest(supabase, {
+    const result = await resolveApprovalRequest(db, {
       approval_id: approvalId,
       status,
       resolved_by,
@@ -54,7 +54,7 @@ export async function PATCH(
       return validationError(result.error ?? "Failed to resolve approval");
     }
 
-    const updated = await getApprovalRequest(supabase, approvalId);
+    const updated = await getApprovalRequest(db, approvalId);
     return json({ approval: updated });
   } catch (err) {
     console.error("PATCH approval error:", err);

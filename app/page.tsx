@@ -7,9 +7,12 @@ import { WorkflowBlock } from '@/components/dossier/workflow-block';
 import { RightPanel } from '@/components/dossier/right-panel';
 import { ProjectSelector } from '@/components/dossier/project-selector';
 import { MessageSquare, Bot, Clock, Sparkles } from 'lucide-react';
-import type { ProjectContext, ContextArtifact } from '@/lib/types/ui';
+import type { ProjectContext, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 import type { CodeFileForPanel } from '@/components/dossier/implementation-card';
 import { useMapSnapshot, useCardKnowledge, useCardPlannedFiles, useSubmitAction, useTriggerBuild } from '@/lib/hooks';
+import { MapErrorBoundary } from '@/components/dossier/map-error-boundary';
+import { ChatErrorBoundary } from '@/components/dossier/chat-error-boundary';
+import { MapSkeleton } from '@/components/dossier/map-skeleton';
 
 const PROJECT_STORAGE_KEY = 'dossier_project_id';
 
@@ -62,12 +65,12 @@ export default function DossierPage() {
   );
 
   const getCardKnowledge = useCallback(
-    (cardId: string) => {
+    (cardId: string): CardKnowledgeForDisplay | undefined => {
       if (cardId !== expandedCardId) return undefined;
       const card = snapshot?.workflows
         .flatMap((wf) => wf.activities.flatMap((a) => [...a.steps.flatMap((s) => s.cards), ...a.cards]))
         .find((c) => c.id === cardId);
-      const out: Record<string, unknown> = {};
+      const out: CardKnowledgeForDisplay = {};
       if (cardKnowledge?.requirements?.length) out.requirements = cardKnowledge.requirements;
       if (cardPlannedFiles?.length) out.plannedFiles = cardPlannedFiles;
       if (cardKnowledge?.facts?.length) out.facts = cardKnowledge.facts;
@@ -192,6 +195,7 @@ export default function DossierPage() {
       />
 
       <div className="flex flex-1 overflow-hidden">
+        <ChatErrorBoundary>
         <LeftSidebar
           isCollapsed={leftSidebarCollapsed}
           onToggle={setLeftSidebarCollapsed}
@@ -209,6 +213,7 @@ export default function DossierPage() {
             refetch();
           }}
         />
+        </ChatErrorBoundary>
 
         <div className="flex-1 flex flex-col overflow-hidden bg-background">
           {appMode === 'ideation' ? (
@@ -266,11 +271,7 @@ export default function DossierPage() {
               </div>
 
               <div className="flex-1 overflow-y-auto">
-                {mapLoading && (
-                  <div className="flex items-center justify-center py-16">
-                    <div className="text-sm text-muted-foreground">Loading map...</div>
-                  </div>
-                )}
+                {mapLoading && <MapSkeleton />}
                 {!mapLoading && mapError && (
                   <div className="flex flex-col items-center justify-center py-16 gap-2">
                     <p className="text-sm text-destructive">{mapError}</p>
@@ -284,6 +285,7 @@ export default function DossierPage() {
                   </div>
                 )}
                 {!mapLoading && !mapError && snapshot && (
+                  <MapErrorBoundary onRetry={refetch}>
                   <WorkflowBlock
                     snapshot={snapshot}
                     viewMode={viewMode}
@@ -306,8 +308,9 @@ export default function DossierPage() {
                       setRightPanelOpen(true);
                     }}
                     onUpdateFileDescription={handleUpdateFileDescription}
-                    getCardKnowledge={getCardKnowledge as never}
+                    getCardKnowledge={getCardKnowledge}
                   />
+                  </MapErrorBoundary>
                 )}
               </div>
             </>

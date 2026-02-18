@@ -1,17 +1,77 @@
 /**
  * Ingestion pipeline tests (M8).
- * Mocks getRuvectorClient so tests pass without RuVector.
+ * Mock path: tests pass without RuVector.
+ * Integration path: real SQLite + RuVector when available.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
 import { ingestMemoryUnit, ingestCardContext } from "@/lib/memory/ingestion";
 import { createMockDbAdapter } from "../mock-db-adapter";
-
-vi.mock("@/lib/ruvector/client", () => ({
-  getRuvectorClient: vi.fn(),
-}));
-
+import { createTestDb } from "../create-test-db";
+import { ruvectorAvailable, cleanupRuvectorTestVectors } from "../ruvector-test-helpers";
 import { getRuvectorClient } from "@/lib/ruvector/client";
+import { resetRuvectorForTesting } from "@/lib/ruvector/client";
+
+vi.mock("@/lib/ruvector/client", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/lib/ruvector/client")>();
+  return { ...mod, getRuvectorClient: vi.fn() };
+});
+
+const sqliteAvailable = (() => {
+  try {
+    const Database = require("better-sqlite3");
+    new Database(":memory:").close();
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+function setupCardHierarchy(db: ReturnType<typeof createTestDb>) {
+  const projectId = crypto.randomUUID();
+  const workflowId = crypto.randomUUID();
+  const activityId = crypto.randomUUID();
+  const stepId = crypto.randomUUID();
+  const cardId = crypto.randomUUID();
+
+  db.insertProject({
+    id: projectId,
+    name: "Test Project",
+    repo_url: null,
+    default_branch: "main",
+  });
+  db.insertWorkflow({
+    id: workflowId,
+    project_id: projectId,
+    title: "Workflow",
+    description: null,
+    position: 0,
+  });
+  db.insertWorkflowActivity({
+    id: activityId,
+    workflow_id: workflowId,
+    title: "Activity",
+    position: 0,
+  });
+  db.insertStep({
+    id: stepId,
+    workflow_activity_id: activityId,
+    title: "Step",
+    position: 0,
+  });
+  db.insertCard({
+    id: cardId,
+    workflow_activity_id: activityId,
+    step_id: stepId,
+    title: "Card",
+    description: "Card description",
+    status: "todo",
+    priority: 0,
+    position: 0,
+  });
+
+  return { projectId, workflowId, activityId, stepId, cardId };
+}
 
 describe("Ingestion pipeline (M8)", () => {
   let db: ReturnType<typeof createMockDbAdapter>;
@@ -68,6 +128,93 @@ describe("Ingestion pipeline (M8)", () => {
       db.verifyCardInProject = vi.fn().mockResolvedValue(false);
       const count = await ingestCardContext(db, "c1", "p1");
       expect(count).toBe(0);
+    });
+  });
+
+  describe.skipIf(!ruvectorAvailable || !sqliteAvailable)("integration with real RuVector", () => {
+    let realGetRuvectorClient: typeof getRuvectorClient;
+    let sqliteDb: ReturnType<typeof createTestDb>;
+    const insertedIds: string[] = [];
+
+    beforeAll(async () => {
+      const mod = await vi.importActual<typeof import("@/lib/ruvector/client")>("@/lib/ruvector/client");
+      realGetRuvectorClient = mod.getRuvectorClient;
+    });
+
+    beforeEach(() => {
+      resetRuvectorForTesting();
+      vi.mocked(getRuvectorClient).mockImplementation(realGetRuvectorClient);
+      sqliteDb = createTestDb();
+    });
+
+    afterEach(async () => {
+      const client = getRuvectorClient();
+      if (client) await cleanupRuvectorTestVectors(insertedIds, client);
+      insertedIds.length = 0;
+    });
+
+    it("ingestMemoryUnit: stores in DbAdapter and RuVector, retrievable via search", async () => {
+      const id = await ingestMemoryUnit(
+        sqliteDb,
+        { contentText: "integration test memory content", title: "Integration Test" },
+        { cardId: "c1", projectId: "p1" }
+      );
+      expect(id).not.toBeNull();
+      if (id) insertedIds.push(id);
+
+      const units = await sqliteDb.getMemoryUnitsByIds([id!]);
+      expect(units).toHaveLength(1);
+      expect(units[0].content_text).toBe("integration test memory content");
+      expect(units[0].embedding_ref).toBe(id);
+
+      const client = getRuvectorClient();
+      expect(client).not.toBeNull();
+      const vec = await import("@/lib/memory/embedding").then((m) => m.embedText("integration test memory content"));
+      const results = await client!.search({ vector: vec, k: 5 });
+      expect(results.length).toBeGreaterThan(0);
+      expect(results.some((r) => r.id === id)).toBe(true);
+    });
+
+    it("ingestCardContext: ingests card + approved requirements/facts, count matches, vectors searchable", async () => {
+      const { projectId, cardId } = setupCardHierarchy(sqliteDb);
+
+      sqliteDb.insertCardRequirement({
+        id: crypto.randomUUID(),
+        card_id: cardId,
+        text: "Requirement one for card context",
+        status: "approved",
+        source: "user",
+        position: 0,
+      });
+      sqliteDb.insertCardFact({
+        id: crypto.randomUUID(),
+        card_id: cardId,
+        text: "Fact one for card context",
+        status: "approved",
+        source: "user",
+        position: 0,
+      });
+      sqliteDb.insertCardRequirement({
+        id: crypto.randomUUID(),
+        card_id: cardId,
+        text: "Draft requirement",
+        status: "draft",
+        source: "user",
+        position: 1,
+      });
+
+      const count = await ingestCardContext(sqliteDb, cardId, projectId);
+      expect(count).toBeGreaterThan(0);
+
+      const relations = await sqliteDb.getMemoryUnitRelationsByEntity("card", cardId);
+      const memoryIds = relations.map((r) => r.memory_unit_id as string);
+      for (const mid of memoryIds) insertedIds.push(mid);
+
+      const client = getRuvectorClient();
+      expect(client).not.toBeNull();
+      const vec = await import("@/lib/memory/embedding").then((m) => m.embedText("Requirement one for card context"));
+      const results = await client!.search({ vector: vec, k: 10 });
+      expect(results.length).toBeGreaterThan(0);
     });
   });
 });

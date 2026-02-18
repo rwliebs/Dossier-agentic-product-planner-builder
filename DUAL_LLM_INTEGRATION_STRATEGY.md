@@ -28,12 +28,13 @@ Enable users to move from product idea to production-grade software through:
   - Writing to GitHub repositories.
   - Creating/modifying/deleting real files in connected repositories.
 
-### Build Orchestrator (RuVector + Agent Flow)
+### Build Orchestrator (claude-flow + RuVector)
 - Primary channels: orchestration APIs, run status UI, per-card build triggers.
+- Execution plane: claude-flow (MCP server on dedicated host) with RuVector embedded for persistent memory.
 - Allowed actions:
   - Commit card/context artifacts to memory.
-  - Assign cards to specialized coding agents.
-  - Execute coding tasks on feature branches and isolated worktrees in existing repositories.
+  - Coordinate multi-agent swarms (architect → coder → tester → reviewer) with shared memory per build.
+  - Execute coding tasks on feature branches in the repo checkout on the dedicated host.
   - Commit to those feature branches as part of scoped card execution.
   - Prepare draft PRs for human review.
 - Forbidden actions:
@@ -41,6 +42,10 @@ Enable users to move from product idea to production-grade software through:
   - Merging to `main` or protected branches without explicit user action.
   - Skipping test/lint gates.
   - Ignoring card context boundaries.
+- MVP scope:
+  - Single-card builds only. One build at a time per project (enforced by single-build lock).
+  - No git worktree provisioning. Agents work in the same repo checkout on the dedicated host.
+  - Parallel multi-card builds deferred until worktree management is implemented.
 
 ## Decision-Making Principles
 1. Separation of concerns first:
@@ -65,7 +70,9 @@ Enable users to move from product idea to production-grade software through:
 
 ## Architectural Strategy
 
-### Service Topology
+### Service Topology (Two-Service Architecture)
+
+**Service 1: Dossier (Vercel)**
 - Frontend (existing Next.js app):
   - Canvas and chat interactions.
   - Run status and approval controls.
@@ -74,38 +81,72 @@ Enable users to move from product idea to production-grade software through:
   - Action schema validation.
   - Context-document and map-mutation contract.
 - Orchestrator API service (Next.js API route):
-  - Memory ingestion and retrieval orchestration.
-  - Agent flow execution requests.
-  - Status and artifact reporting.
-- External orchestration and memory stack:
-  - RuVector for cross-project memory and historical card snapshots (delivered with Agentic-flow).
-  - claude-flow/agentic-flow for multi-agent task execution.
-  - GitHub for branch/PR lifecycle.
+  - Memory content CRUD (Postgres `memory_unit` tables).
+  - Build dispatch via MCP to claude-flow.
+  - Status polling and artifact reporting.
+- Supabase (Postgres):
+  - All canonical entities, orchestration state, memory content + metadata.
+  - Single source of truth for current state.
+
+**Service 2: claude-flow + RuVector (Dedicated Host — Railway / Fly.io)**
+- claude-flow MCP server (`npx claude-flow@v3alpha mcp start`):
+  - Multi-agent swarm coordination (60+ agent types, hierarchical topology).
+  - Task routing via Q-Learning with Mixture of Experts.
+  - Agent lifecycle management (spawn, monitor, retry, terminate).
+  - Per-build shared memory pool for agent collaboration.
+  - Git operations (branch creation, commits) on the repo checkout.
+- RuVector (embedded in claude-flow, persistent volume):
+  - Vector embeddings for semantic memory search.
+  - HNSW indexes with SIMD acceleration.
+  - GNN self-learning weights (improve retrieval quality over time).
+  - Historical build snapshots (append-only).
+  - Local embedding generation via fastembed (no external API cost).
+- Persistent volume mounts:
+  - `/data/ruvector/` — vectors, indexes, GNN weights, snapshots.
+  - `/data/repo/` — git checkout of the target repository.
+- GitHub for branch/PR lifecycle.
+
+**Communication**: Dossier dispatches to claude-flow via MCP over HTTP. Claude-flow reports status via MCP `tasks/status` and `tasks/cancel` tools. All MCP calls are short-lived from Dossier's perspective (dispatch returns immediately; status is polled).
+
+**Why two services**: Dossier's API routes are lightweight, short-lived requests suitable for Vercel serverless. Claude-flow runs long-lived agent processes (minutes per build), spawns subprocesses, needs filesystem write access, and requires persistent disk for RuVector data. These are incompatible with serverless constraints.
 
 ### Orchestration Ownership Model (Control Plane + Execution Plane + Memory Plane)
 - Dossier is the system orchestrator (control plane):
   - Owns workflow/card truth, approvals, policy enforcement, and run lifecycle.
   - Decides which roles/profiles may execute and what repo boundaries apply.
-- Agentic-flow is the execution orchestrator (execution plane):
-  - Owns worker routing, worker coordination, retries/fallbacks, and task fan-out/fan-in.
+  - Owns memory content and metadata in Postgres (`memory_unit`, `memory_unit_relation`).
+  - Orchestrates the seed/execute/harvest memory cycle for each build.
+- claude-flow is the execution orchestrator (execution plane):
+  - Owns swarm coordination, agent routing, retries/fallbacks, and task lifecycle.
+  - Coordinates multi-agent collaboration with shared per-build memory pool.
   - Must execute only within Dossier-provided scope envelopes and constraints.
-- RuVector is the memory substrate (memory plane):
-  - Owns semantic memory storage/retrieval for approved contextual artifacts.
+  - Accessed via MCP over HTTP; exposes `tools/call`, `tasks/status`, `tasks/cancel`.
+- RuVector is the memory substrate (memory plane, embedded in claude-flow):
+  - Owns vector embeddings, HNSW indexes, GNN self-learning weights, and historical snapshots.
+  - Provides semantic search with GNN-refined ranking that improves over time.
+  - Generates embeddings locally via fastembed (no external embedding API dependency).
   - Does not decide policy, approvals, or repository write authority.
+  - Data persists on dedicated host's persistent volume across builds and restarts.
 - Integration principle:
-  - Dossier remains the policy authority even when Agentic-flow handles worker-level orchestration.
+  - Dossier remains the policy authority even when claude-flow handles worker-level orchestration.
+  - Postgres is the source of truth for memory content; RuVector is the source of truth for vectors and learning.
+  - Memory content in Postgres links to RuVector entries via `embedding_ref`.
 
 ### Storage Architecture: Current State and Historical Learning
 
 The system uses a split storage model to maximize both relational integrity and self-learning.
 
-**Postgres: Current State (Source of Truth)**
+**Postgres (Supabase): Current State (Source of Truth)**
 - All canonical entities: Project, Workflow, WorkflowActivity, Step, Card, ContextArtifact, CardPlannedFile, knowledge items, runs, approvals.
-- Single source of truth for current state.
+- Memory content and metadata: `memory_unit` (content + `embedding_ref`), `memory_unit_relation` (provenance), `memory_retrieval_log`.
+- Single source of truth for current state and memory content.
 - ACID transactions, referential integrity, exact lookups, aggregations.
 
-**RuVector: Semantic Memory and Historical Snapshots**
-- **MemoryUnits** (approved context artifacts): embeddings for RAG retrieval; referenced by `MemoryUnit` + `embedding_ref` in Postgres.
+**RuVector (embedded in claude-flow, persistent volume): Semantic Memory and Historical Snapshots**
+- **MemoryUnit embeddings**: vectors for RAG retrieval; referenced by `MemoryUnit.embedding_ref` in Postgres.
+- **GNN self-learning weights**: graph neural network model that refines retrieval ranking over time based on build outcomes.
+- **HNSW indexes**: fast approximate nearest neighbor search with SIMD acceleration.
+- **Local embeddings**: fastembed models (no Voyage AI or other external embedding API dependency).
 - **Historical card snapshots**: append-only copies of past card states for learning.
   - Snapshot granularity: on status transitions, approval events (e.g. `planned_file_approved`), or on build trigger.
   - Each snapshot: embedding of `title + description + status + planned_files_summary` (or equivalent) plus metadata (`card_id`, `project_id`, `workflow_id`, `timestamp`, `status`, `event_type`).
@@ -113,15 +154,24 @@ The system uses a split storage model to maximize both relational integrity and 
   - Enables retrieval: "find past card states similar to this one" for context augmentation.
 
 **Benefits**
-- No conflict: Postgres owns current; RuVector owns immutable history.
-- GNN self-learning improves retrieval over time within a single project/build.
+- No conflict: Postgres owns current content; RuVector owns vectors and immutable history.
+- GNN self-learning improves retrieval quality over time across builds within a project.
 - Richer context: similar past states as additional orchestration input.
 - Append-only sync: no update conflicts; Postgres mutations trigger async snapshot writes.
+- No external embedding API cost: fastembed runs locally on the dedicated host.
+- Memory compounds across builds: each build's learnings persist and inform future builds.
 
 **Sync Policy**
 - Dossier triggers snapshot on key events (status change, approval, build start).
 - Snapshot pipeline is async; Postgres mutations never block on RuVector.
-- Full object content remains in Postgres; RuVector stores embedding + metadata only (optionally minimal payload for deep inspection).
+- Full object content remains in Postgres; RuVector stores embedding + metadata only.
+- RuVector data persists on the dedicated host's persistent volume; survives container restarts and redeployments.
+
+**Build Memory Lifecycle (Seed → Execute → Harvest)**
+- **Seed (pre-build)**: Dossier queries RuVector (via claude-flow MCP `memory_search`) for vectors similar to the current card context. Returns ranked `memory_unit_ids`. Dossier fetches full content from Postgres and seeds it into claude-flow's per-build swarm memory namespace.
+- **Execute (during build)**: Swarm agents read and write to the shared per-build memory pool. Each agent builds on prior agents' work (architect's plan, coder's implementation, tester's results, reviewer's feedback).
+- **Harvest (post-build)**: Dossier reads durable learnings from claude-flow's swarm memory (via MCP `memory_list`). For each learning: calls RuVector to generate embedding and store vector, saves `embedding_ref` back to a new `memory_unit` row in Postgres with provenance relations (`card` source + `project` scope). Appends historical snapshot to RuVector.
+- **Compound effect**: Build N+1 retrieves Build 1..N's learnings during its seed phase. Agents don't reinvent patterns, reuse established interfaces, and avoid known pitfalls.
 
 ### Execution Input Contract (System-Wide vs Per-Build)
 - System-wide input contract (always-on, applies to every run):
@@ -141,20 +191,33 @@ The system uses a split storage model to maximize both relational integrity and 
   - System-wide policy constrains all per-build inputs.
   - Per-build inputs may narrow scope further but cannot relax system-wide constraints.
 
-### Orchestration Flow (Control + Execution + Memory, Text-First)
+### Orchestration Flow (Control + Execution + Memory)
 - Trigger:
-  - User starts a `card` or `workflow` build from Dossier.
+  - User starts a `card` build from Dossier (single-card scope for MVP).
+  - Dossier checks single-build lock: rejects if any `OrchestrationRun` with status `running` exists for this project.
 - Control-plane intake:
   - Dossier resolves system-wide input bundle and per-build input bundle.
   - Dossier validates policy precedence and scope boundaries.
-- Memory stage:
-  - RuVector retrieval is executed with scope-first ranking and policy filters.
-  - Optionally: retrieve similar past card states for context augmentation.
+  - Dossier creates `OrchestrationRun` and `CardAssignment` records in Postgres.
+- Seed stage:
+  - Dossier queries RuVector (via claude-flow MCP `memory_search`) for project-scoped and card-scoped approved memory.
+  - Dossier fetches full memory content from Postgres by returned IDs.
+  - Dossier seeds claude-flow's swarm memory namespace (via MCP `memory_store`) with card context, requirements, planned files, acceptance criteria, and retrieved memory.
 - Execution stage:
-  - Dossier submits assignment plan + immutable snapshots to Agentic-flow.
-  - Agentic-flow routes/coordinators workers within Dossier-provided constraints.
+  - Dossier dispatches to claude-flow via MCP `tools/call` with task description, feature branch, allowed/forbidden paths, and constraints.
+  - claude-flow initializes a hierarchical swarm for the card:
+    - **Architect agent**: reads seeded memory, produces implementation plan, writes decisions to shared memory.
+    - **Coder agent**: reads plan + memory, implements files per plan, commits to feature branch, writes implementation notes to shared memory.
+    - **Tester agent**: reads implementation from memory, writes and runs tests, writes results to shared memory.
+    - **Reviewer agent**: reads everything, checks boundary compliance and code quality, approves or requests revisions via shared memory.
+  - All agents share the same memory pool; each builds on the work of previous agents.
+  - Dossier polls claude-flow `tasks/status` to track progress; updates `AgentExecution` and `EventLog` in Postgres.
+- Harvest stage:
+  - On completion, Dossier reads durable learnings from claude-flow's swarm memory.
+  - Dossier writes new `MemoryUnit` entries to Postgres with `embedding_ref` pointing to RuVector vectors.
+  - Dossier appends historical snapshot to RuVector (build outcome, files changed, checks passed).
 - Quality and approval stage:
-  - Required checks execute.
+  - Required checks execute (lint, unit, integration, e2e per policy profile).
   - Dossier requests approval only after required checks pass.
   - PR lifecycle actions remain user-gated for protected branches.
 
@@ -165,7 +228,7 @@ The system uses a split storage model to maximize both relational integrity and 
 - Retrieval:
   - Pull card/workflow-scoped approved memory first, then broaden only when policy allows.
 - Execution:
-  - Dispatch scoped assignments to Agentic-flow with immutable assignment input snapshots.
+  - Dispatch scoped assignments to claude-flow via MCP with immutable assignment input snapshots.
 - Global quality baseline:
   - Execute `dependency`, `security`, and `policy` checks for all runs.
   - Execute build checks matrix (`lint`, `unit`, `integration`, `e2e`) per system profile requirements.
@@ -202,12 +265,18 @@ The system uses a split storage model to maximize both relational integrity and 
 
 ### Orchestration Strategy
 - Semi-autonomous execution mode:
-  - Agents can generate code and commit on feature branches/worktrees.
+  - Agents can generate code and commit on feature branches.
   - Human must explicitly approve PR creation/merge to protected branches.
 - Assignment model:
-  - Card-to-agent mapping with immutable execution snapshot and context envelope.
+  - Card-to-swarm mapping: each card build dispatches a multi-agent swarm (architect, coder, tester, reviewer) with shared memory, immutable execution snapshot, and context envelope.
+  - Single-card builds only for MVP. One active build per project (single-build lock).
 - Integration model:
   - A dedicated integration pass validates cross-card compatibility.
+- Execution plane technology:
+  - claude-flow v3 (MCP server) with RuVector embedded for memory.
+  - Accessed via MCP over HTTP from Dossier API routes.
+  - Deployed on dedicated host (Railway / Fly.io) with persistent volume.
+- Future: parallel multi-card builds via git worktree isolation (deferred past MVP).
 
 ### Dual Scope Operation Policy
 - The system supports two first-class execution scopes:
@@ -446,7 +515,7 @@ This schema is the implementation contract for Phase 1+ APIs, storage, and UI wi
 
 ### Memory and Retrieval (RuVector)
 
-RuVector is the memory substrate, delivered with Agentic-flow. It provides semantic search, GNN self-learning, and historical snapshot storage.
+RuVector is the memory substrate, embedded in claude-flow on the dedicated host. It provides semantic search, GNN self-learning, local embedding generation, and historical snapshot storage. Dossier interacts with RuVector exclusively through claude-flow's MCP tools (`memory_store`, `memory_search`, `memory_list`).
 
 **Content Memory (MemoryUnits)**
 - `MemoryUnit` (minimal wrapper around RuVector entries)
@@ -664,11 +733,25 @@ RuVector is the memory substrate, delivered with Agentic-flow. It provides seman
   - Redaction rules for secrets before memory writes.
   - Least-privilege credentials for GitHub and orchestration services.
 
-### Risk: Historical snapshot sync lag or loss when RuVector is unavailable
+### Risk: Historical snapshot sync lag or loss when RuVector/claude-flow host is unavailable
 - Mitigation:
   - Snapshot pipeline is async; Postgres mutations never block on RuVector.
   - Queue snapshots for retry on failure; optionally replay from EventLog if needed.
-  - Learning degrades gracefully; retrieval still works from MemoryUnits and current state.
+  - Learning degrades gracefully; retrieval falls back to exact card/project scoping from Postgres when semantic search is unavailable.
+  - RuVector data persists on the dedicated host's persistent volume; survives container restarts.
+
+### Risk: claude-flow alpha instability
+- Mitigation:
+  - Pin exact claude-flow version in deployment config.
+  - Mock client auto-activates when claude-flow is unavailable (existing pattern from `claude-flow-client.ts`).
+  - Dossier enforces constraints independently (allowed_paths, policy) regardless of claude-flow behavior.
+  - Pre-commit hook on feature branches rejects out-of-scope file changes as defense-in-depth.
+
+### Risk: Dedicated host downtime blocks builds
+- Mitigation:
+  - Dossier detects timeout on MCP calls, marks run as failed, allows retry.
+  - Planning and all non-build workflows continue to function (Vercel + Supabase are independent).
+  - No data loss: all content and metadata are in Postgres; only vectors and GNN weights are on the dedicated host.
 
 ## Guardrails and Non-Negotiables
 - No direct coding actions from planning interactions.
@@ -689,7 +772,7 @@ RuVector is the memory substrate, delivered with Agentic-flow. It provides seman
 - End-to-end tests (adaptive, minimal):
   - Idea -> context artifact/map updates.
   - Planned-file approval -> build trigger eligibility.
-  - Build run -> `agentic-flow` dispatch -> status reconciliation.
+  - Build run -> claude-flow dispatch via MCP -> status reconciliation.
 - Regression checks:
   - Existing canvas/chat interactions remain functional.
   - UI smoke checks for modified screens.

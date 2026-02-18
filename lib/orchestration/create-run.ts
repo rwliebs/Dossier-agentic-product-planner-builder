@@ -3,12 +3,9 @@
  * Validates policy and run input before persisting.
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbAdapter } from "@/lib/db/adapter";
 import { createOrchestrationRunInputSchema } from "@/lib/schemas/slice-c";
-import {
-  getSystemPolicyProfileByProject,
-  ORCHESTRATION_TABLES,
-} from "@/lib/supabase/queries/orchestration";
+import { getSystemPolicyProfileByProject } from "@/lib/supabase/queries/orchestration";
 import {
   getCardIdsByWorkflow,
   getCardPlannedFiles,
@@ -43,13 +40,13 @@ export interface CreateRunResult {
  * Validates run input against active system policy before insert.
  */
 export async function createRun(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   input: CreateRunInput
 ): Promise<CreateRunResult> {
   try {
     // Fetch active system policy profile
     const policy = await getSystemPolicyProfileByProject(
-      supabase,
+      db,
       input.project_id
     );
 
@@ -101,11 +98,11 @@ export async function createRun(
       input.scope === "card" && input.card_id
         ? [input.card_id]
         : input.scope === "workflow" && input.workflow_id
-          ? await getCardIdsByWorkflow(supabase, input.workflow_id)
+          ? await getCardIdsByWorkflow(db, input.workflow_id)
           : [];
 
     for (const cardId of targetedCardIds) {
-      const plannedFiles = await getCardPlannedFiles(supabase, cardId);
+      const plannedFiles = await getCardPlannedFiles(db, cardId);
       const hasApproved = plannedFiles.some(
         (f) => (f as { status?: string }).status === "approved"
       );
@@ -136,36 +133,25 @@ export async function createRun(
       worktree_root: input.worktree_root ?? null,
     });
 
-    const { data: inserted, error } = await supabase
-      .from(ORCHESTRATION_TABLES.orchestration_runs)
-      .insert({
-        project_id: runPayload.project_id,
-        scope: runPayload.scope,
-        workflow_id: runPayload.workflow_id,
-        card_id: runPayload.card_id,
-        trigger_type: runPayload.trigger_type,
-        status: runPayload.status,
-        initiated_by: runPayload.initiated_by,
-        repo_url: runPayload.repo_url,
-        base_branch: runPayload.base_branch,
-        system_policy_profile_id: runPayload.system_policy_profile_id,
-        system_policy_snapshot: runPayload.system_policy_snapshot,
-        run_input_snapshot: runPayload.run_input_snapshot,
-        worktree_root: runPayload.worktree_root,
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
+    const inserted = await db.insertOrchestrationRun({
+      project_id: runPayload.project_id,
+      scope: runPayload.scope,
+      workflow_id: runPayload.workflow_id,
+      card_id: runPayload.card_id,
+      trigger_type: runPayload.trigger_type,
+      status: runPayload.status,
+      initiated_by: runPayload.initiated_by,
+      repo_url: runPayload.repo_url,
+      base_branch: runPayload.base_branch,
+      system_policy_profile_id: runPayload.system_policy_profile_id,
+      system_policy_snapshot: runPayload.system_policy_snapshot,
+      run_input_snapshot: runPayload.run_input_snapshot,
+      worktree_root: runPayload.worktree_root,
+    });
 
     return {
       success: true,
-      runId: inserted?.id,
+      runId: inserted?.id as string,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

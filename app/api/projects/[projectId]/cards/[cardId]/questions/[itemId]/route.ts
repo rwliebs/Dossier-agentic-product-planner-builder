@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { verifyCardInProject } from "@/lib/supabase/queries";
 import {
   json,
@@ -8,25 +8,18 @@ import {
   internalError,
 } from "@/lib/api/response-helpers";
 import { updateKnowledgeItemSchema } from "@/lib/validation/request-schema";
-import { TABLES } from "@/lib/supabase/queries";
 
 type RouteParams = {
   params: Promise<{ projectId: string; cardId: string; itemId: string }>;
 };
 
 async function getQuestion(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  db: ReturnType<typeof getDb>,
   cardId: string,
   itemId: string
 ) {
-  const { data, error } = await supabase
-    .from(TABLES.card_questions)
-    .select("*")
-    .eq("id", itemId)
-    .eq("card_id", cardId)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
+  const items = await db.getCardQuestions(cardId);
+  return items.find((r) => (r as { id?: string }).id === itemId) ?? null;
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
@@ -45,11 +38,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return validationError("Invalid request body", details);
     }
 
-    const supabase = await createClient();
-    const inProject = await verifyCardInProject(supabase, cardId, projectId);
+    const db = getDb();
+    const inProject = await verifyCardInProject(db, cardId, projectId);
     if (!inProject) return notFoundError("Card not found");
 
-    const existing = await getQuestion(supabase, cardId, itemId);
+    const existing = await getQuestion(db, cardId, itemId);
     if (!existing) return notFoundError("Question not found");
 
     const updates: Record<string, unknown> = {};
@@ -60,22 +53,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     if (Object.keys(updates).length === 0) return json(existing);
 
-    updates.updated_at = new Date().toISOString();
+    await db.updateCardQuestion(itemId, cardId, updates);
 
-    const { data, error } = await supabase
-      .from(TABLES.card_questions)
-      .update(updates)
-      .eq("id", itemId)
-      .eq("card_id", cardId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("PATCH question error:", error);
-      return internalError(error.message);
-    }
-
-    return json(data);
+    const updated = await getQuestion(db, cardId, itemId);
+    return json(updated ?? existing);
   } catch (err) {
     console.error("PATCH question error:", err);
     return internalError();
@@ -85,24 +66,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
     const { projectId, cardId, itemId } = await params;
-    const supabase = await createClient();
+    const db = getDb();
 
-    const inProject = await verifyCardInProject(supabase, cardId, projectId);
+    const inProject = await verifyCardInProject(db, cardId, projectId);
     if (!inProject) return notFoundError("Card not found");
 
-    const existing = await getQuestion(supabase, cardId, itemId);
+    const existing = await getQuestion(db, cardId, itemId);
     if (!existing) return notFoundError("Question not found");
 
-    const { error } = await supabase
-      .from(TABLES.card_questions)
-      .delete()
-      .eq("id", itemId)
-      .eq("card_id", cardId);
-
-    if (error) {
-      console.error("DELETE question error:", error);
-      return internalError(error.message);
-    }
+    await db.deleteCardQuestion(itemId, cardId);
 
     return new Response(null, { status: 204 });
   } catch (err) {

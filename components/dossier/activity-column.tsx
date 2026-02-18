@@ -2,16 +2,7 @@
 
 import { ImplementationCard, type CodeFileForPanel } from './implementation-card';
 import { StepGroup, type StepGroupProps } from './step-group';
-import type {
-  MapActivity,
-  MapCard,
-  ContextArtifact,
-  CardRequirement,
-  CardKnownFact,
-  CardAssumption,
-  CardQuestion,
-  CardPlannedFile,
-} from '@/lib/types/ui';
+import type { MapActivity, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 
 export interface ActivityColumnProps {
   activity: MapActivity;
@@ -25,15 +16,7 @@ export interface ActivityColumnProps {
   onSelectDoc?: (doc: ContextArtifact) => void;
   onSelectFile?: (file: CodeFileForPanel) => void;
   codeFiles?: CodeFileForPanel[];
-  getCardKnowledge?: (cardId: string) => {
-    requirements?: CardRequirement[];
-    contextArtifacts?: ContextArtifact[];
-    plannedFiles?: CardPlannedFile[];
-    facts?: CardKnownFact[];
-    assumptions?: CardAssumption[];
-    questions?: CardQuestion[];
-    quickAnswer?: string | null;
-  } | undefined;
+  getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
 }
 
 export function ActivityColumn({
@@ -77,7 +60,7 @@ export function ActivityColumn({
             onSelectDoc={onSelectDoc}
             onSelectFile={onSelectFile}
             codeFiles={codeFiles}
-            getCardKnowledge={getCardKnowledge as never}
+            getCardKnowledge={getCardKnowledge}
           />
         ))}
         {sortedActivityCards.map((card) => {

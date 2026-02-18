@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { fetchMapSnapshot, getLinkedArtifactsForPrompt } from "@/lib/supabase/map-snapshot";
 import {
   claudePlanningRequest,
@@ -9,9 +9,7 @@ import {
 import { buildPreviewFromActions } from "@/lib/llm/build-preview-response";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
 import { json } from "@/lib/api/response-helpers";
-
-const PLANNING_LLM_ENABLED =
-  process.env.NEXT_PUBLIC_PLANNING_LLM_ENABLED !== "false";
+import { PLANNING_LLM } from "@/lib/feature-flags";
 
 export interface ChatRequest {
   message: string;
@@ -38,7 +36,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
-  if (!PLANNING_LLM_ENABLED) {
+  if (!PLANNING_LLM) {
     return json(
       {
         status: "error",
@@ -66,20 +64,20 @@ export async function POST(
     return json({ status: "error", message: "Message is required" }, 400);
   }
 
-  let supabase;
+  let db;
   try {
-    supabase = await createClient();
+    db = getDb();
   } catch (e) {
     return json(
       {
         status: "error",
-        message: "Server configuration error. Supabase not configured.",
+        message: "Server configuration error. Database not configured.",
       },
       500,
     );
   }
 
-  const state = await fetchMapSnapshot(supabase, projectId);
+  const state = await fetchMapSnapshot(db, projectId);
   if (!state) {
     return json({ status: "error", message: "Project not found" }, 404);
   }

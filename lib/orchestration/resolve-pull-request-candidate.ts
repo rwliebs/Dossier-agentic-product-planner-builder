@@ -2,9 +2,8 @@
  * Update pull request candidate status.
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbAdapter } from "@/lib/db/adapter";
 import { updatePullRequestCandidateStatusSchema } from "@/lib/schemas/slice-c";
-import { ORCHESTRATION_TABLES } from "@/lib/supabase/queries/orchestration";
 
 export interface ResolvePullRequestCandidateInput {
   pr_candidate_id: string;
@@ -21,7 +20,7 @@ export interface ResolvePullRequestCandidateResult {
  * Updates a PullRequestCandidate status (e.g. when PR is created or merged).
  */
 export async function resolvePullRequestCandidate(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   input: ResolvePullRequestCandidateInput
 ): Promise<ResolvePullRequestCandidateResult> {
   try {
@@ -30,25 +29,12 @@ export async function resolvePullRequestCandidate(
       pr_url: input.pr_url ?? null,
     });
 
-    const updateData: Record<string, unknown> = {
-      status: payload.status,
-      updated_at: new Date().toISOString(),
-    };
+    const updates: Record<string, unknown> = { status: payload.status };
     if (payload.pr_url !== undefined) {
-      updateData.pr_url = payload.pr_url;
+      updates.pr_url = payload.pr_url;
     }
 
-    const { error } = await supabase
-      .from(ORCHESTRATION_TABLES.pull_request_candidates)
-      .update(updateData)
-      .eq("id", input.pr_candidate_id);
-
-    if (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
+    await db.updatePullRequestCandidate(input.pr_candidate_id, updates);
 
     return { success: true };
   } catch (err) {

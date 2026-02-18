@@ -103,7 +103,7 @@ export function createMemoryStore(db: DbAdapter, ruvectorAvailable: boolean): Me
   return {
     async search(queryText: string, scope: RetrievalScope, options?: { limit?: number }) {
       const limit = options?.limit ?? 10;
-      const vec = embedText(queryText);
+      const vec = await embedText(queryText);
       const raw = await rv.search({ vector: vec, k: Math.min(50, limit * 5) });
       const ids = raw.map((r) => r.id);
       if (ids.length === 0) return [];

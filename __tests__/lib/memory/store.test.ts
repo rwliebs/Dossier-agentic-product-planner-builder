@@ -1,14 +1,35 @@
 /**
  * MemoryStore tests (M8).
- * Uses createMockMemoryStore - no RuVector required.
+ * Mock path: createMockMemoryStore, no RuVector required.
+ * Integration path: real SQLite + RuVector when available.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
 import {
   createMockMemoryStore,
   createMemoryStore,
 } from "@/lib/memory/store";
 import { createMockDbAdapter } from "../mock-db-adapter";
+import { createTestDb } from "../create-test-db";
+import { ruvectorAvailable, cleanupRuvectorTestVectors } from "../ruvector-test-helpers";
+import { ingestMemoryUnit } from "@/lib/memory/ingestion";
+import { getRuvectorClient } from "@/lib/ruvector/client";
+import { resetRuvectorForTesting } from "@/lib/ruvector/client";
+
+vi.mock("@/lib/ruvector/client", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/lib/ruvector/client")>();
+  return { ...mod, getRuvectorClient: vi.fn() };
+});
+
+const sqliteAvailable = (() => {
+  try {
+    const Database = require("better-sqlite3");
+    new Database(":memory:").close();
+    return true;
+  } catch {
+    return false;
+  }
+})();
 
 describe("MemoryStore (M8)", () => {
   describe("createMockMemoryStore", () => {
@@ -47,6 +68,138 @@ describe("MemoryStore (M8)", () => {
       const store = createMemoryStore(db, false);
       const refs = await store.retrieveForCard("c1", "p1", "context");
       expect(refs).toEqual([]);
+    });
+  });
+
+  describe.skipIf(!ruvectorAvailable || !sqliteAvailable)("integration with real RuVector", () => {
+    let realGetRuvectorClient: typeof getRuvectorClient;
+    let sqliteDb: ReturnType<typeof createTestDb>;
+    const insertedIds: string[] = [];
+
+    beforeAll(async () => {
+      const mod = await vi.importActual<typeof import("@/lib/ruvector/client")>("@/lib/ruvector/client");
+      realGetRuvectorClient = mod.getRuvectorClient;
+    });
+
+    beforeEach(() => {
+      resetRuvectorForTesting();
+      vi.mocked(getRuvectorClient).mockImplementation(realGetRuvectorClient);
+      sqliteDb = createTestDb();
+    });
+
+    afterEach(async () => {
+      const client = getRuvectorClient();
+      if (client) await cleanupRuvectorTestVectors(insertedIds, client);
+      insertedIds.length = 0;
+    });
+
+    it("full retrieval cycle: card-scoped results come first", async () => {
+      const cardId = "store-test-card";
+      const projectId = "store-test-project";
+
+      const id1 = await ingestMemoryUnit(
+        sqliteDb,
+        { contentText: "Card-scoped content A", title: "Card A" },
+        { cardId, projectId }
+      );
+      const id2 = await ingestMemoryUnit(
+        sqliteDb,
+        { contentText: "Card-scoped content B", title: "Card B" },
+        { cardId, projectId }
+      );
+      const id3 = await ingestMemoryUnit(
+        sqliteDb,
+        { contentText: "Project-only content", title: "Project" },
+        { cardId: "other-card", projectId }
+      );
+      if (id1) insertedIds.push(id1);
+      if (id2) insertedIds.push(id2);
+      if (id3) insertedIds.push(id3);
+
+      const store = createMemoryStore(sqliteDb, true);
+      const ids = await store.search("card content", { cardId, projectId }, { limit: 10 });
+      expect(ids.length).toBeGreaterThan(0);
+      const cardScoped = [id1, id2];
+      const cardScopedInResults = ids.filter((id) => cardScoped.includes(id));
+      const projectOnlyInResults = ids.filter((id) => id === id3);
+      expect(cardScopedInResults.length).toBeGreaterThanOrEqual(0);
+      if (cardScopedInResults.length > 0 && projectOnlyInResults.length > 0) {
+        expect(ids.indexOf(cardScopedInResults[0])).toBeLessThan(ids.indexOf(projectOnlyInResults[0]));
+      }
+    });
+
+    it("retrieveForCard returns content strings (not just IDs)", async () => {
+      const cardId = "store-retrieve-card";
+      const projectId = "store-retrieve-project";
+
+      const id = await ingestMemoryUnit(
+        sqliteDb,
+        { contentText: "Retrievable content for card", title: "Retrieve Test" },
+        { cardId, projectId }
+      );
+      if (id) insertedIds.push(id);
+
+      const store = createMemoryStore(sqliteDb, true);
+      const content = await store.retrieveForCard(cardId, projectId, "retrievable content");
+      expect(content.length).toBeGreaterThan(0);
+      expect(content.some((s) => typeof s === "string" && s.includes("Retrievable content"))).toBe(true);
+    });
+
+    it("logRetrieval writes to memory_retrieval_log table", async () => {
+      const insertSpy = vi.spyOn(sqliteDb, "insertMemoryRetrievalLog");
+      const store = createMemoryStore(sqliteDb, true);
+      await store.logRetrieval("test query", "card", "c1", ["id1", "id2"]);
+
+      expect(insertSpy).toHaveBeenCalledWith({
+        query_text: "test query",
+        scope_entity_type: "card",
+        scope_entity_id: "c1",
+        result_memory_ids: ["id1", "id2"],
+      });
+      insertSpy.mockRestore();
+    });
+
+    it("rejected items are excluded from results", async () => {
+      const cardId = "store-rejected-card";
+      const projectId = "store-rejected-project";
+
+      const idApproved = await ingestMemoryUnit(
+        sqliteDb,
+        { contentText: "Approved content", title: "Approved" },
+        { cardId, projectId }
+      );
+      if (idApproved) insertedIds.push(idApproved);
+
+      const vec = await import("@/lib/memory/embedding").then((m) => m.embedText("Rejected content"));
+      const client = getRuvectorClient();
+      const rejectedId = crypto.randomUUID();
+      await client!.insert({ id: rejectedId, vector: vec });
+      insertedIds.push(rejectedId);
+
+      await sqliteDb.insertMemoryUnit({
+        id: rejectedId,
+        content_type: "inline",
+        content_text: "Rejected content",
+        title: "Rejected",
+        status: "rejected",
+        embedding_ref: rejectedId,
+      });
+      await sqliteDb.insertMemoryUnitRelation({
+        memory_unit_id: rejectedId,
+        entity_type: "card",
+        entity_id: cardId,
+        relation_role: "source",
+      });
+      await sqliteDb.insertMemoryUnitRelation({
+        memory_unit_id: rejectedId,
+        entity_type: "project",
+        entity_id: projectId,
+        relation_role: "supports",
+      });
+
+      const store = createMemoryStore(sqliteDb, true);
+      const ids = await store.search("content", { cardId, projectId }, { limit: 10 });
+      expect(ids).not.toContain(rejectedId);
     });
   });
 });

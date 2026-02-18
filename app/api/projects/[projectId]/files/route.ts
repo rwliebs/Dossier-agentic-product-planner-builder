@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { getProject, getPlannedFilesByProject } from "@/lib/supabase/queries";
 import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
 
@@ -52,10 +52,10 @@ function buildTree(rows: { logical_file_name: string }[]): FileNode[] {
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { projectId } = await params;
-    const supabase = await createClient();
-    const project = await getProject(supabase, projectId);
+    const db = getDb();
+    const project = await getProject(db, projectId);
     if (!project) return notFoundError("Project not found");
-    const rows = await getPlannedFilesByProject(supabase, projectId);
+    const rows = await getPlannedFilesByProject(db, projectId);
     const tree = buildTree(rows as { logical_file_name: string }[]);
     return json(tree);
   } catch (err) {

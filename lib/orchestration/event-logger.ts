@@ -4,9 +4,8 @@
  * agent_run_started, checks_executed, approval_requested, pr_created.
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbAdapter } from "@/lib/db/adapter";
 import { createEventLogInputSchema } from "@/lib/schemas/slice-c";
-import { ORCHESTRATION_TABLES } from "@/lib/supabase/queries/orchestration";
 
 export type EventType =
   | "planning_action_applied"
@@ -40,7 +39,7 @@ export interface LogEventResult {
  * Writes an event to event_log.
  */
 export async function logEvent(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   input: LogEventInput
 ): Promise<LogEventResult> {
   try {
@@ -53,26 +52,18 @@ export async function logEvent(
       created_at: new Date().toISOString(),
     });
 
-    const { data: inserted, error } = await supabase
-      .from(ORCHESTRATION_TABLES.event_logs)
-      .insert({
-        project_id: payload.project_id,
-        run_id: payload.run_id,
-        event_type: payload.event_type,
-        actor: payload.actor,
-        payload: payload.payload,
-        created_at: payload.created_at,
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
+    const inserted = await db.insertEventLog({
+      project_id: payload.project_id,
+      run_id: payload.run_id,
+      event_type: payload.event_type,
+      actor: payload.actor,
+      payload: payload.payload,
+      created_at: payload.created_at,
+    });
 
     return {
       success: true,
-      eventId: inserted?.id,
+      eventId: inserted?.id as string,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

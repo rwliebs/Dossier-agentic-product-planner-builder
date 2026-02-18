@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { getProject } from "@/lib/supabase/queries";
 import {
   json,
@@ -8,15 +8,14 @@ import {
   internalError,
 } from "@/lib/api/response-helpers";
 import { updateProjectSchema } from "@/lib/validation/request-schema";
-import { TABLES } from "@/lib/supabase/queries";
 
 type RouteParams = { params: Promise<{ projectId: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { projectId } = await params;
-    const supabase = await createClient();
-    const project = await getProject(supabase, projectId);
+    const db = getDb();
+    const project = await getProject(db, projectId);
 
     if (!project) {
       return notFoundError("Project not found");
@@ -45,8 +44,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return validationError("Invalid request body", details);
     }
 
-    const supabase = await createClient();
-    const existing = await getProject(supabase, projectId);
+    const db = getDb();
+    const existing = await getProject(db, projectId);
 
     if (!existing) {
       return notFoundError("Project not found");
@@ -62,21 +61,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return json(existing);
     }
 
-    updates.updated_at = new Date().toISOString();
+    await db.updateProject(projectId, updates);
 
-    const { data, error } = await supabase
-      .from(TABLES.projects)
-      .update(updates)
-      .eq("id", projectId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("PATCH /api/projects/[projectId] error:", error);
-      return internalError(error.message);
-    }
-
-    return json(data);
+    const updated = await getProject(db, projectId);
+    return json(updated ?? existing);
   } catch (err) {
     console.error("PATCH /api/projects/[projectId] error:", err);
     return internalError();

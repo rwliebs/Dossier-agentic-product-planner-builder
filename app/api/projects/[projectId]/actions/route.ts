@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import {
   getProject,
   getPlanningActionsByProject,
@@ -21,14 +21,14 @@ type RouteParams = { params: Promise<{ projectId: string }> };
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { projectId } = await params;
-    const supabase = await createClient();
+    const db = getDb();
 
-    const project = await getProject(supabase, projectId);
+    const project = await getProject(db, projectId);
     if (!project) {
       return notFoundError("Project not found");
     }
 
-    const actions = await getPlanningActionsByProject(supabase, projectId);
+    const actions = await getPlanningActionsByProject(db, projectId);
     return json(actions);
   } catch (err) {
     console.error("GET /api/projects/[projectId]/actions error:", err);
@@ -52,8 +52,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return validationError("Invalid request body", details);
     }
 
-    const supabase = await createClient();
-    const project = await getProject(supabase, projectId);
+    const db = getDb();
+    const project = await getProject(db, projectId);
 
     if (!project) {
       return notFoundError("Project not found");
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (idempotencyKey) {
       try {
         const existing = await getPlanningActionsByIdempotencyKey(
-          supabase,
+          db,
           projectId,
           idempotencyKey
         );
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    const result = await pipelineApply(supabase, projectId, parsed.data.actions, {
+    const result = await pipelineApply(db, projectId, parsed.data.actions, {
       idempotencyKey,
     });
 
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (expectedSequence !== undefined) {
       try {
         const newSeq = await incrementProjectActionSequence(
-          supabase,
+          db,
           projectId,
           expectedSequence
         );

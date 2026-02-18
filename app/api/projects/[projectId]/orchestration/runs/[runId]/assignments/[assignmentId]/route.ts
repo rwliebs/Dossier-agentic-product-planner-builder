@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { getCardAssignment } from "@/lib/supabase/queries/orchestration";
 import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
 
@@ -13,9 +13,9 @@ export async function GET(
 ) {
   try {
     const { assignmentId } = await params;
-    const supabase = await createClient();
+    const db = getDb();
 
-    const assignment = await getCardAssignment(supabase, assignmentId);
+    const assignment = await getCardAssignment(db, assignmentId);
     if (!assignment) {
       return notFoundError("Card assignment not found");
     }

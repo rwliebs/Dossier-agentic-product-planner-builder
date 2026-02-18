@@ -57,7 +57,7 @@ export async function ingestMemoryUnit(
       ? contentText
       : (input.title ? `${input.title}: ` : "") + (input.linkUrl ?? "");
 
-  const vec = embedText(textForEmbedding);
+  const vec = await embedText(textForEmbedding);
   const memoryUnitId = crypto.randomUUID();
 
   try {

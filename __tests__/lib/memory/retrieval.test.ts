@@ -1,16 +1,49 @@
 /**
  * Retrieval policy tests (M8).
- * Uses mock MemoryStore (RuVector unavailable) - returns empty.
+ * Mock path: uses mock MemoryStore (RuVector unavailable) - returns empty.
+ * Integration path: real SQLite + RuVector when available.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
 import { retrieveForCard } from "@/lib/memory/retrieval";
 import { createMockDbAdapter } from "../mock-db-adapter";
 import { resetMemoryStoreForTesting } from "@/lib/memory";
+import { createSqliteAdapter } from "@/lib/db/sqlite-adapter";
+import { ingestMemoryUnit } from "@/lib/memory/ingestion";
+import { getRuvectorClient } from "@/lib/ruvector/client";
+import { resetRuvectorForTesting } from "@/lib/ruvector/client";
+
+vi.mock("@/lib/ruvector/client", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/lib/ruvector/client")>();
+  return { ...mod, getRuvectorClient: vi.fn() };
+});
+
+const ruvectorAvailable = (() => {
+  try {
+    return require("ruvector-core") != null;
+  } catch {
+    return false;
+  }
+})();
+
+const sqliteAvailable = (() => {
+  try {
+    const Database = require("better-sqlite3");
+    new Database(":memory:").close();
+    return true;
+  } catch {
+    return false;
+  }
+})();
 
 describe("Retrieval policy (M8)", () => {
   beforeEach(() => {
     resetMemoryStoreForTesting();
+    vi.mocked(getRuvectorClient).mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("returns empty array when using mock store", async () => {
@@ -23,5 +56,57 @@ describe("Retrieval policy (M8)", () => {
     const db = createMockDbAdapter();
     const refs = await retrieveForCard(db, "c1", "p1", "context", { limit: 5 });
     expect(refs).toEqual([]);
+  });
+
+  describe.skipIf(!ruvectorAvailable || !sqliteAvailable)("integration with real RuVector", () => {
+    let realGetRuvectorClient: typeof getRuvectorClient;
+    let sqliteDb: ReturnType<typeof createSqliteAdapter>;
+    const insertedIds: string[] = [];
+
+    beforeAll(async () => {
+      const mod = await vi.importActual<typeof import("@/lib/ruvector/client")>("@/lib/ruvector/client");
+      realGetRuvectorClient = mod.getRuvectorClient;
+    });
+
+    beforeEach(() => {
+      resetMemoryStoreForTesting();
+      resetRuvectorForTesting();
+      vi.mocked(getRuvectorClient).mockImplementation(realGetRuvectorClient);
+      sqliteDb = createSqliteAdapter(":memory:");
+    });
+
+    afterEach(async () => {
+      const client = getRuvectorClient();
+      for (const id of insertedIds) {
+        try {
+          await client?.delete(id);
+        } catch {
+          // ignore
+        }
+      }
+      insertedIds.length = 0;
+    });
+
+    it("retrieveForCard end-to-end: ingest content, retrieve with semantically similar query, results non-empty", async () => {
+      const cardId = "retrieval-test-card";
+      const projectId = "retrieval-test-project";
+
+      const id = await ingestMemoryUnit(
+        sqliteDb,
+        { contentText: "User authentication must support OAuth2 and SSO", title: "Auth requirement" },
+        { cardId, projectId }
+      );
+      expect(id).not.toBeNull();
+      if (id) insertedIds.push(id);
+
+      const refs = await retrieveForCard(
+        sqliteDb,
+        cardId,
+        projectId,
+        "how does login work with OAuth"
+      );
+      expect(refs.length).toBeGreaterThan(0);
+      expect(refs.some((s) => s.includes("OAuth2") || s.includes("authentication"))).toBe(true);
+    });
   });
 });

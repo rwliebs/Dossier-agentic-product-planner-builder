@@ -1,28 +1,29 @@
 /**
  * Execution dispatch: fetch assignment + card + planned files,
- * retrieve memory (placeholder), build payload, dispatch to agentic-flow,
+ * retrieve memory, build payload, dispatch to claude-flow,
  * create AgentExecution, update status, log event.
  *
  * @see WORKTREE_MANAGEMENT_FLOW.md
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbAdapter } from "@/lib/db/adapter";
+import { MEMORY_PLANE } from "@/lib/feature-flags";
 import {
-  createAgenticFlowClient,
+  createClaudeFlowClient,
   type DispatchPayload,
-} from "./agentic-flow-client";
+} from "./claude-flow-client";
 import { logEvent } from "./event-logger";
 import {
   getCardAssignment,
   getOrchestrationRun,
   updateCardAssignmentStatus,
-  ORCHESTRATION_TABLES,
 } from "@/lib/supabase/queries/orchestration";
 import {
   getCardById,
   getCardPlannedFiles,
   getCardRequirements,
 } from "@/lib/supabase/queries";
+import { getMemoryStore } from "@/lib/memory";
 
 export interface DispatchAssignmentInput {
   assignment_id: string;
@@ -37,27 +38,17 @@ export interface DispatchAssignmentResult {
 }
 
 /**
- * Memory retrieval placeholder. Returns empty array until Memory Plane is implemented.
- */
-async function retrieveMemoryForCard(
-  _supabase: SupabaseClient,
-  _cardId: string
-): Promise<string[]> {
-  return [];
-}
-
-/**
- * Dispatches a single assignment to agentic-flow.
+ * Dispatches a single assignment to claude-flow.
  * Fetches assignment, run, card, planned files; builds payload; dispatches;
  * creates AgentExecution; updates assignment status; logs event.
  */
 export async function dispatchAssignment(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   input: DispatchAssignmentInput
 ): Promise<DispatchAssignmentResult> {
   const { assignment_id, actor } = input;
 
-  const assignment = await getCardAssignment(supabase, assignment_id);
+  const assignment = await getCardAssignment(db, assignment_id);
   if (!assignment) {
     return { success: false, error: "Assignment not found" };
   }
@@ -70,7 +61,7 @@ export async function dispatchAssignment(
   }
 
   const run = await getOrchestrationRun(
-    supabase,
+    db,
     (assignment as { run_id: string }).run_id
   );
   if (!run) {
@@ -78,12 +69,12 @@ export async function dispatchAssignment(
   }
 
   const cardId = (assignment as { card_id: string }).card_id;
-  const card = await getCardById(supabase, cardId);
+  const card = await getCardById(db, cardId);
   if (!card) {
     return { success: false, error: "Card not found" };
   }
 
-  const plannedFiles = await getCardPlannedFiles(supabase, cardId);
+  const plannedFiles = await getCardPlannedFiles(db, cardId);
   const approvedPlannedFiles = plannedFiles.filter(
     (f) => (f as { status?: string }).status === "approved"
   );
@@ -94,7 +85,7 @@ export async function dispatchAssignment(
     };
   }
 
-  const requirements = await getCardRequirements(supabase, cardId);
+  const requirements = await getCardRequirements(db, cardId);
   const acceptanceCriteria = requirements.map(
     (r) => (r as { text?: string }).text ?? ""
   );
@@ -103,7 +94,21 @@ export async function dispatchAssignment(
     acceptanceCriteria.unshift(cardDesc);
   }
 
-  const memoryRefs = await retrieveMemoryForCard(supabase, cardId);
+  const projectId = run.project_id as string;
+  const contextSummary = [
+    (card as { title?: string }).title,
+    (card as { description?: string }).description,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const memoryRefs = MEMORY_PLANE
+    ? await getMemoryStore(db).retrieveForCard(
+        cardId,
+        projectId,
+        contextSummary || cardId,
+        { limit: 10 }
+      )
+    : [];
 
   const payload: DispatchPayload = {
     run_id: (run as { id: string }).id,
@@ -121,11 +126,11 @@ export async function dispatchAssignment(
     acceptance_criteria: acceptanceCriteria.filter(Boolean),
   };
 
-  const client = createAgenticFlowClient();
+  const client = createClaudeFlowClient();
   const dispatchResult = await client.dispatch(payload);
 
   if (!dispatchResult.success) {
-    await logEvent(supabase, {
+    await logEvent(db, {
       project_id: (run as { project_id: string }).project_id,
       run_id: (run as { id: string }).id,
       event_type: "execution_failed",
@@ -143,41 +148,34 @@ export async function dispatchAssignment(
 
   const executionId = dispatchResult.execution_id;
 
-  const { data: agentExec, error: insertError } = await supabase
-    .from(ORCHESTRATION_TABLES.agent_executions)
-    .insert({
+  let agentExec: { id?: string } | null = null;
+  try {
+    agentExec = await db.insertAgentExecution({
       assignment_id,
       status: "running",
       started_at: new Date().toISOString(),
       summary: null,
       error: null,
-    })
-    .select("id")
-    .single();
-
-  if (insertError) {
+    });
+  } catch (insertError) {
     return {
       success: false,
-      error: `Failed to create AgentExecution: ${insertError.message}`,
+      error: `Failed to create AgentExecution: ${insertError instanceof Error ? insertError.message : String(insertError)}`,
     };
   }
 
-  await updateCardAssignmentStatus(supabase, assignment_id, "running");
+  await updateCardAssignmentStatus(db, assignment_id, "running");
 
   // Ensure run status is running when first assignment dispatched
   const runStatus = (run as { status?: string }).status;
   if (runStatus === "queued") {
-    await supabase
-      .from(ORCHESTRATION_TABLES.orchestration_runs)
-      .update({
-        status: "running",
-        started_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", (run as { id: string }).id);
+    await db.updateOrchestrationRun((run as { id: string }).id, {
+      status: "running",
+      started_at: new Date().toISOString(),
+    });
   }
 
-  await logEvent(supabase, {
+  await logEvent(db, {
     project_id: (run as { project_id: string }).project_id,
     run_id: (run as { id: string }).id,
     event_type: "agent_run_started",

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { getProject, getArtifactById } from "@/lib/supabase/queries";
 import {
   json,
@@ -8,7 +8,6 @@ import {
   internalError,
 } from "@/lib/api/response-helpers";
 import { updateArtifactSchema } from "@/lib/validation/request-schema";
-import { TABLES } from "@/lib/supabase/queries";
 
 type RouteParams = {
   params: Promise<{ projectId: string; artifactId: string }>;
@@ -20,14 +19,14 @@ export async function GET(
 ) {
   try {
     const { projectId, artifactId } = await params;
-    const supabase = await createClient();
+    const db = getDb();
 
-    const project = await getProject(supabase, projectId);
+    const project = await getProject(db, projectId);
     if (!project) {
       return notFoundError("Project not found");
     }
 
-    const artifact = await getArtifactById(supabase, artifactId);
+    const artifact = await getArtifactById(db, artifactId);
     if (!artifact) {
       return notFoundError("Artifact not found");
     }
@@ -62,13 +61,13 @@ export async function PATCH(
       return validationError("Invalid request body", details);
     }
 
-    const supabase = await createClient();
-    const project = await getProject(supabase, projectId);
+    const db = getDb();
+    const project = await getProject(db, projectId);
     if (!project) {
       return notFoundError("Project not found");
     }
 
-    const artifact = await getArtifactById(supabase, artifactId);
+    const artifact = await getArtifactById(db, artifactId);
     if (!artifact) {
       return notFoundError("Artifact not found");
     }
@@ -92,22 +91,10 @@ export async function PATCH(
       return json(artifact);
     }
 
-    updates.updated_at = new Date().toISOString();
+    await db.updateContextArtifact(artifactId, updates);
 
-    const { data, error } = await supabase
-      .from(TABLES.context_artifacts)
-      .update(updates)
-      .eq("id", artifactId)
-      .eq("project_id", projectId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("PATCH artifact error:", error);
-      return internalError(error.message);
-    }
-
-    return json(data);
+    const updated = await db.getArtifactById(artifactId);
+    return json(updated ?? artifact);
   } catch (err) {
     console.error("PATCH /api/projects/[projectId]/artifacts/[artifactId] error:", err);
     return internalError();
@@ -120,14 +107,14 @@ export async function DELETE(
 ) {
   try {
     const { projectId, artifactId } = await params;
-    const supabase = await createClient();
+    const db = getDb();
 
-    const project = await getProject(supabase, projectId);
+    const project = await getProject(db, projectId);
     if (!project) {
       return notFoundError("Project not found");
     }
 
-    const artifact = await getArtifactById(supabase, artifactId);
+    const artifact = await getArtifactById(db, artifactId);
     if (!artifact) {
       return notFoundError("Artifact not found");
     }
@@ -136,16 +123,7 @@ export async function DELETE(
       return notFoundError("Artifact not found");
     }
 
-    const { error } = await supabase
-      .from(TABLES.context_artifacts)
-      .delete()
-      .eq("id", artifactId)
-      .eq("project_id", projectId);
-
-    if (error) {
-      console.error("DELETE artifact error:", error);
-      return internalError(error.message);
-    }
+    await db.deleteContextArtifact(artifactId, projectId);
 
     return new Response(null, { status: 204 });
   } catch (err) {

@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { processWebhook, type WebhookPayload } from "@/lib/orchestration/process-webhook";
 import { json, validationError, internalError } from "@/lib/api/response-helpers";
 
 /**
- * Webhook receiver for agentic-flow callbacks.
+ * Webhook receiver for claude-flow callbacks.
  * Handles: execution_started, commit_created, execution_completed, execution_failed.
  */
 export async function POST(request: NextRequest) {
@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
-    const result = await processWebhook(supabase, body as WebhookPayload);
+    const db = getDb();
+    const result = await processWebhook(db, body as WebhookPayload);
 
     if (!result.success) {
       return validationError(result.error ?? "Webhook processing failed");
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     return json({ received: true, processed: true }, 202);
   } catch (err) {
-    console.error("Agentic-flow webhook error:", err);
+    console.error("Claude-flow webhook error:", err);
     return internalError();
   }
 }

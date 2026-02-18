@@ -5,7 +5,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { getProject } from "@/lib/supabase/queries";
 import { fetchMapSnapshot } from "@/lib/supabase/map-snapshot";
 import { previewActionBatch } from "@/lib/actions/preview-action";
@@ -36,14 +36,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return validationError("Invalid request body", details);
     }
 
-    const supabase = await createClient();
-    const project = await getProject(supabase, projectId);
+    const db = getDb();
+    const project = await getProject(db, projectId);
 
     if (!project) {
       return notFoundError("Project not found");
     }
 
-    const state = await fetchMapSnapshot(supabase, projectId);
+    const state = await fetchMapSnapshot(db, projectId);
     if (!state) {
       return notFoundError("Project map not found");
     }

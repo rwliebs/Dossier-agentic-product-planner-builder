@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { createApprovalRequest } from "@/lib/orchestration";
 import { getApprovalRequestsByRun } from "@/lib/supabase/queries/orchestration";
 import { json, validationError, notFoundError, internalError } from "@/lib/api/response-helpers";
@@ -17,8 +17,8 @@ export async function GET(
       return validationError("run_id query parameter is required");
     }
 
-    const supabase = await createClient();
-    const approvals = await getApprovalRequestsByRun(supabase, runId);
+    const db = getDb();
+    const approvals = await getApprovalRequestsByRun(db, runId);
 
     return json({ approvals });
   } catch (err) {
@@ -41,8 +41,8 @@ export async function POST(
       );
     }
 
-    const supabase = await createClient();
-    const result = await createApprovalRequest(supabase, {
+    const db = getDb();
+    const result = await createApprovalRequest(db, {
       run_id,
       approval_type,
       requested_by,

@@ -1,21 +1,19 @@
 /**
  * Integration tests for orchestration execution:
- * - Agentic-flow mock client (dispatch, status, cancel)
+ * - Claude-flow mock client (dispatch, status, cancel)
  * - Webhook processing (execution_completed, execution_failed)
  * - Event logger
- * - Dispatch with mock agentic-flow
+ * - Dispatch with mock claude-flow
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  createMockAgenticFlowClient,
-  createAgenticFlowClient,
-} from "@/lib/orchestration/agentic-flow-client";
+import { createMockClaudeFlowClient } from "@/lib/orchestration/claude-flow-client";
 import { logEvent } from "@/lib/orchestration/event-logger";
 import { processWebhook } from "@/lib/orchestration/process-webhook";
 import { dispatchAssignment } from "@/lib/orchestration/dispatch";
 import * as orchestrationQueries from "@/lib/supabase/queries/orchestration";
 import * as queries from "@/lib/supabase/queries";
+import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
 
 const projectId = "11111111-1111-1111-1111-111111111111";
 const runId = "22222222-2222-2222-2222-222222222222";
@@ -28,14 +26,6 @@ vi.mock("@/lib/supabase/queries/orchestration", () => ({
   updateCardAssignmentStatus: vi.fn(),
   getAgentExecutionsByAssignment: vi.fn(),
   getRunChecksByRun: vi.fn().mockResolvedValue([]),
-  ORCHESTRATION_TABLES: {
-    orchestration_runs: "orchestration_run",
-    card_assignments: "card_assignment",
-    agent_executions: "agent_execution",
-    agent_commits: "agent_commit",
-    run_checks: "run_check",
-    event_logs: "event_log",
-  },
 }));
 
 vi.mock("@/lib/supabase/queries", () => ({
@@ -44,9 +34,9 @@ vi.mock("@/lib/supabase/queries", () => ({
   getCardRequirements: vi.fn(),
 }));
 
-describe("Agentic-flow mock client", () => {
+describe("Claude-flow mock client", () => {
   it("dispatch returns execution_id", async () => {
-    const client = createMockAgenticFlowClient();
+    const client = createMockClaudeFlowClient();
     const result = await client.dispatch({
       run_id: runId,
       assignment_id: assignmentId,
@@ -62,7 +52,7 @@ describe("Agentic-flow mock client", () => {
   });
 
   it("status returns completed for mock execution", async () => {
-    const client = createMockAgenticFlowClient();
+    const client = createMockClaudeFlowClient();
     const dispatchResult = await client.dispatch({
       run_id: runId,
       assignment_id: assignmentId,
@@ -78,7 +68,7 @@ describe("Agentic-flow mock client", () => {
   });
 
   it("cancel removes execution", async () => {
-    const client = createMockAgenticFlowClient();
+    const client = createMockClaudeFlowClient();
     const dispatchResult = await client.dispatch({
       run_id: runId,
       assignment_id: assignmentId,
@@ -99,18 +89,10 @@ describe("Agentic-flow mock client", () => {
 
 describe("Event logger", () => {
   it("writes event to event_log", async () => {
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: { id: "event-123" },
-          error: null,
-        }),
-      }),
-    });
-    const mockFrom = vi.fn().mockReturnValue({ insert: mockInsert });
-    const mockSupabase = { from: mockFrom } as never;
+    const mockInsertEventLog = vi.fn().mockResolvedValue({ id: "event-123" });
+    const mockDb = createMockDbAdapter({ insertEventLog: mockInsertEventLog });
 
-    const result = await logEvent(mockSupabase, {
+    const result = await logEvent(mockDb, {
       project_id: projectId,
       run_id: runId,
       event_type: "agent_run_started",
@@ -120,7 +102,7 @@ describe("Event logger", () => {
 
     expect(result.success).toBe(true);
     expect(result.eventId).toBe("event-123");
-    expect(mockInsert).toHaveBeenCalledWith(
+    expect(mockInsertEventLog).toHaveBeenCalledWith(
       expect.objectContaining({
         project_id: projectId,
         run_id: runId,
@@ -162,19 +144,9 @@ describe("Webhook processing", () => {
   });
 
   it("execution_completed updates assignment and agent_execution", async () => {
-    const mockUpdate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: {}, error: null }) }),
-    });
-    const mockFrom = vi.fn((table: string) => {
-      if (table === "card_assignment") return { update: mockUpdate };
-      if (table === "agent_execution") return { update: mockUpdate };
-      if (table === "event_log") return { insert: mockInsert };
-      return { insert: mockInsert };
-    });
-    const mockSupabase = { from: mockFrom } as never;
+    const mockDb = createMockDbAdapter();
 
-    const result = await processWebhook(mockSupabase, {
+    const result = await processWebhook(mockDb, {
       event_type: "execution_completed",
       assignment_id: assignmentId,
       summary: "Done",
@@ -184,11 +156,9 @@ describe("Webhook processing", () => {
   });
 
   it("execution_failed updates run status", async () => {
-    const mockUpdate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
-    const mockFrom = vi.fn(() => ({ update: mockUpdate }));
-    const mockSupabase = { from: mockFrom } as never;
+    const mockDb = createMockDbAdapter();
 
-    const result = await processWebhook(mockSupabase, {
+    const result = await processWebhook(mockDb, {
       event_type: "execution_failed",
       assignment_id: assignmentId,
       error: "Build failed",
@@ -198,8 +168,7 @@ describe("Webhook processing", () => {
   });
 
   it("returns error for unknown event_type", async () => {
-    const mockSupabase = { from: vi.fn() } as never;
-    const result = await processWebhook(mockSupabase, {
+    const result = await processWebhook(createMockDbAdapter(), {
       event_type: "unknown_event" as never,
       assignment_id: assignmentId,
     });
@@ -248,8 +217,7 @@ describe("Dispatch assignment", () => {
   it("returns error when assignment not found", async () => {
     vi.mocked(orchestrationQueries.getCardAssignment).mockResolvedValue(null);
 
-    const mockSupabase = { from: vi.fn() } as never;
-    const result = await dispatchAssignment(mockSupabase, {
+    const result = await dispatchAssignment(createMockDbAdapter(), {
       assignment_id: assignmentId,
       actor: "user",
     });
@@ -264,8 +232,7 @@ describe("Dispatch assignment", () => {
       status: "running",
     } as never);
 
-    const mockSupabase = { from: vi.fn() } as never;
-    const result = await dispatchAssignment(mockSupabase, {
+    const result = await dispatchAssignment(createMockDbAdapter(), {
       assignment_id: assignmentId,
       actor: "user",
     });
@@ -279,8 +246,7 @@ describe("Dispatch assignment", () => {
       { id: "pf-1", status: "proposed" },
     ] as never);
 
-    const mockSupabase = { from: vi.fn() } as never;
-    const result = await dispatchAssignment(mockSupabase, {
+    const result = await dispatchAssignment(createMockDbAdapter(), {
       assignment_id: assignmentId,
       actor: "user",
     });
@@ -290,30 +256,11 @@ describe("Dispatch assignment", () => {
   });
 
   it("dispatches successfully with mock client", async () => {
-    const agentExecInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: { id: "agent-exec-123" },
-          error: null,
-        }),
-      }),
+    const mockDb = createMockDbAdapter({
+      insertAgentExecution: vi.fn().mockResolvedValue({ id: "agent-exec-123" }),
     });
-    const eventLogInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: { id: "ev-1" }, error: null }),
-      }),
-    });
-    const mockUpdate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
-    const mockFrom = vi.fn((table: string) => {
-      if (table === "agent_execution") return { insert: agentExecInsert };
-      if (table === "card_assignment") return { update: mockUpdate };
-      if (table === "orchestration_run") return { update: mockUpdate };
-      if (table === "event_log") return { insert: eventLogInsert };
-      return {};
-    });
-    const mockSupabase = { from: mockFrom } as never;
 
-    const result = await dispatchAssignment(mockSupabase, {
+    const result = await dispatchAssignment(mockDb, {
       assignment_id: assignmentId,
       actor: "user",
     });

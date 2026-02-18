@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbAdapter } from "@/lib/db/adapter";
 import type {
   Project,
   Workflow,
@@ -23,14 +23,14 @@ import {
 } from "./queries";
 
 /**
- * Fetch project map snapshot from Supabase and build PlanningState.
+ * Fetch project map snapshot from DB and build PlanningState.
  * Used by chat API and map snapshot endpoint.
  */
 export async function fetchMapSnapshot(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   projectId: string,
 ): Promise<PlanningState | null> {
-  const projectRow = await getProject(supabase, projectId);
+  const projectRow = await getProject(db, projectId);
   if (!projectRow) return null;
 
   const project: Project = {
@@ -42,7 +42,7 @@ export async function fetchMapSnapshot(
 
   const state = createEmptyPlanningState(project);
 
-  const workflows = await getWorkflowsByProject(supabase, projectId);
+  const workflows = await getWorkflowsByProject(db, projectId);
   for (const w of workflows ?? []) {
     const workflow: Workflow = {
       id: w.id,
@@ -56,7 +56,7 @@ export async function fetchMapSnapshot(
   }
 
   for (const w of workflows ?? []) {
-    const activities = await getActivitiesByWorkflow(supabase, w.id);
+    const activities = await getActivitiesByWorkflow(db, w.id as string);
     for (const a of activities ?? []) {
       const activity: WorkflowActivity = {
         id: a.id,
@@ -71,7 +71,7 @@ export async function fetchMapSnapshot(
 
   const allActivities = Array.from(state.activities.values());
   for (const a of allActivities) {
-    const steps = await getStepsByActivity(supabase, a.id);
+    const steps = await getStepsByActivity(db, a.id);
     for (const s of steps ?? []) {
       const step: Step = {
         id: s.id,
@@ -88,7 +88,7 @@ export async function fetchMapSnapshot(
       (s) => s.workflow_activity_id === a.id,
     );
     for (const s of stepsInActivity) {
-      const cards = await getCardsByStep(supabase, s.id);
+      const cards = await getCardsByStep(db, s.id);
       for (const c of cards ?? []) {
         const card: Card = {
           id: c.id,
@@ -103,7 +103,7 @@ export async function fetchMapSnapshot(
         state.cards.set(c.id, card);
       }
     }
-    const cardsWithoutStep = await getCardsByActivity(supabase, a.id);
+    const cardsWithoutStep = await getCardsByActivity(db, a.id);
     for (const c of cardsWithoutStep ?? []) {
       if (!state.cards.has(c.id)) {
         const card: Card = {
@@ -121,7 +121,7 @@ export async function fetchMapSnapshot(
     }
   }
 
-  const artifacts = await getArtifactsByProject(supabase, projectId);
+  const artifacts = await getArtifactsByProject(db, projectId);
   for (const art of artifacts ?? []) {
     const artifact: ContextArtifact = {
       id: art.id,
@@ -142,7 +142,7 @@ export async function fetchMapSnapshot(
   }
 
   for (const card of state.cards.values()) {
-    const links = await getCardContextArtifacts(supabase, card.id);
+    const links = await getCardContextArtifacts(db, card.id);
     const artifactIds = new Set(
       (links ?? []).map((l) => l.context_artifact_id),
     );

@@ -44,7 +44,7 @@ export async function appendCardSnapshot(input: CardSnapshotInput): Promise<bool
   const text = parts.join("\n");
   if (!text.trim()) return false;
 
-  const vec = embedText(text);
+  const vec = await embedText(text);
   const ts = input.timestamp ?? new Date().toISOString();
   const id = `snapshot:card:${input.cardId}:${ts.replace(/[:.]/g, "-")}`;
 

@@ -1,17 +1,31 @@
 /**
  * Build harvest pipeline tests (M8).
- * Mocks getRuvectorClient so harvest returns 0 when learnings provided.
+ * Mock path: tests pass without RuVector.
+ * Integration path: real SQLite + RuVector when available.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
 import { harvestBuildLearnings } from "@/lib/memory/harvest";
 import { createMockDbAdapter } from "../mock-db-adapter";
-
-vi.mock("@/lib/ruvector/client", () => ({
-  getRuvectorClient: vi.fn(),
-}));
-
+import { createTestDb } from "../create-test-db";
+import { ruvectorAvailable, cleanupRuvectorTestVectors } from "../ruvector-test-helpers";
 import { getRuvectorClient } from "@/lib/ruvector/client";
+import { resetRuvectorForTesting } from "@/lib/ruvector/client";
+
+vi.mock("@/lib/ruvector/client", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/lib/ruvector/client")>();
+  return { ...mod, getRuvectorClient: vi.fn() };
+});
+
+const sqliteAvailable = (() => {
+  try {
+    const Database = require("better-sqlite3");
+    new Database(":memory:").close();
+    return true;
+  } catch {
+    return false;
+  }
+})();
 
 describe("Harvest pipeline (M8)", () => {
   beforeEach(() => {
@@ -21,6 +35,7 @@ describe("Harvest pipeline (M8)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
+
   it("returns 0 when learnings empty", async () => {
     const db = createMockDbAdapter();
     const count = await harvestBuildLearnings(db, {
@@ -65,5 +80,59 @@ describe("Harvest pipeline (M8)", () => {
       learnings: ["", "  ", "valid"],
     });
     expect(count).toBe(0);
+  });
+
+  describe.skipIf(!ruvectorAvailable || !sqliteAvailable)("integration with real RuVector", () => {
+    let realGetRuvectorClient: typeof getRuvectorClient;
+    let sqliteDb: ReturnType<typeof createTestDb>;
+    const insertedIds: string[] = [];
+
+    beforeAll(async () => {
+      const mod = await vi.importActual<typeof import("@/lib/ruvector/client")>("@/lib/ruvector/client");
+      realGetRuvectorClient = mod.getRuvectorClient;
+    });
+
+    beforeEach(() => {
+      resetRuvectorForTesting();
+      vi.mocked(getRuvectorClient).mockImplementation(realGetRuvectorClient);
+      sqliteDb = createTestDb();
+    });
+
+    afterEach(async () => {
+      const client = getRuvectorClient();
+      if (client) await cleanupRuvectorTestVectors(insertedIds, client);
+      insertedIds.length = 0;
+    });
+
+    it("harvestBuildLearnings: ingests learnings, count > 0, vectors searchable", async () => {
+      const count = await harvestBuildLearnings(sqliteDb, {
+        assignmentId: "a1",
+        runId: "r1",
+        cardId: "c1",
+        projectId: "p1",
+        learnings: ["Build learning one", "Build learning two"],
+      });
+      expect(count).toBeGreaterThan(0);
+
+      const relations = await sqliteDb.getMemoryUnitRelationsByEntity("card", "c1");
+      for (const r of relations) insertedIds.push(r.memory_unit_id as string);
+
+      const client = getRuvectorClient();
+      expect(client).not.toBeNull();
+      const vec = await import("@/lib/memory/embedding").then((m) => m.embedText("Build learning one"));
+      const results = await client!.search({ vector: vec, k: 5 });
+      expect(results.length).toBeGreaterThan(0);
+    });
+
+    it("skips empty/whitespace learnings (integration)", async () => {
+      const count = await harvestBuildLearnings(sqliteDb, {
+        assignmentId: "a1",
+        runId: "r1",
+        cardId: "c1",
+        projectId: "p1",
+        learnings: ["", "  ", "\t", "\n"],
+      });
+      expect(count).toBe(0);
+    });
   });
 });

@@ -1,13 +1,20 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { triggerBuild } from "@/lib/orchestration/trigger-build";
 import { json, validationError, notFoundError, internalError } from "@/lib/api/response-helpers";
+import { BUILD_ORCHESTRATOR } from "@/lib/feature-flags";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
+    if (!BUILD_ORCHESTRATOR) {
+      return json(
+        { error: "Build orchestrator is disabled", message: "Set NEXT_PUBLIC_BUILD_ORCHESTRATOR_ENABLED=true to enable." },
+        503
+      );
+    }
     const { projectId } = await params;
     const body = await request.json().catch(() => ({}));
 
@@ -32,8 +39,8 @@ export async function POST(
       return validationError("card_id required when scope=card");
     }
 
-    const supabase = await createClient();
-    const result = await triggerBuild(supabase, {
+    const db = getDb();
+    const result = await triggerBuild(db, {
       project_id: projectId,
       scope,
       workflow_id: workflow_id ?? null,

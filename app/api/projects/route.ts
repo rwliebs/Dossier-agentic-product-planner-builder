@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { listProjects } from "@/lib/supabase/queries";
 import {
   json,
@@ -7,12 +7,11 @@ import {
   internalError,
 } from "@/lib/api/response-helpers";
 import { createProjectSchema } from "@/lib/validation/request-schema";
-import { TABLES } from "@/lib/supabase/queries";
 
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const projects = await listProjects(supabase);
+    const db = getDb();
+    const projects = await listProjects(db);
     return json(projects);
   } catch (err) {
     console.error("GET /api/projects error:", err);
@@ -35,24 +34,18 @@ export async function POST(request: NextRequest) {
     }
 
     const { name, repo_url, default_branch } = parsed.data;
-    const supabase = await createClient();
+    const db = getDb();
+    const id = crypto.randomUUID();
 
-    const { data, error } = await supabase
-      .from(TABLES.projects)
-      .insert({
-        name,
-        repo_url: repo_url ?? null,
-        default_branch: default_branch ?? "main",
-      })
-      .select()
-      .single();
+    await db.insertProject({
+      id,
+      name,
+      repo_url: repo_url ?? null,
+      default_branch: default_branch ?? "main",
+    });
 
-    if (error) {
-      console.error("POST /api/projects insert error:", error);
-      return internalError(error.message);
-    }
-
-    return json(data, 201);
+    const created = await db.getProject(id);
+    return json(created ?? { id, name, repo_url: repo_url ?? null, default_branch: default_branch ?? "main" }, 201);
   } catch (err) {
     console.error("POST /api/projects error:", err);
     return internalError();

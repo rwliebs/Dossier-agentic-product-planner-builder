@@ -3,7 +3,7 @@
  * Orchestrates the full lifecycle for Build button and Build All.
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbAdapter } from "@/lib/db/adapter";
 import { createRun } from "./create-run";
 import { createAssignment } from "./create-assignment";
 import { dispatchAssignment } from "./dispatch";
@@ -13,6 +13,7 @@ import {
   getCardPlannedFiles,
   getProject,
 } from "@/lib/supabase/queries";
+import { listOrchestrationRunsByProject } from "@/lib/supabase/queries/orchestration";
 
 export interface TriggerBuildInput {
   project_id: string;
@@ -33,12 +34,26 @@ export interface TriggerBuildResult {
 
 /**
  * Triggers a full build: creates run, assignments for each card, dispatches each.
+ * Enforces single-build lock: rejects if any run with status=running exists for project.
  */
 export async function triggerBuild(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   input: TriggerBuildInput
 ): Promise<TriggerBuildResult> {
-  const project = await getProject(supabase, input.project_id);
+  // O10.6: Single-build lock — strategy-mandated safety
+  const runningRuns = await listOrchestrationRunsByProject(db, input.project_id, {
+    status: "running",
+    limit: 1,
+  });
+  if (runningRuns.length > 0) {
+    return {
+      success: false,
+      error: "Build in progress",
+      validationErrors: ["A build is already running for this project. Wait for it to complete."],
+    };
+  }
+
+  const project = await getProject(db, input.project_id);
   if (!project) {
     return { success: false, error: "Project not found" };
   }
@@ -52,7 +67,7 @@ export async function triggerBuild(
     input.scope === "card" && input.card_id
       ? [input.card_id]
       : input.scope === "workflow" && input.workflow_id
-        ? await getCardIdsByWorkflow(supabase, input.workflow_id)
+        ? await getCardIdsByWorkflow(db, input.workflow_id)
         : [];
 
   if (cardIds.length === 0) {
@@ -62,7 +77,7 @@ export async function triggerBuild(
     };
   }
 
-  const runResult = await createRun(supabase, {
+  const runResult = await createRun(db, {
     project_id: input.project_id,
     scope: input.scope,
     workflow_id: input.workflow_id ?? null,
@@ -87,7 +102,7 @@ export async function triggerBuild(
 
   const runId = runResult.runId!;
 
-  await logEvent(supabase, {
+  await logEvent(db, {
     project_id: input.project_id,
     run_id: runId,
     event_type: "run_initialized",
@@ -98,7 +113,7 @@ export async function triggerBuild(
   const assignmentIds: string[] = [];
 
   for (const cardId of cardIds) {
-    const plannedFiles = await getCardPlannedFiles(supabase, cardId);
+    const plannedFiles = await getCardPlannedFiles(db, cardId);
     const approved = plannedFiles.filter(
       (f) => (f as { status?: string }).status === "approved"
     );
@@ -111,7 +126,7 @@ export async function triggerBuild(
     const cardIdShort = cardId.slice(0, 8);
     const featureBranch = `feat/run-${runIdShort}-${cardIdShort}`;
 
-    const assignResult = await createAssignment(supabase, {
+    const assignResult = await createAssignment(db, {
       run_id: runId,
       card_id: cardId,
       agent_role: "coder",
@@ -137,7 +152,7 @@ export async function triggerBuild(
     if (assignResult.assignmentId) {
       assignmentIds.push(assignResult.assignmentId);
 
-      const dispatchResult = await dispatchAssignment(supabase, {
+      const dispatchResult = await dispatchAssignment(db, {
         assignment_id: assignResult.assignmentId,
         actor: input.initiated_by,
       });

@@ -1,7 +1,8 @@
-# ADR 0006: Build Orchestration via Agentic-Flow
+# ADR 0006: Build Orchestration via Claude-Flow
 
 - Status: Accepted
 - Date: 2026-02-12
+- Supersedes: 0006-agentic-flow-execution-plane (agentic-flow scrapped)
 
 ## Context
 
@@ -9,12 +10,13 @@ Dossier defines policy and run boundaries. Execution must occur in an isolated, 
 
 ## Decision
 
-Use `agentic-flow` as the execution plane for build orchestration.
+Use `claude-flow` as the execution plane for build orchestration.
 
 - Dossier remains control plane and policy authority.
-- `agentic-flow` executes assignments within Dossier-provided envelopes.
+- `claude-flow` executes assignments within Dossier-provided envelopes.
 - Worktree and branch constraints remain mandatory.
 - Approval and merge gates remain user-controlled.
+- Self-deploy: claude-flow runs in-process. No agentic-flow.
 
 ## Consequences
 
@@ -24,4 +26,5 @@ Use `agentic-flow` as the execution plane for build orchestration.
 
 ## Alternatives Considered
 
-- Direct execution inside Dossier without `agentic-flow`: rejected for weaker separation and scaling concerns.
+- Direct execution inside Dossier without claude-flow: rejected for weaker separation and scaling concerns.
+- Agentic-flow (HTTP/MCP): scrapped — we use claude-flow only.

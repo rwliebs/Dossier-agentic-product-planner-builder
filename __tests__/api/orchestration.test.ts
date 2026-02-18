@@ -1,32 +1,18 @@
 /**
  * API contract tests for orchestration endpoints.
- * Tests route handler logic with mocked Supabase.
+ * Tests route handler logic with mocked DbAdapter.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
 
 const mockListRuns = vi.fn().mockResolvedValue([]);
-const mockCreateClient = vi.fn().mockResolvedValue({
-  from: vi.fn(() => ({
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        order: vi.fn(() => ({
-          limit: vi.fn().mockResolvedValue({ data: [], error: null }),
-        })),
-        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-      })),
-    })),
-  })),
+const mockDb = createMockDbAdapter({
+  listOrchestrationRunsByProject: mockListRuns,
 });
 
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: () => mockCreateClient(),
-}));
-
-vi.mock("@/lib/supabase/queries/orchestration", () => ({
-  listOrchestrationRunsByProject: (...args: unknown[]) =>
-    mockListRuns(...args),
-  ORCHESTRATION_TABLES: { orchestration_runs: "orchestration_runs" },
+vi.mock("@/lib/db", () => ({
+  getDb: () => mockDb,
 }));
 
 describe("Orchestration API contracts", () => {

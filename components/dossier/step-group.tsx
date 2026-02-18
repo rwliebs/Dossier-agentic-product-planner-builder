@@ -1,7 +1,7 @@
 'use client';
 
 import { ImplementationCard, type CodeFileForPanel } from './implementation-card';
-import type { MapStep, MapCard, ContextArtifact, CardRequirement, CardKnownFact, CardAssumption, CardQuestion, CardPlannedFile } from '@/lib/types/ui';
+import type { MapStep, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 
 export interface StepGroupProps {
   step: MapStep;
@@ -15,15 +15,7 @@ export interface StepGroupProps {
   onSelectDoc?: (doc: ContextArtifact) => void;
   onSelectFile?: (file: CodeFileForPanel) => void;
   codeFiles?: CodeFileForPanel[];
-  getCardKnowledge?: (cardId: string) => {
-    requirements?: CardRequirement[];
-    contextArtifacts?: ContextArtifact[];
-    plannedFiles?: CardPlannedFile[];
-    facts?: CardKnownFact[];
-    assumptions?: CardAssumption[];
-    questions?: CardQuestion[];
-    quickAnswer?: string | null;
-  };
+  getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
 }
 
 export function StepGroup({

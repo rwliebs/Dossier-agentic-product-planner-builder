@@ -4,7 +4,7 @@
  * Drift detection: compare reconstructed state with actual DB state.
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbAdapter } from "@/lib/db/adapter";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
 import type { PlanningState } from "@/lib/schemas/planning-state";
 import { createEmptyPlanningState } from "@/lib/schemas/planning-state";
@@ -71,13 +71,13 @@ export function reconstructStateFromActions(
  * Fetch accepted actions from DB and replay onto empty state.
  */
 export async function reconstructStateFromDb(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   projectId: string
 ): Promise<ReconstructResult | null> {
-  const project = await getProject(supabase, projectId);
+  const project = await getProject(db, projectId);
   if (!project) return null;
 
-  const allActions = await getPlanningActionsByProject(supabase, projectId, 500);
+  const allActions = await getPlanningActionsByProject(db, projectId, 500);
   const accepted = allActions
     .filter((a) => (a as { validation_status?: string }).validation_status === "accepted")
     .sort(
@@ -133,13 +133,13 @@ export function detectDrift(
  * Reconstruct from DB and detect drift against actual state.
  */
 export async function reconstructAndDetectDrift(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   projectId: string
 ): Promise<{ reconstruct: ReconstructResult | null; drift: DriftReport | null }> {
-  const actual = await fetchMapSnapshot(supabase, projectId);
+  const actual = await fetchMapSnapshot(db, projectId);
   if (!actual) return { reconstruct: null, drift: null };
 
-  const reconstruct = await reconstructStateFromDb(supabase, projectId);
+  const reconstruct = await reconstructStateFromDb(db, projectId);
   if (!reconstruct?.success) return { reconstruct, drift: null };
 
   const drift = detectDrift(reconstruct.state, actual);

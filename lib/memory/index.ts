@@ -34,7 +34,7 @@ export function resetMemoryStoreForTesting(): void {
 
 export { createMockMemoryStore, createMemoryStore } from "./store";
 export type { MemoryStore, MemoryUnitContent, RetrievalScope } from "./store";
-export { embedText } from "./embedding";
+export { embedText, resetEmbeddingForTesting, DEFAULT_DIMENSIONS } from "./embedding";
 export { ingestMemoryUnit, ingestCardContext } from "./ingestion";
 export type { IngestScope, IngestContentInput } from "./ingestion";
 export { harvestBuildLearnings } from "./harvest";

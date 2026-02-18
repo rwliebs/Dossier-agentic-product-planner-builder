@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronUp, BookOpen, Bot, User, Send, Loader2, Github, Check, FolderOpen, Folder, FileCode, ChevronRight, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChatPreviewPanel } from '@/components/dossier/chat-preview-panel';
+import { useProjectFiles, type FileNode } from '@/lib/hooks/use-project-files';
 
 interface ProjectInfo {
   name: string;
@@ -22,13 +23,6 @@ interface ClarifyingQuestion {
   id: string;
   question: string;
   options?: string[];
-}
-
-interface FileNode {
-  name: string;
-  type: 'file' | 'folder';
-  path: string;
-  children?: FileNode[];
 }
 
 function normalizePreviewErrors(
@@ -75,21 +69,6 @@ const initialQuestions: ClarifyingQuestion[] = [
   { id: 'q3', question: 'Do you have existing systems this needs to integrate with?', options: ['Accounting software', 'CRM', 'Calendar/scheduling', 'Payment processing', 'None yet'] },
 ];
 
-const mockFileTree: FileNode[] = [
-  { name: 'src', type: 'folder', path: '/src', children: [
-    { name: 'components', type: 'folder', path: '/src/components', children: [
-      { name: 'Dashboard.tsx', type: 'file', path: '/src/components/Dashboard.tsx' },
-      { name: 'CustomerList.tsx', type: 'file', path: '/src/components/CustomerList.tsx' },
-    ]},
-    { name: 'api', type: 'folder', path: '/src/api', children: [
-      { name: 'customers.ts', type: 'file', path: '/src/api/customers.ts' },
-    ]},
-  ]},
-  { name: 'prisma', type: 'folder', path: '/prisma', children: [
-    { name: 'schema.prisma', type: 'file', path: '/prisma/schema.prisma' },
-  ]},
-];
-
 function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: FileNode; depth?: number; selectedFiles: string[]; onToggleFile: (path: string) => void }) {
   const [isOpen, setIsOpen] = useState(depth < 1);
   const isSelected = selectedFiles.includes(node.path);
@@ -116,7 +95,26 @@ function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: 
   );
 }
 
+const DEMO_FILE_TREE: FileNode[] = [
+  { name: 'src', type: 'folder', path: '/src', children: [
+    { name: 'components', type: 'folder', path: '/src/components', children: [
+      { name: 'Dashboard.tsx', type: 'file', path: '/src/components/Dashboard.tsx' },
+      { name: 'CustomerList.tsx', type: 'file', path: '/src/components/CustomerList.tsx' },
+    ]},
+    { name: 'api', type: 'folder', path: '/src/api', children: [
+      { name: 'customers.ts', type: 'file', path: '/src/api/customers.ts' },
+    ]},
+  ]},
+  { name: 'prisma', type: 'folder', path: '/prisma', children: [
+    { name: 'schema.prisma', type: 'file', path: '/prisma/schema.prisma' },
+  ]},
+];
+
 export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeationMode = false, onIdeationComplete, onPlanningApplied }: LeftSidebarProps) {
+  const { data: projectFiles } = useProjectFiles(projectId);
+  const isDemoMode = !projectId;
+  const contextFileTree = projectFiles && projectFiles.length > 0 ? projectFiles : (isDemoMode ? DEMO_FILE_TREE : []);
+
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['overview', 'chat', 'github'])
   );
@@ -459,9 +457,16 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
                   <span className="text-[11px] font-mono flex-1 truncate">{repoName}</span>
                   <Check className="h-3 w-3 text-green-500" />
                 </div>
-                <p className="text-[10px] text-muted-foreground mb-2">Select files for context:</p>
+                <p className="text-[10px] text-muted-foreground mb-2 flex items-center gap-2">
+                  Select files for context:
+                  {isDemoMode && (
+                    <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-mono">
+                      Demo
+                    </span>
+                  )}
+                </p>
                 <div className="border border-grid-line rounded bg-background max-h-32 overflow-y-auto">
-                  {mockFileTree.map((node) => (
+                  {contextFileTree.map((node) => (
                     <FileTreeNode key={node.path} node={node} selectedFiles={selectedContextFiles} onToggleFile={toggleContextFile} />
                   ))}
                 </div>

@@ -82,6 +82,17 @@ export interface MapSnapshot {
   workflows: MapWorkflow[];
 }
 
+/** Return type for getCardKnowledge callback used by WorkflowBlock/StoryMapCanvas */
+export interface CardKnowledgeForDisplay {
+  requirements?: import("@/lib/schemas/slice-b").CardRequirement[];
+  contextArtifacts?: import("@/lib/schemas/slice-b").ContextArtifact[];
+  plannedFiles?: import("@/lib/schemas/slice-b").CardPlannedFile[];
+  facts?: import("@/lib/schemas/slice-b").CardKnownFact[];
+  assumptions?: import("@/lib/schemas/slice-b").CardAssumption[];
+  questions?: import("@/lib/schemas/slice-b").CardQuestion[];
+  quickAnswer?: string | null;
+}
+
 // UI-only: card with knowledge items and artifacts for display
 export interface CardWithKnowledge extends SchemaCard {
   requirements?: import("@/lib/schemas/slice-b").CardRequirement[];

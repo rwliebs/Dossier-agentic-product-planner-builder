@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ActivityColumn, type ActivityColumnProps } from './activity-column';
-import type { MapWorkflow, ContextArtifact, CardRequirement, CardKnownFact, CardAssumption, CardQuestion, CardPlannedFile } from '@/lib/types/ui';
+import type { MapWorkflow, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 import type { CodeFileForPanel } from './implementation-card';
 
 export interface StoryMapCanvasProps {
@@ -17,15 +17,7 @@ export interface StoryMapCanvasProps {
   onSelectDoc?: (doc: ContextArtifact) => void;
   onSelectFile?: (file: CodeFileForPanel) => void;
   codeFiles?: CodeFileForPanel[];
-  getCardKnowledge?: (cardId: string) => {
-    requirements?: CardRequirement[];
-    contextArtifacts?: ContextArtifact[];
-    plannedFiles?: CardPlannedFile[];
-    facts?: CardKnownFact[];
-    assumptions?: CardAssumption[];
-    questions?: CardQuestion[];
-    quickAnswer?: string | null;
-  } | undefined;
+  getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
 }
 
 export function StoryMapCanvas({

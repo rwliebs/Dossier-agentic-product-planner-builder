@@ -2,13 +2,10 @@
  * Card-to-agent assignment creation with path constraints validation.
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbAdapter } from "@/lib/db/adapter";
 import { createCardAssignmentInputSchema } from "@/lib/schemas/slice-c";
-import { TABLES } from "@/lib/supabase/queries";
 import {
   getOrchestrationRun,
-  getSystemPolicyProfileByProject,
-  ORCHESTRATION_TABLES,
 } from "@/lib/supabase/queries/orchestration";
 
 export interface CreateAssignmentInput {
@@ -39,12 +36,12 @@ export interface CreateAssignmentResult {
  * - allowed_paths/forbidden_paths do not violate system policy
  */
 export async function createAssignment(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   input: CreateAssignmentInput
 ): Promise<CreateAssignmentResult> {
   try {
     // Fetch run to get project and base branch
-    const run = await getOrchestrationRun(supabase, input.run_id);
+    const run = await getOrchestrationRun(db, input.run_id);
     if (!run) {
       return {
         success: false,
@@ -53,13 +50,8 @@ export async function createAssignment(
     }
 
     // Fetch project for default_branch check
-    const { data: project } = await supabase
-      .from(TABLES.projects)
-      .select("default_branch")
-      .eq("id", run.project_id)
-      .maybeSingle();
-
-    const defaultBranch = project?.default_branch ?? "main";
+    const project = await db.getProject(run.project_id as string);
+    const defaultBranch = (project?.default_branch as string) ?? "main";
 
     // feature_branch must not equal default_branch
     if (input.feature_branch === defaultBranch) {
@@ -110,33 +102,22 @@ export async function createAssignment(
       status: "queued",
     });
 
-    const { data: inserted, error } = await supabase
-      .from(ORCHESTRATION_TABLES.card_assignments)
-      .insert({
-        run_id: payload.run_id,
-        card_id: payload.card_id,
-        agent_role: payload.agent_role,
-        agent_profile: payload.agent_profile,
-        feature_branch: payload.feature_branch,
-        worktree_path: payload.worktree_path,
-        allowed_paths: payload.allowed_paths,
-        forbidden_paths: payload.forbidden_paths,
-        assignment_input_snapshot: payload.assignment_input_snapshot,
-        status: payload.status,
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
+    const inserted = await db.insertCardAssignment({
+      run_id: payload.run_id,
+      card_id: payload.card_id,
+      agent_role: payload.agent_role,
+      agent_profile: payload.agent_profile,
+      feature_branch: payload.feature_branch,
+      worktree_path: payload.worktree_path,
+      allowed_paths: payload.allowed_paths,
+      forbidden_paths: payload.forbidden_paths,
+      assignment_input_snapshot: payload.assignment_input_snapshot,
+      status: payload.status,
+    });
 
     return {
       success: true,
-      assignmentId: inserted?.id,
+      assignmentId: inserted?.id as string,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { recordCheck } from "@/lib/orchestration";
 import {
   getOrchestrationRun,
@@ -13,14 +13,14 @@ export async function GET(
 ) {
   try {
     const { runId } = await params;
-    const supabase = await createClient();
+    const db = getDb();
 
-    const run = await getOrchestrationRun(supabase, runId);
+    const run = await getOrchestrationRun(db, runId);
     if (!run) {
       return notFoundError("Orchestration run not found");
     }
 
-    const checks = await getRunChecksByRun(supabase, runId);
+    const checks = await getRunChecksByRun(db, runId);
     return json({ checks });
   } catch (err) {
     console.error("GET run checks error:", err);
@@ -42,13 +42,13 @@ export async function POST(
       return validationError("Missing required fields: check_type, status");
     }
 
-    const supabase = await createClient();
-    const run = await getOrchestrationRun(supabase, runId);
+    const db = getDb();
+    const run = await getOrchestrationRun(db, runId);
     if (!run) {
       return notFoundError("Orchestration run not found");
     }
 
-    const result = await recordCheck(supabase, {
+    const result = await recordCheck(db, {
       run_id: runId,
       check_type,
       status,

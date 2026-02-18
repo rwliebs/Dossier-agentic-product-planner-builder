@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getDb } from "@/lib/db";
 import { createRun } from "@/lib/orchestration";
 import {
   listOrchestrationRunsByProject,
@@ -12,7 +12,7 @@ export async function GET(
 ) {
   try {
     const { projectId } = await params;
-    const supabase = await createClient();
+    const db = getDb();
 
     const { searchParams } = new URL(request.url);
     const scope = searchParams.get("scope") as "workflow" | "card" | null;
@@ -20,7 +20,7 @@ export async function GET(
     const limit = searchParams.get("limit");
     const limitNum = limit ? parseInt(limit, 10) : undefined;
 
-    const runs = await listOrchestrationRunsByProject(supabase, projectId, {
+    const runs = await listOrchestrationRunsByProject(db, projectId, {
       scope: scope ?? undefined,
       status: status ?? undefined,
       limit: limitNum,
@@ -57,8 +57,8 @@ export async function POST(
       return validationError("Missing required fields: scope, initiated_by, repo_url, base_branch, run_input_snapshot");
     }
 
-    const supabase = await createClient();
-    const result = await createRun(supabase, {
+    const db = getDb();
+    const result = await createRun(db, {
       project_id: projectId,
       scope,
       workflow_id: workflow_id ?? null,

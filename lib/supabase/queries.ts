@@ -1,9 +1,9 @@
 /**
- * Reusable query builders for Supabase.
- * Centralizes table names and common query patterns.
+ * Reusable query builders.
+ * Uses DbAdapter (SQLite or Postgres) - no Supabase dependency.
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbAdapter } from "@/lib/db/adapter";
 
 /** Singular table names (strategy-aligned schema). */
 export const TABLES = {
@@ -22,342 +22,138 @@ export const TABLES = {
   planning_actions: "planning_action",
 } as const;
 
-export async function getProject(
-  supabase: SupabaseClient,
-  projectId: string
-) {
-  const { data, error } = await supabase
-    .from(TABLES.projects)
-    .select("*")
-    .eq("id", projectId)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data;
+export async function getProject(db: DbAdapter, projectId: string) {
+  return db.getProject(projectId);
 }
 
-/**
- * Increment project action_sequence iff current value matches expected.
- * Returns new sequence or null if mismatch (concurrent modification).
- */
 export async function incrementProjectActionSequence(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   projectId: string,
   expectedSequence: number
 ): Promise<number | null> {
-  const { data, error } = await supabase
-    .from(TABLES.projects)
-    .update({
-      action_sequence: expectedSequence + 1,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", projectId)
-    .eq("action_sequence", expectedSequence)
-    .select("action_sequence")
-    .maybeSingle();
-
-  if (error) throw error;
-  return data ? (data.action_sequence as number) : null;
+  return db.incrementProjectActionSequence(projectId, expectedSequence);
 }
 
-export async function listProjects(supabase: SupabaseClient) {
-  const { data, error } = await supabase
-    .from(TABLES.projects)
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-  return data ?? [];
+export async function listProjects(db: DbAdapter) {
+  return db.listProjects();
 }
 
-export async function getWorkflowsByProject(
-  supabase: SupabaseClient,
-  projectId: string
-) {
-  const { data, error } = await supabase
-    .from(TABLES.workflows)
-    .select("*")
-    .eq("project_id", projectId)
-    .order("position", { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+export async function getWorkflowsByProject(db: DbAdapter, projectId: string) {
+  return db.getWorkflowsByProject(projectId);
 }
 
-export async function getActivitiesByWorkflow(
-  supabase: SupabaseClient,
-  workflowId: string
-) {
-  const { data, error } = await supabase
-    .from(TABLES.workflow_activities)
-    .select("*")
-    .eq("workflow_id", workflowId)
-    .order("position", { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+export async function getActivitiesByWorkflow(db: DbAdapter, workflowId: string) {
+  return db.getActivitiesByWorkflow(workflowId);
 }
 
-export async function getStepsByActivity(
-  supabase: SupabaseClient,
-  activityId: string
-) {
-  const { data, error } = await supabase
-    .from(TABLES.steps)
-    .select("*")
-    .eq("workflow_activity_id", activityId)
-    .order("position", { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+export async function getActivitiesByProject(db: DbAdapter, projectId: string) {
+  return db.getActivitiesByProject(projectId);
 }
 
-export async function getCardsByStep(
-  supabase: SupabaseClient,
-  stepId: string
-) {
-  const { data, error } = await supabase
-    .from(TABLES.cards)
-    .select("*")
-    .eq("step_id", stepId)
-    .order("priority", { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+export async function getStepsByActivity(db: DbAdapter, activityId: string) {
+  return db.getStepsByActivity(activityId);
 }
 
-export async function getCardsByActivity(
-  supabase: SupabaseClient,
-  activityId: string
-) {
-  const { data, error } = await supabase
-    .from(TABLES.cards)
-    .select("*")
-    .eq("workflow_activity_id", activityId)
-    .is("step_id", null)
-    .order("priority", { ascending: true });
+export async function getStepsByProject(db: DbAdapter, projectId: string) {
+  return db.getStepsByProject(projectId);
+}
 
-  if (error) throw error;
-  return data ?? [];
+export async function getCardsByStep(db: DbAdapter, stepId: string) {
+  return db.getCardsByStep(stepId);
+}
+
+export async function getCardsByActivity(db: DbAdapter, activityId: string) {
+  return db.getCardsByActivity(activityId);
+}
+
+export async function getCardsByProject(db: DbAdapter, projectId: string) {
+  return db.getCardsByProject(projectId);
 }
 
 export async function getPlanningActionsByProject(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   projectId: string,
   limit = 100
 ) {
-  const { data, error } = await supabase
-    .from(TABLES.planning_actions)
-    .select("*")
-    .eq("project_id", projectId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) throw error;
-  return data ?? [];
+  return db.getPlanningActionsByProject(projectId, limit);
 }
 
-/** Check idempotency: return existing results if this key was already processed. */
 export async function getPlanningActionsByIdempotencyKey(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   projectId: string,
   idempotencyKey: string
 ) {
-  const { data, error } = await supabase
-    .from(TABLES.planning_actions)
-    .select("id, action_type, validation_status, rejection_reason, applied_at")
-    .eq("project_id", projectId)
-    .eq("idempotency_key", idempotencyKey)
-    .order("created_at", { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+  return db.getPlanningActionsByIdempotencyKey(projectId, idempotencyKey);
 }
 
-export async function getArtifactsByProject(
-  supabase: SupabaseClient,
+export async function getArtifactsByProject(db: DbAdapter, projectId: string) {
+  return db.getArtifactsByProject(projectId);
+}
+
+export async function getArtifactById(db: DbAdapter, artifactId: string) {
+  return db.getArtifactById(artifactId);
+}
+
+export async function getCardContextArtifacts(db: DbAdapter, cardId: string) {
+  return db.getCardContextArtifacts(cardId);
+}
+
+export async function getCardContextLinksByProject(
+  db: DbAdapter,
   projectId: string
-) {
-  const { data, error } = await supabase
-    .from(TABLES.context_artifacts)
-    .select("*")
-    .eq("project_id", projectId)
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-  return data ?? [];
+): Promise<Array<{ card_id: string; context_artifact_id: string }>> {
+  return db.getCardContextLinksByProject(projectId);
 }
 
-export async function getArtifactById(
-  supabase: SupabaseClient,
-  artifactId: string
-) {
-  const { data, error } = await supabase
-    .from(TABLES.context_artifacts)
-    .select("*")
-    .eq("id", artifactId)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data;
+export async function getCardById(db: DbAdapter, cardId: string) {
+  return db.getCardById(cardId);
 }
 
-export async function getCardContextArtifacts(
-  supabase: SupabaseClient,
-  cardId: string
-) {
-  const { data, error } = await supabase
-    .from(TABLES.card_context_artifacts)
-    .select("context_artifact_id, usage_hint, linked_by")
-    .eq("card_id", cardId);
-
-  if (error) throw error;
-  return data ?? [];
-}
-
-export async function getCardById(
-  supabase: SupabaseClient,
-  cardId: string
-) {
-  const { data, error } = await supabase
-    .from(TABLES.cards)
-    .select("*")
-    .eq("id", cardId)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data;
-}
-
-/** Verify card exists and belongs to project (via workflow_activity -> workflow) */
 export async function verifyCardInProject(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   cardId: string,
   projectId: string
 ): Promise<boolean> {
-  const card = await getCardById(supabase, cardId);
-  if (!card) return false;
-
-  const activityId = (card as Record<string, unknown>).workflow_activity_id as string;
-  const { data: activity } = await supabase
-    .from(TABLES.workflow_activities)
-    .select("workflow_id")
-    .eq("id", activityId)
-    .single();
-
-  if (!activity) return false;
-
-  const { data: workflow } = await supabase
-    .from(TABLES.workflows)
-    .select("project_id")
-    .eq("id", (activity as Record<string, unknown>).workflow_id)
-    .single();
-
-  return workflow !== null && (workflow as Record<string, unknown>).project_id === projectId;
+  return db.verifyCardInProject(cardId, projectId);
 }
 
-export async function getCardRequirements(supabase: SupabaseClient, cardId: string) {
-  const { data, error } = await supabase
-    .from(TABLES.card_requirements)
-    .select("*")
-    .eq("card_id", cardId)
-    .order("position", { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+export async function getCardRequirements(db: DbAdapter, cardId: string) {
+  return db.getCardRequirements(cardId);
 }
 
-export async function getCardFacts(supabase: SupabaseClient, cardId: string) {
-  const { data, error } = await supabase
-    .from(TABLES.card_known_facts)
-    .select("*")
-    .eq("card_id", cardId)
-    .order("position", { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+export async function getCardFacts(db: DbAdapter, cardId: string) {
+  return db.getCardFacts(cardId);
 }
 
-export async function getCardAssumptions(supabase: SupabaseClient, cardId: string) {
-  const { data, error } = await supabase
-    .from(TABLES.card_assumptions)
-    .select("*")
-    .eq("card_id", cardId)
-    .order("position", { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+export async function getCardAssumptions(db: DbAdapter, cardId: string) {
+  return db.getCardAssumptions(cardId);
 }
 
-export async function getCardQuestions(supabase: SupabaseClient, cardId: string) {
-  const { data, error } = await supabase
-    .from(TABLES.card_questions)
-    .select("*")
-    .eq("card_id", cardId)
-    .order("position", { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+export async function getCardQuestions(db: DbAdapter, cardId: string) {
+  return db.getCardQuestions(cardId);
 }
 
-export async function getCardPlannedFiles(supabase: SupabaseClient, cardId: string) {
-  const { data, error } = await supabase
-    .from(TABLES.card_planned_files)
-    .select("*")
-    .eq("card_id", cardId)
-    .order("position", { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+export async function getCardPlannedFiles(db: DbAdapter, cardId: string) {
+  return db.getCardPlannedFiles(cardId);
 }
 
-/** Get all card IDs in a workflow (for workflow-scope run validation). */
 export async function getCardIdsByWorkflow(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   workflowId: string
 ): Promise<string[]> {
-  const activities = await getActivitiesByWorkflow(supabase, workflowId);
-  const cardIds: string[] = [];
-
-  for (const act of activities) {
-    const steps = await getStepsByActivity(supabase, act.id);
-    for (const step of steps) {
-      const cards = await getCardsByStep(supabase, step.id);
-      cardIds.push(...cards.map((c) => c.id));
-    }
-    const activityCards = await getCardsByActivity(supabase, act.id);
-    cardIds.push(...activityCards.map((c) => c.id));
-  }
-
-  return [...new Set(cardIds)];
+  return db.getCardIdsByWorkflow(workflowId);
 }
 
-/** Get all card IDs in a project (for project-scope queries). */
 export async function getCardIdsByProject(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   projectId: string
 ): Promise<string[]> {
-  const workflows = await getWorkflowsByProject(supabase, projectId);
-  const cardIds: string[] = [];
-  for (const wf of workflows) {
-    const ids = await getCardIdsByWorkflow(supabase, wf.id);
-    cardIds.push(...ids);
-  }
-  return [...new Set(cardIds)];
+  return db.getCardIdsByProject(projectId);
 }
 
-/** Get all planned files for a project (across all cards). */
 export async function getPlannedFilesByProject(
-  supabase: SupabaseClient,
+  db: DbAdapter,
   projectId: string
 ) {
-  const cardIds = await getCardIdsByProject(supabase, projectId);
-  if (cardIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from(TABLES.card_planned_files)
-    .select("*")
-    .in("card_id", cardIds)
-    .order("position", { ascending: true });
-  if (error) throw error;
-  return data ?? [];
+  return db.getPlannedFilesByProject(projectId);
 }

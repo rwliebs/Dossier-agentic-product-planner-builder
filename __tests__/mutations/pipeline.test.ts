@@ -23,6 +23,7 @@ import {
   clonePlanningState,
 } from "@/lib/schemas/planning-state";
 import type { Project, PlanningAction } from "@/lib/schemas/slice-a";
+import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const workflowId = "22222222-2222-4222-8222-222222222222";
@@ -30,32 +31,18 @@ const activityId = "33333333-3333-4333-8333-333333333333";
 const stepId = "44444444-4444-4444-8444-444444444444";
 const cardId = "55555555-5555-4555-8555-555555555555";
 
-function createMockSupabase() {
-  const inserted: unknown[] = [];
-  return {
-    from: vi.fn((table: string) => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          maybeSingle: vi.fn(async () => ({ data: { id: projectId, name: "Test" }, error: null })),
-          order: vi.fn(() => ({ limit: vi.fn(async () => ({ data: [], error: null })) })),
-          eq: vi.fn(() => ({
-            order: vi.fn(async () => ({ data: [], error: null })),
-          })),
-        })),
-      })),
-      insert: vi.fn((row: unknown) => {
-        inserted.push(row);
-        return { error: null };
-      }),
-      update: vi.fn(() => ({ eq: vi.fn(() => ({ error: null })) })),
-    })),
-    _inserted: inserted,
-  } as unknown as Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>;
+function createPipelineMockDb() {
+  return createMockDbAdapter({
+    getProject: vi.fn().mockResolvedValue({ id: projectId, name: "Test" }),
+    getWorkflowsByProject: vi.fn().mockResolvedValue([]),
+    getActivitiesByWorkflow: vi.fn().mockResolvedValue([]),
+    getStepsByActivity: vi.fn().mockResolvedValue([]),
+  });
 }
 
 describe("pipelineApply", () => {
   it("applies batch of actions and returns results", async () => {
-    const supabase = createMockSupabase();
+    const db = createPipelineMockDb();
     const actions: ActionInput[] = [
       {
         action_type: "createWorkflow",
@@ -63,7 +50,7 @@ describe("pipelineApply", () => {
         payload: { id: workflowId, title: "Core", description: null, position: 0 },
       },
     ];
-    const result = await pipelineApply(supabase, projectId, actions);
+    const result = await pipelineApply(db, projectId, actions);
     expect(result.applied).toBe(1);
     expect(result.results).toHaveLength(1);
     expect(result.results[0].validation_status).toBe("accepted");
@@ -71,7 +58,7 @@ describe("pipelineApply", () => {
   });
 
   it("stops on first rejection and returns failedAt", async () => {
-    const supabase = createMockSupabase();
+    const db = createPipelineMockDb();
     const actions: ActionInput[] = [
       {
         action_type: "createWorkflow",
@@ -89,7 +76,7 @@ describe("pipelineApply", () => {
         },
       },
     ];
-    const result = await pipelineApply(supabase, projectId, actions);
+    const result = await pipelineApply(db, projectId, actions);
     expect(result.failedAt).toBe(1);
     expect(result.rejectionReason).toBeDefined();
   });

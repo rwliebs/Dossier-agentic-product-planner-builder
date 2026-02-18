@@ -171,16 +171,19 @@ export async function processWebhook(
         );
       }
 
-      // Harvest build learnings into memory (M4.5)
-      const cardId = (assignment as { card_id: string }).card_id;
-      await harvestBuildLearnings(db, {
-        assignmentId: assignment_id,
-        runId,
-        cardId,
-        projectId,
-        workflowId: (run as { workflow_id?: string }).workflow_id ?? null,
-        learnings: payload.learnings ?? [],
-      });
+      // Harvest build learnings into memory (M4.5) — skip when memory plane disabled
+      const { MEMORY_PLANE } = await import("@/lib/feature-flags");
+      if (MEMORY_PLANE) {
+        const cardId = (assignment as { card_id: string }).card_id;
+        await harvestBuildLearnings(db, {
+          assignmentId: assignment_id,
+          runId,
+          cardId,
+          projectId,
+          workflowId: (run as { workflow_id?: string }).workflow_id ?? null,
+          learnings: payload.learnings ?? [],
+        });
+      }
       break;
     }
 

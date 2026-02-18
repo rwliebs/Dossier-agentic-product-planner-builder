@@ -3,13 +3,33 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronUp, Bot, User, Send, Github, Check, FolderOpen, Folder, FileCode, ChevronRight, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ChatPreviewPanel } from '@/components/dossier/chat-preview-panel';
 import { useProjectFiles, type FileNode } from '@/lib/hooks/use-project-files';
+
+function repoUrlToDisplayName(url: string | null | undefined): string {
+  if (!url) return '';
+  try {
+    const u = new URL(url);
+    const path = u.pathname.replace(/^\/+/, '').replace(/\.git$/, '');
+    return path || url;
+  } catch {
+    return url;
+  }
+}
 
 interface ProjectInfo {
   name: string;
   description: string | null;
   status: 'active' | 'planning' | 'completed';
+  repo_url?: string | null;
 }
 
 interface Message {
@@ -31,6 +51,7 @@ function normalizePreviewErrors(
 
 interface ChatPreviewResponse {
   status?: "success" | "error";
+  responseType?: "clarification" | "actions" | "mixed";
   message?: string;
   actions?: Array<{ id: string; action_type: string; target_ref: unknown; payload: unknown }>;
   preview?: {
@@ -50,8 +71,8 @@ interface LeftSidebarProps {
   projectId?: string;
   /** Called when user accepts preview and actions are applied (map should refresh) */
   onPlanningApplied?: () => void;
-  /** Called when user edits the project name or description */
-  onProjectUpdate?: (updates: { name?: string; description?: string | null }) => void;
+  /** Called when user edits the project name, description, or repo link. May return a Promise that resolves to true if the update succeeded. */
+  onProjectUpdate?: (updates: { name?: string; description?: string | null; repo_url?: string | null; default_branch?: string }) => void | Promise<boolean | void>;
 }
 
 function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: FileNode; depth?: number; selectedFiles: string[]; onToggleFile: (path: string) => void }) {
@@ -99,6 +120,12 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
   const [pendingActions, setPendingActions] = useState<ChatPreviewResponse['actions']>([]);
   const [pendingErrors, setPendingErrors] = useState<ChatPreviewResponse['errors']>([]);
   const [isApplying, setIsApplying] = useState(false);
+
+  // Streaming / two-phase state
+  const [populateConfirmWorkflowIds, setPopulateConfirmWorkflowIds] = useState<string[] | null>(null);
+  const [populateOriginalMessage, setPopulateOriginalMessage] = useState<string>('');
+  const [isPopulating, setIsPopulating] = useState(false);
+  const [populateProgress, setPopulateProgress] = useState<{ current: number; total: number; workflowTitle?: string } | null>(null);
   
   // Inline editing state for project header
   const [editingName, setEditingName] = useState(false);
@@ -127,10 +154,89 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
     onProjectUpdate?.({ description: trimmed || null });
   }, [draftDesc, project.description, onProjectUpdate]);
 
-  // GitHub state
-  const [githubConnected, setGithubConnected] = useState(false);
+  // GitHub connect dialog state
+  const [connectDialogOpen, setConnectDialogOpen] = useState(false);
+  const [connectMode, setConnectMode] = useState<'link' | 'create'>('link');
+  const [repos, setRepos] = useState<Array<{ full_name: string; html_url: string; private: boolean }>>([]);
+  const [reposLoading, setReposLoading] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createPrivate, setCreatePrivate] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const [connectSubmitting, setConnectSubmitting] = useState(false);
   const [selectedContextFiles, setSelectedContextFiles] = useState<string[]>([]);
-  const repoName = 'acme/servicepro-app';
+
+  const repoUrl = project.repo_url ?? null;
+  const githubConnected = !!repoUrl;
+  const repoName = repoUrlToDisplayName(repoUrl);
+
+  const openConnectDialog = useCallback(() => {
+    setConnectError(null);
+    setConnectDialogOpen(true);
+    if (connectMode === 'link') {
+      setReposLoading(true);
+      setRepos([]);
+      fetch('/api/github/repos')
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.error) setConnectError(data.error);
+          else setRepos(data.repos ?? []);
+        })
+        .catch(() => setConnectError('Failed to load repositories.'))
+        .finally(() => setReposLoading(false));
+    } else {
+      setCreateName('');
+      setCreatePrivate(false);
+    }
+  }, [connectMode]);
+
+  const linkRepo = useCallback(
+    async (htmlUrl: string) => {
+      setConnectSubmitting(true);
+      setConnectError(null);
+      try {
+        const result = await onProjectUpdate?.({ repo_url: htmlUrl, default_branch: 'main' });
+        if (result !== false) setConnectDialogOpen(false);
+        else setConnectError('Failed to link repository.');
+      } catch {
+        setConnectError('Failed to link repository.');
+      }
+      setConnectSubmitting(false);
+    },
+    [onProjectUpdate]
+  );
+
+  const createAndLinkRepo = useCallback(async () => {
+    const name = createName.trim();
+    if (!name) {
+      setConnectError('Enter a repository name.');
+      return;
+    }
+    setConnectSubmitting(true);
+    setConnectError(null);
+    try {
+      const res = await fetch('/api/github/repos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, private: createPrivate }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setConnectError(data.error ?? 'Failed to create repository.');
+        setConnectSubmitting(false);
+        return;
+      }
+      const linked = await onProjectUpdate?.({ repo_url: data.html_url, default_branch: 'main' });
+      if (linked !== false) setConnectDialogOpen(false);
+      else setConnectError('Repository created but failed to link to project.');
+    } catch {
+      setConnectError('Failed to create repository.');
+    }
+    setConnectSubmitting(false);
+  }, [createName, createPrivate, onProjectUpdate]);
+
+  const disconnectRepo = useCallback(() => {
+    onProjectUpdate?.({ repo_url: null });
+  }, [onProjectUpdate]);
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   useEffect(() => { scrollToBottom(); }, [messages]);
@@ -153,25 +259,92 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
     }
 
     try {
-      const res = await fetch(`/api/projects/${projectId}/chat`, {
+      const res = await fetch(`/api/projects/${projectId}/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, mode: 'scaffold' }),
       });
-      const data = (await res.json()) as ChatPreviewResponse;
+
       if (!res.ok) {
-        addMessage('agent', data.message ?? 'Planning service error. Try again.');
+        const err = await res.json().catch(() => ({}));
+        addMessage('agent', (err as { error?: string }).error ?? 'Planning service error. Try again.');
+        setIsThinking(false);
         return;
       }
-      setPendingActions(data.actions ?? []);
-      setPendingPreview(data.preview ?? null);
-      setPendingErrors(data.errors ?? []);
-      if (data.preview) {
-        addMessage('agent', data.preview.summary);
-      } else if (data.errors?.length) {
-        addMessage('agent', `${data.errors.length} action(s) could not be applied. Check the preview.`);
-      } else {
-        addMessage('agent', data.message ?? 'No changes suggested. Try rephrasing your request.');
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) {
+        addMessage('agent', 'Stream not available. Try again.');
+        setIsThinking(false);
+        return;
+      }
+
+      let buffer = '';
+      let agentMessage = '';
+      let actionCount = 0;
+      let lastPopulateConfirm: string[] | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const blocks = buffer.split(/\n\n+/);
+        buffer = blocks.pop() ?? '';
+
+        for (const block of blocks) {
+          let eventType = '';
+          let dataStr = '';
+          for (const line of block.split('\n')) {
+            if (line.startsWith('event: ')) eventType = line.slice(7).trim();
+            if (line.startsWith('data: ')) dataStr = line.slice(6);
+          }
+          if (!eventType || !dataStr) continue;
+
+          try {
+            const data = JSON.parse(dataStr);
+            if (eventType === 'message' && data.message) {
+              agentMessage = data.message;
+            }
+            if (eventType === 'action') {
+              actionCount++;
+              onPlanningApplied?.();
+            }
+            if (eventType === 'error' && data.reason) {
+              addMessage('agent', `Error: ${data.reason}`);
+            }
+            if (eventType === 'phase_complete') {
+              if (data.responseType === 'clarification') {
+                addMessage('agent', agentMessage || 'Could you tell me more about what you want to build?');
+              } else if (data.responseType === 'scaffold_complete' && data.workflow_ids?.length) {
+                addMessage('agent', agentMessage || `Created ${data.workflow_ids.length} workflow(s).`);
+                lastPopulateConfirm = data.workflow_ids;
+                setPopulateConfirmWorkflowIds(data.workflow_ids);
+                setPopulateOriginalMessage(text);
+                setPendingPreview({
+                  added: { workflows: data.workflow_ids, activities: [], steps: [], cards: [] },
+                  modified: { cards: [], artifacts: [] },
+                  reordered: [],
+                  summary: `Populate ${data.workflow_ids.length} workflow(s) with activities and cards?`,
+                });
+                setPendingActions([]);
+                setPendingErrors([]);
+              }
+            }
+            if (eventType === 'done') {
+              if (!lastPopulateConfirm && actionCount > 0 && !agentMessage) {
+                addMessage('agent', `Applied ${actionCount} change(s).`);
+              }
+            }
+          } catch {
+            // skip parse errors
+          }
+        }
+      }
+
+      if (agentMessage && !lastPopulateConfirm) {
+        addMessage('agent', agentMessage);
       }
     } catch {
       addMessage('agent', 'Planning service unavailable. Check your connection.');
@@ -181,7 +354,68 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
   };
 
   const handleAcceptPreview = async () => {
-    if (!projectId || !pendingActions?.length) return;
+    if (!projectId) return;
+
+    if (populateConfirmWorkflowIds?.length) {
+      setPendingPreview(null);
+      setPopulateConfirmWorkflowIds(null);
+      setIsPopulating(true);
+      const workflowIds = [...populateConfirmWorkflowIds];
+      const total = workflowIds.length;
+
+      for (let i = 0; i < workflowIds.length; i++) {
+        const wfId = workflowIds[i];
+        setPopulateProgress({ current: i + 1, total });
+
+        try {
+          const res = await fetch(`/api/projects/${projectId}/chat/stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: populateOriginalMessage || 'Populate this workflow with activities and cards', mode: 'populate', workflow_id: wfId }),
+          });
+
+          if (!res.ok) {
+            addMessage('agent', `Failed to populate workflow ${i + 1}/${total}.`);
+            continue;
+          }
+
+          const reader = res.body?.getReader();
+          const decoder = new TextDecoder();
+          if (!reader) continue;
+
+          let buffer = '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const blocks = buffer.split(/\n\n+/);
+            buffer = blocks.pop() ?? '';
+
+            for (const block of blocks) {
+              let eventType = '';
+              let dataStr = '';
+              for (const line of block.split('\n')) {
+                if (line.startsWith('event: ')) eventType = line.slice(7).trim();
+                if (line.startsWith('data: ')) dataStr = line.slice(6);
+              }
+              if (eventType === 'action') {
+                onPlanningApplied?.();
+              }
+            }
+          }
+        } catch {
+          addMessage('agent', `Error populating workflow ${i + 1}/${total}.`);
+        }
+      }
+
+      setPopulateProgress(null);
+      setIsPopulating(false);
+      addMessage('agent', `Populated ${total} workflow(s) with activities and cards.`);
+      onPlanningApplied?.();
+      return;
+    }
+
+    if (!pendingActions?.length) return;
     setIsApplying(true);
     try {
       const res = await fetch(`/api/projects/${projectId}/actions`, {
@@ -210,6 +444,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
     setPendingPreview(null);
     setPendingActions([]);
     setPendingErrors([]);
+    setPopulateConfirmWorkflowIds(null);
   };
 
   const toggleContextFile = (path: string) => {
@@ -345,7 +580,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
                   </div>
                 </div>
               ))}
-              {isThinking && (
+              {(isThinking || isPopulating) && (
                 <div className="flex gap-2">
                   <div className="h-5 w-5 rounded-full bg-secondary flex items-center justify-center shrink-0">
                     <Bot className="h-2.5 w-2.5 animate-pulse" />
@@ -357,7 +592,11 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
                         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} />
                         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} />
                       </div>
-                      <span className="text-[10px] text-muted-foreground ml-1">Thinking...</span>
+                      <span className="text-[10px] text-muted-foreground ml-1">
+                        {isPopulating && populateProgress
+                          ? `Populating workflow ${populateProgress.current}/${populateProgress.total}...`
+                          : 'Creating project structure...'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -368,7 +607,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
                   errors={normalizePreviewErrors(pendingErrors)}
                   onAccept={handleAcceptPreview}
                   onCancel={handleCancelPreview}
-                  isApplying={isApplying}
+                  isApplying={isApplying || isPopulating}
                 />
               )}
               <div ref={messagesEndRef} />
@@ -384,9 +623,9 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSubmit())}
                   placeholder="Describe what you want to build..."
                   className="flex-1 px-2 py-1.5 text-xs bg-secondary border border-grid-line rounded focus:outline-none focus:ring-1 focus:ring-primary/50"
-                  disabled={isThinking}
+                  disabled={isThinking || isPopulating}
                 />
-                <Button size="sm" className="h-7 w-7 p-0" onClick={handleSubmit} disabled={!input.trim() || isThinking}>
+                <Button size="sm" className="h-7 w-7 p-0" onClick={handleSubmit} disabled={!input.trim() || isThinking || isPopulating}>
                   <Send className="h-3 w-3" />
                 </Button>
               </div>
@@ -412,9 +651,9 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
             {githubConnected ? (
               <>
                 <div className="flex items-center gap-2 px-2 py-1.5 bg-secondary rounded border border-grid-line mb-2">
-                  <Github className="h-3 w-3" />
+                  <Github className="h-3 w-3 shrink-0" />
                   <span className="text-[11px] font-mono flex-1 truncate">{repoName}</span>
-                  <Check className="h-3 w-3 text-green-500" />
+                  <Check className="h-3 w-3 shrink-0 text-green-500" />
                 </div>
                 <p className="text-[10px] text-muted-foreground mb-2">
                   Select files for context:
@@ -424,17 +663,105 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
                     <FileTreeNode key={node.path} node={node} selectedFiles={selectedContextFiles} onToggleFile={toggleContextFile} />
                   ))}
                 </div>
+                <Button variant="ghost" size="sm" className="w-full text-[10px] h-6 mt-2 text-muted-foreground" onClick={disconnectRepo}>
+                  Disconnect repository
+                </Button>
               </>
             ) : (
               <>
                 <p className="text-[10px] text-muted-foreground mb-2">Connect a repo to include existing code as context.</p>
-                <Button variant="outline" size="sm" className="w-full text-[11px] h-7 bg-transparent" onClick={() => setGithubConnected(true)}>
+                <Button variant="outline" size="sm" className="w-full text-[11px] h-7 bg-transparent" onClick={openConnectDialog}>
                   <Github className="h-3 w-3 mr-1.5" />Connect Repository
                 </Button>
               </>
             )}
           </div>
         )}
+
+        <Dialog open={connectDialogOpen} onOpenChange={setConnectDialogOpen}>
+          <DialogContent className="sm:max-w-md" showCloseButton={true}>
+            <DialogHeader>
+              <DialogTitle>Connect GitHub repository</DialogTitle>
+              <DialogDescription>
+                Link an existing repository or create a new one. Your GitHub token is used only on the server.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex gap-2 py-2">
+              <Button
+                variant={connectMode === 'link' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => { setConnectMode('link'); setConnectError(null); }}
+              >
+                Link existing
+              </Button>
+              <Button
+                variant={connectMode === 'create' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => { setConnectMode('create'); setConnectError(null); setCreateName(''); setCreatePrivate(false); }}
+              >
+                Create new
+              </Button>
+            </div>
+            {connectError && (
+              <p className="text-xs text-destructive">{connectError}</p>
+            )}
+            {connectMode === 'link' && (
+              <div className="border border-grid-line rounded bg-background max-h-48 overflow-y-auto">
+                {reposLoading ? (
+                  <p className="p-3 text-xs text-muted-foreground">Loading repositories…</p>
+                ) : repos.length === 0 ? (
+                  <p className="p-3 text-xs text-muted-foreground">No repositories found.</p>
+                ) : (
+                  <ul className="py-1">
+                    {repos.map((r) => (
+                      <li key={r.full_name}>
+                        <button
+                          type="button"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] hover:bg-secondary"
+                          onClick={() => linkRepo(r.html_url)}
+                          disabled={connectSubmitting}
+                        >
+                          <Github className="h-3 w-3 shrink-0" />
+                          <span className="font-mono truncate flex-1">{r.full_name}</span>
+                          {r.private && <span className="text-[10px] text-muted-foreground">Private</span>}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {connectMode === 'create' && (
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Repository name</label>
+                <input
+                  type="text"
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                  placeholder="my-app"
+                  className="w-full rounded border border-input bg-background px-2 py-1.5 text-xs font-mono"
+                />
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={createPrivate}
+                    onChange={(e) => setCreatePrivate(e.target.checked)}
+                  />
+                  Private repository
+                </label>
+                <DialogFooter showCloseButton={false}>
+                  <Button variant="outline" size="sm" onClick={() => setConnectDialogOpen(false)}>Cancel</Button>
+                  <Button size="sm" onClick={createAndLinkRepo} disabled={connectSubmitting || !createName.trim()}>
+                    {connectSubmitting ? 'Creating…' : 'Create and connect'}
+                  </Button>
+                </DialogFooter>
+              </div>
+            )}
+            {connectMode === 'link' && !reposLoading && repos.length > 0 && (
+              <p className="text-[10px] text-muted-foreground">Click a repository to link it to this project.</p>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
 
     </div>

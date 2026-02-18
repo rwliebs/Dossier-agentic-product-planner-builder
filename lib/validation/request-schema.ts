@@ -127,7 +127,21 @@ export const approvePlannedFileSchema = z.object({
 // Chat request
 export const chatRequestSchema = z.object({
   message: z.string().min(1, "Message is required").transform((s) => s.trim()),
+  conversationHistory: z.array(z.object({
+    role: z.enum(["user", "agent"]),
+    content: z.string(),
+  })).optional().default([]),
 });
+
+// Chat stream request (scaffold or populate mode)
+export const chatStreamRequestSchema = z.object({
+  message: z.string().min(1, "Message is required").transform((s) => s.trim()),
+  mode: z.enum(["scaffold", "populate"]).optional().default("scaffold"),
+  workflow_id: z.string().uuid().optional(),
+}).refine(
+  (d) => d.mode !== "populate" || d.workflow_id != null,
+  { message: "workflow_id is required when mode is populate" }
+);
 
 // Orchestration: create run (POST body; project_id from params)
 export const createRunRequestSchema = z

@@ -4,20 +4,29 @@ import type { ContextArtifact } from "@/lib/schemas/slice-b";
 import {
   buildPlanningSystemPrompt,
   buildPlanningUserMessage,
+  buildConversationMessages,
+  type ConversationMessage,
 } from "./planning-prompt";
 
 const DEFAULT_MODEL = "claude-sonnet-4-5-20250929";
-const DEFAULT_MAX_TOKENS = 4096;
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_MAX_TOKENS = 16384;
+const DEFAULT_TIMEOUT_MS = 120_000;
+
+export interface ClaudeStreamingRequestInput {
+  systemPrompt: string;
+  userMessage: string;
+}
 
 export interface ClaudePlanningRequestInput {
   userRequest: string;
   mapSnapshot: PlanningState;
   linkedArtifacts?: ContextArtifact[];
+  conversationHistory?: ConversationMessage[];
 }
 
 export interface ClaudePlanningResponse {
   text: string;
+  stopReason: string | null;
   usage: {
     inputTokens: number;
     outputTokens: number;
@@ -65,11 +74,20 @@ export async function claudePlanningRequest(
   const client = new Anthropic({ apiKey });
 
   const systemPrompt = buildPlanningSystemPrompt();
-  const userMessage = buildPlanningUserMessage(
-    input.userRequest,
-    input.mapSnapshot,
-    input.linkedArtifacts ?? [],
-  );
+  const history = input.conversationHistory ?? [];
+
+  const messages = history.length > 0
+    ? buildConversationMessages(
+        input.userRequest,
+        input.mapSnapshot,
+        input.linkedArtifacts ?? [],
+        history,
+      )
+    : [{ role: "user" as const, content: buildPlanningUserMessage(
+        input.userRequest,
+        input.mapSnapshot,
+        input.linkedArtifacts ?? [],
+      )}];
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -80,7 +98,7 @@ export async function claudePlanningRequest(
         model,
         max_tokens: maxTokens,
         system: systemPrompt,
-        messages: [{ role: "user", content: userMessage }],
+        messages,
       },
       { signal: controller.signal },
     );
@@ -92,6 +110,7 @@ export async function claudePlanningRequest(
 
     return {
       text,
+      stopReason: message.stop_reason ?? null,
       usage: {
         inputTokens: usage?.input_tokens ?? 0,
         outputTokens: usage?.output_tokens ?? 0,
@@ -116,4 +135,71 @@ export async function claudePlanningRequest(
     }
     throw error;
   }
+}
+
+/**
+ * Call Claude API with streaming. Returns a ReadableStream that yields text deltas
+ * as they arrive. Used for incremental parsing and live updates.
+ */
+export async function claudeStreamingRequest(
+  input: ClaudeStreamingRequestInput,
+  options?: {
+    apiKey?: string;
+    model?: string;
+    maxTokens?: number;
+    timeoutMs?: number;
+  },
+): Promise<ReadableStream<string>> {
+  const apiKey = options?.apiKey ?? process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "ANTHROPIC_API_KEY is required for planning LLM. Set it in .env.local.",
+    );
+  }
+
+  const model = options?.model ?? process.env.PLANNING_LLM_MODEL ?? DEFAULT_MODEL;
+  const maxTokens = options?.maxTokens ?? DEFAULT_MAX_TOKENS;
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+  const client = new Anthropic({ apiKey });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  const stream = client.messages.stream(
+    {
+      model,
+      max_tokens: maxTokens,
+      system: input.systemPrompt,
+      messages: [{ role: "user", content: input.userMessage }],
+    },
+    { signal: controller.signal },
+  );
+
+  return new ReadableStream<string>({
+    start(streamController) {
+      stream.on("text", (delta: string) => {
+        try {
+          streamController.enqueue(delta);
+        } catch {
+          // Stream may be closed
+        }
+      });
+      stream.on("end", () => {
+        clearTimeout(timeoutId);
+        streamController.close();
+      });
+      stream.on("error", (err) => {
+        clearTimeout(timeoutId);
+        streamController.error(err);
+      });
+      stream.on("abort", (err) => {
+        clearTimeout(timeoutId);
+        streamController.error(
+          new Error(
+            `Planning LLM request timed out after ${timeoutMs}ms. Try again.`,
+          ),
+        );
+      });
+    },
+  });
 }

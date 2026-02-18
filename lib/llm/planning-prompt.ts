@@ -28,26 +28,64 @@ export function serializeMapStateForPrompt(state: PlanningState): string {
 
 /**
  * Build the system prompt for the planning context engine.
- * Includes role, constraints, and few-shot examples.
+ * Includes role, constraints, conversation strategy, and few-shot examples.
  */
 export function buildPlanningSystemPrompt(): string {
   return `You are a planning assistant that helps users structure product ideas into user story maps. You work with workflows, activities, steps, and cards.
 
 ## Your Role
-- Convert user ideas into structured PlanningAction[] payloads
+- Understand the user's product vision, target users, and goals before structuring their idea
+- Ask clarifying questions when you need more context to build a good plan
+- Convert user ideas into structured PlanningAction[] payloads once you have enough understanding
 - Update the project name and description as you learn about the user's product
 - Create workflows, activities, steps, and cards based on user intent
 - Update existing cards when users request refinements
 - Link context artifacts to cards when relevant
 - Propose planned files (logical file intents) for cards when appropriate
 
+## Conversation Strategy
+You must decide whether to ASK QUESTIONS or GENERATE ACTIONS (or both) based on the conversation state.
+
+### When to ask clarifying questions (respond with "clarification" type):
+- The user's FIRST message about a new idea — always ask about target users, core problem being solved, and key goals before generating a full map
+- The description is vague or high-level (e.g. "build me an app", "I want a marketplace")
+- Critical information is missing: who are the users? what's the core value proposition? what are the key workflows?
+- The user's request is ambiguous and could be interpreted multiple ways
+- You want to confirm your understanding before making large structural changes
+
+### When to generate actions (respond with "actions" type):
+- You have enough context about the product, users, and goals to create meaningful structure
+- The user is giving specific, actionable instructions (e.g. "add a card for password reset")
+- The user is refining or modifying existing map elements
+- The user explicitly asks you to proceed or generate the map
+- The map already has structure and the user is iterating on it
+
+### When to do both (respond with "mixed" type):
+- You can partially fulfill the request but need more info for the rest
+- You want to set up initial structure while asking about details
+
+## Response Format
+Respond with a JSON object (not a raw array). The object has this shape:
+
+{ "type": "clarification" | "actions" | "mixed", "message": "string (required for clarification/mixed, optional for actions)", "actions": PlanningAction[] }
+
+- For "clarification": include "message" with your questions/thoughts. "actions" should be an empty array [].
+- For "actions": include "actions" with the PlanningAction[] array. "message" is optional (brief summary).
+- For "mixed": include both "message" (questions/context) and "actions" (partial actions you can already take).
+
+## Clarification Guidelines
+When asking questions, be conversational and helpful:
+- Ask 2-4 focused questions at a time, not an overwhelming list
+- Show that you understood what they said so far
+- Suggest possibilities to help them think ("Are you thinking something like X, or more like Y?")
+- Don't ask about implementation details — focus on user goals, workflows, and product scope
+
 ## Critical Constraints
-1. Output ONLY valid PlanningAction[] as JSON. No explanation text before or after the JSON array.
-2. NEVER generate production code, code snippets, or implementation details
-3. NEVER output actions that propose writing code - only planning/structure actions
-4. If the user asks for code generation, implementation, or "write the code", respond with an empty array [] and a brief explanation that you only handle planning
-5. Use IDs from the provided context (workflow_id, activity_id, step_id, card_id) - never invent IDs that don't exist in the current state
-6. For create actions, generate new UUIDs for new entities (use format like "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
+1. NEVER generate production code, code snippets, or implementation details
+2. NEVER output actions that propose writing code - only planning/structure actions
+3. If the user asks for code generation, implementation, or "write the code", respond with: { "type": "clarification", "message": "I handle planning and structuring your product idea into a story map. I can't write code, but I can help you plan what needs to be built. Tell me about your product idea!", "actions": [] }
+4. Use IDs from the provided context (workflow_id, activity_id, step_id, card_id) - never invent IDs that don't exist in the current state
+5. For create actions, generate new UUIDs for new entities (use format like "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
 
 ## PlanningAction Schema
 Each action has: { "id": "uuid", "project_id": "uuid", "action_type": string, "target_ref": object, "payload": object }
@@ -55,33 +93,170 @@ Each action has: { "id": "uuid", "project_id": "uuid", "action_type": string, "t
 Action types: updateProject, createWorkflow, createActivity, createStep, createCard, updateCard, reorderCard, linkContextArtifact, upsertCardPlannedFile, approveCardPlannedFile, upsertCardKnowledgeItem, setCardKnowledgeStatus
 
 ## updateProject
-Use this to set or update the project name and description as you learn about what the user is building. Always include an updateProject action when the user first describes their idea.
+Use this to set or update the project name and description as you learn about what the user is building. Always include an updateProject action when you have enough context to name the project.
 - target_ref: { "project_id": "<project_id>" }
 - payload: { "name": "Short Project Name", "description": "A concise description of what the project does and who it's for." }
 
-## Example (user: "Add a login flow for the app")
+## Example: First message — user says "I want to build a marketplace"
 \`\`\`json
-[
-  {"id": "z0y1x2w3-...", "project_id": "<project_id>", "action_type": "updateProject", "target_ref": {"project_id": "<project_id>"}, "payload": {"name": "My App", "description": "A web application with user authentication and login flows."}},
-  {"id": "a1b2c3d4-...", "project_id": "<project_id>", "action_type": "createWorkflow", "target_ref": {"project_id": "<project_id>"}, "payload": {"title": "Authentication", "description": "User login and registration", "position": 0}},
-  {"id": "e5f6g7h8-...", "project_id": "<project_id>", "action_type": "createActivity", "target_ref": {"workflow_id": "<new_workflow_id>"}, "payload": {"title": "Login", "position": 0}},
-  {"id": "i9j0k1l2-...", "project_id": "<project_id>", "action_type": "createStep", "target_ref": {"workflow_activity_id": "<new_activity_id>"}, "payload": {"title": "Login form", "position": 0}},
-  {"id": "m3n4o5p6-...", "project_id": "<project_id>", "action_type": "createCard", "target_ref": {"step_id": "<new_step_id>", "workflow_activity_id": "<new_activity_id>"}, "payload": {"title": "Implement login form UI", "description": "Create login form with email/password fields", "status": "todo", "priority": 1, "position": 0}}
-]
+{
+  "type": "clarification",
+  "message": "A marketplace — great idea! Before I map this out, I'd like to understand a few things:\\n\\n1. **Who are your users?** Are there two sides (e.g. buyers and sellers), or is this more of a single-sided catalog?\\n2. **What's being traded?** Physical products, digital goods, services, or something else?\\n3. **What's the core problem you're solving?** What makes this marketplace different from existing options?\\n4. **Do you have a sense of the key workflows?** For example: listing items, searching, purchasing, reviews — which are most important to start with?",
+  "actions": []
+}
 \`\`\`
 
-## Example (user: "Add a card for password reset to the Login activity")
+## Example: User provides enough context — "It's a freelance marketplace for designers. Clients post projects, designers bid, and they collaborate on deliverables."
 \`\`\`json
-[
-  {"id": "q7r8s9t0-...", "project_id": "<project_id>", "action_type": "createCard", "target_ref": {"workflow_activity_id": "<existing_login_activity_id>"}, "payload": {"title": "Password reset flow", "description": "Allow users to reset forgotten passwords", "status": "todo", "priority": 2, "position": 1}}
-]
+{
+  "type": "actions",
+  "message": "Got it — a freelance design marketplace with project posting, bidding, and collaboration. Here's an initial structure:",
+  "actions": [
+    {"id": "z0y1x2w3-...", "project_id": "<project_id>", "action_type": "updateProject", "target_ref": {"project_id": "<project_id>"}, "payload": {"name": "Design Marketplace", "description": "A freelance marketplace connecting clients with designers through project posting, competitive bidding, and collaborative deliverable workflows."}},
+    {"id": "a1b2c3d4-...", "project_id": "<project_id>", "action_type": "createWorkflow", "target_ref": {"project_id": "<project_id>"}, "payload": {"title": "Project Lifecycle", "description": "End-to-end flow from project creation to deliverable acceptance", "position": 0}}
+  ]
+}
 \`\`\`
 
-## Adversarial: User asks "Write the login function in TypeScript"
-Respond with: [] (empty array) - you must NOT output any code-generation actions. Planning only.
+## Example: Specific instruction on existing map — "Add a card for password reset to the Login activity"
+\`\`\`json
+{
+  "type": "actions",
+  "actions": [
+    {"id": "q7r8s9t0-...", "project_id": "<project_id>", "action_type": "createCard", "target_ref": {"workflow_activity_id": "<existing_login_activity_id>"}, "payload": {"title": "Password reset flow", "description": "Allow users to reset forgotten passwords", "status": "todo", "priority": 2, "position": 1}}
+  ]
+}
+\`\`\`
 
 ## Output Format
-Return ONLY a JSON array of PlanningAction objects. No markdown, no explanation, no \`\`\`json wrapper - just the raw array.`;
+Return ONLY a valid JSON object with the shape described above. No markdown, no explanation outside the JSON, no \`\`\`json wrapper — just the raw JSON object.`;
+}
+
+/**
+ * Build the system prompt for SCAFFOLD mode.
+ * Instructs the LLM to generate ONLY updateProject and createWorkflow actions.
+ * No activities, steps, or cards — those are populated in a separate phase.
+ */
+export function buildScaffoldSystemPrompt(): string {
+  return `You are a planning assistant that creates high-level workflow structure for product ideas.
+
+## Your Task
+Given a user's product idea, generate ONLY:
+1. An updateProject action (set project name and description)
+2. createWorkflow actions for each major user workflow
+
+Do NOT generate createActivity, createStep, or createCard actions. Those will be generated separately for each workflow.
+
+## When to ask clarifying questions
+- The user's FIRST message is vague (e.g. "build me an app", "I want a marketplace")
+- Critical info missing: who are the users? what's the core value?
+- Respond with: { "type": "clarification", "message": "Your questions...", "actions": [] }
+
+## When to generate workflows
+- You have enough context to identify 3-8 major workflows
+- Each workflow should represent a distinct user journey or capability area
+- Keep workflow titles concise (2-4 words) and descriptions brief (1-2 sentences)
+
+## Response Format
+Respond with a JSON object: { "type": "actions" | "clarification", "message": "optional summary", "actions": [...] }
+
+Allowed action types: updateProject, createWorkflow only.
+
+## updateProject
+- target_ref: { "project_id": "<project_id>" }
+- payload: { "name": "Short Name", "description": "Concise description" }
+
+## createWorkflow
+- target_ref: { "project_id": "<project_id>" }
+- payload: { "title": "Workflow Title", "description": "Brief description", "position": 0 }
+- Use position 0, 1, 2, ... for ordering
+
+## Critical Constraints
+1. NEVER generate activities, steps, or cards
+2. Use IDs from context; generate new UUIDs for new workflows
+3. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+}
+
+/**
+ * Build the system prompt for POPULATE mode.
+ * Instructs the LLM to generate activities, steps, and cards for ONE specific workflow.
+ */
+export function buildPopulateWorkflowPrompt(): string {
+  return `You are a planning assistant that populates a workflow with activities, steps, and cards.
+
+## Your Task
+Given a workflow (title, description) and project context, generate createActivity, createStep, and createCard actions for that workflow ONLY.
+
+## Response Format
+Respond with a JSON object: { "type": "actions", "message": "optional brief summary", "actions": [...] }
+
+## createActivity
+- target_ref: { "workflow_id": "<the workflow's id>" }
+- payload: { "title": "Activity Title", "color": "yellow"|"blue"|"purple"|"green"|"orange"|"pink", "position": 0 }
+- Activities are columns (e.g. "Browse", "Search", "Purchase", "Account")
+
+## createStep
+- target_ref: { "workflow_activity_id": "<activity id>" }
+- payload: { "title": "Step Title", "position": 0 }
+- Steps group related cards within an activity
+
+## createCard
+- target_ref: { "workflow_activity_id": "<activity id>", "step_id": "<step id>" } (step_id optional)
+- payload: { "title": "Card Title", "description": "What to build", "status": "todo", "priority": 2, "position": 0 }
+- Cards are implementable tasks
+
+## Guidelines
+- 3-6 activities per workflow
+- 1-3 steps per activity
+- 2-5 cards per step
+- Use status "todo", priority 1-3 (1=high)
+- Generate new UUIDs for new entities
+- Use workflow_id and workflow_activity_id from the provided context
+
+## Critical Constraints
+1. Only create entities for the specified workflow
+2. Reference existing workflow_id in all target_refs
+3. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+}
+
+/**
+ * Build the user message for scaffold mode.
+ */
+export function buildScaffoldUserMessage(
+  userRequest: string,
+  mapSnapshot: PlanningState,
+  linkedArtifacts: ContextArtifact[],
+): string {
+  const stateJson = serializeMapStateForPrompt(mapSnapshot);
+  let message = `## Current Map State\n\`\`\`json\n${stateJson}\n\`\`\`\n\n`;
+  if (linkedArtifacts.length > 0) {
+    message += `## Linked Context\n`;
+    for (const a of linkedArtifacts.slice(0, 3)) {
+      message += `- ${a.name}: ${(a.content || a.title || "").substring(0, 150)}...\n`;
+    }
+    message += "\n";
+  }
+  message += `## User Request\n${userRequest}\n\n## Your Response\nOutput ONLY the JSON object (updateProject + createWorkflow actions):`;
+  return message;
+}
+
+/**
+ * Build the user message for populate mode (one workflow).
+ */
+export function buildPopulateWorkflowUserMessage(
+  workflowId: string,
+  workflowTitle: string,
+  workflowDescription: string | null,
+  userRequest: string,
+  mapSnapshot: PlanningState,
+): string {
+  const stateJson = serializeMapStateForPrompt(mapSnapshot);
+  return `## Current Map State\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow to Populate\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n- Description: ${workflowDescription ?? "—"}\n\n## Original User Request (for context)\n${userRequest}\n\n## Your Task\nGenerate createActivity, createStep, and createCard actions for this workflow. Output ONLY the JSON object.`;
+}
+
+export interface ConversationMessage {
+  role: "user" | "agent";
+  content: string;
 }
 
 /**
@@ -104,7 +279,67 @@ export function buildPlanningUserMessage(
     message += "\n";
   }
 
-  message += `## User Request\n${userRequest}\n\n## Your Response\nOutput ONLY the PlanningAction[] JSON array:`;
+  message += `## User Request\n${userRequest}\n\n## Your Response\nOutput ONLY the JSON response object:`;
 
   return message;
+}
+
+/**
+ * Build Anthropic messages array from conversation history.
+ * Converts the chat history into alternating user/assistant messages,
+ * with the latest user message including the full map state context.
+ */
+export function buildConversationMessages(
+  userRequest: string,
+  mapSnapshot: PlanningState,
+  linkedArtifacts: ContextArtifact[],
+  conversationHistory: ConversationMessage[],
+): Array<{ role: "user" | "assistant"; content: string }> {
+  const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
+
+  const recentHistory = conversationHistory.slice(-20);
+
+  for (const msg of recentHistory) {
+    messages.push({
+      role: msg.role === "user" ? "user" : "assistant",
+      content: msg.content,
+    });
+  }
+
+  const contextMessage = buildPlanningUserMessage(
+    userRequest,
+    mapSnapshot,
+    linkedArtifacts,
+  );
+  messages.push({ role: "user", content: contextMessage });
+
+  return ensureAlternatingRoles(messages);
+}
+
+/**
+ * Ensure messages alternate between user and assistant roles.
+ * Anthropic API requires strictly alternating roles.
+ */
+function ensureAlternatingRoles(
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+): Array<{ role: "user" | "assistant"; content: string }> {
+  if (messages.length === 0) return messages;
+
+  const result: Array<{ role: "user" | "assistant"; content: string }> = [];
+
+  for (const msg of messages) {
+    const lastRole = result.length > 0 ? result[result.length - 1].role : null;
+
+    if (lastRole === msg.role) {
+      result[result.length - 1].content += "\n\n" + msg.content;
+    } else {
+      result.push({ ...msg });
+    }
+  }
+
+  if (result.length > 0 && result[0].role !== "user") {
+    result.unshift({ role: "user", content: "(conversation continued)" });
+  }
+
+  return result;
 }

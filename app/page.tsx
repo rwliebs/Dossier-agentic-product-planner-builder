@@ -53,12 +53,14 @@ export default function DossierPage() {
     setProjectIdState(id);
   }, []);
 
-  const [appMode, setAppMode] = useState<'ideation' | 'active'>('ideation');
   const [viewMode, setViewMode] = useState<'functionality' | 'architecture'>('functionality');
   const [agentStatus, setAgentStatus] = useState<'idle' | 'building' | 'reviewing'>('idle');
   const { data: snapshot, loading: mapLoading, error: mapError, refetch } = useMapSnapshot(
     projectId || undefined
   );
+
+  const hasContent = (snapshot?.workflows?.length ?? 0) > 0;
+  const appMode = hasContent ? 'active' : 'ideation';
   const { submit: submitAction } = useSubmitAction(appMode === 'active' ? projectId : undefined);
   const { triggerBuild } = useTriggerBuild(appMode === 'active' ? projectId : undefined);
 
@@ -236,12 +238,7 @@ export default function DossierPage() {
           }}
           projectId={projectId || undefined}
           onPlanningApplied={() => {
-            if (appMode === 'ideation') {
-              setAppMode('active');
-              setAgentStatus('building');
-            } else {
-              setAgentStatus('reviewing');
-            }
+            setAgentStatus(hasContent ? 'reviewing' : 'building');
             refetch();
           }}
           onProjectUpdate={handleProjectUpdate}

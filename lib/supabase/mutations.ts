@@ -71,8 +71,11 @@ export async function pipelineApply(
     const result = await applyAction(db, projectId, actionRecord);
     const validationStatus = result.applied ? "accepted" : "rejected";
 
+    // Always use a fresh UUID for the planning_action audit record to avoid
+    // collisions from LLM-generated IDs being reused across requests.
+    const auditRecordId = crypto.randomUUID();
     const insertPayload: Record<string, unknown> = {
-      id: actionId,
+      id: auditRecordId,
       project_id: projectId,
       action_type: action.action_type,
       target_ref: action.target_ref ?? {},

@@ -10,6 +10,7 @@ import { MessageSquare, Bot, Clock, Sparkles } from 'lucide-react';
 import type { ProjectContext, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 import type { CodeFileForPanel } from '@/components/dossier/implementation-card';
 import { useMapSnapshot, useCardKnowledge, useCardPlannedFiles, useSubmitAction, useTriggerBuild } from '@/lib/hooks';
+import { useProjects } from '@/lib/hooks/use-projects';
 import { MapErrorBoundary } from '@/components/dossier/map-error-boundary';
 import { ChatErrorBoundary } from '@/components/dossier/chat-error-boundary';
 import { MapSkeleton } from '@/components/dossier/map-skeleton';
@@ -30,11 +31,20 @@ function setStoredProjectId(id: string): void {
 export default function DossierPage() {
   const defaultProjectId = process.env.NEXT_PUBLIC_DEFAULT_PROJECT_ID ?? '';
   const [projectIdState, setProjectIdState] = useState<string>(() => getStoredProjectId() || defaultProjectId);
+  const { data: projects } = useProjects();
 
   useEffect(() => {
     const stored = getStoredProjectId();
-    if (stored && stored !== projectIdState) setProjectIdState(stored);
-  }, []);
+    if (stored && stored !== projectIdState) {
+      setProjectIdState(stored);
+      return;
+    }
+    if (!projectIdState && projects?.length) {
+      const firstId = projects[0].id;
+      setStoredProjectId(firstId);
+      setProjectIdState(firstId);
+    }
+  }, [projects, projectIdState]);
 
   const projectId = projectIdState || defaultProjectId;
 
@@ -46,8 +56,6 @@ export default function DossierPage() {
   const [appMode, setAppMode] = useState<'ideation' | 'active'>('ideation');
   const [viewMode, setViewMode] = useState<'functionality' | 'architecture'>('functionality');
   const [agentStatus, setAgentStatus] = useState<'idle' | 'building' | 'reviewing'>('idle');
-  const [userRequest, setUserRequest] = useState('');
-
   const { data: snapshot, loading: mapLoading, error: mapError, refetch } = useMapSnapshot(
     appMode === 'active' ? projectId : undefined
   );
@@ -90,16 +98,10 @@ export default function DossierPage() {
   );
 
   const projectContext: ProjectContext = {
-    userRequest: userRequest || 'Build a field service management app like Jobber - capture leads, send quotes, schedule jobs, and invoice customers',
+    userRequest: snapshot?.project?.name ?? 'Describe your idea in the Agent chat to get started',
     generatedAt: snapshot?.project?.name ? 'Just now' : '—',
     activeAgents: 3,
     lastUpdate: 'Just now',
-  };
-
-  const handleIdeationComplete = (request: string) => {
-    setUserRequest(request);
-    setAppMode('active');
-    setAgentStatus('building');
   };
 
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
@@ -207,16 +209,18 @@ export default function DossierPage() {
           isCollapsed={leftSidebarCollapsed}
           onToggle={setLeftSidebarCollapsed}
           project={{
-            name: 'Dossier',
+            name: snapshot?.project?.name ?? 'Dossier',
             description: 'Break vision into flow maps. Bundle context. Ship at AI speed.',
             status: appMode === 'ideation' ? 'planning' : 'active',
-            collaborators: ['You', 'AI Agent'],
           }}
           projectId={projectId || undefined}
-          isIdeationMode={appMode === 'ideation'}
-          onIdeationComplete={handleIdeationComplete}
           onPlanningApplied={() => {
-            setAgentStatus('reviewing');
+            if (appMode === 'ideation') {
+              setAppMode('active');
+              setAgentStatus('building');
+            } else {
+              setAgentStatus('reviewing');
+            }
             refetch();
           }}
         />
@@ -232,7 +236,7 @@ export default function DossierPage() {
                 <h2 className="text-xl font-semibold text-foreground mb-3">Describe your idea</h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   Use the Agent chat in the left panel to describe what you want to build.
-                  I'll ask a few questions, then generate an implementation roadmap.
+                  The planning agent will generate workflows, activities, and cards for your implementation map.
                 </p>
                 <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                   <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />

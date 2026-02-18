@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, ChevronUp, BookOpen, Bot, User, Send, Github, Check, FolderOpen, Folder, FileCode, ChevronRight, Tag } from 'lucide-react';
+import { ChevronDown, ChevronUp, Bot, User, Send, Github, Check, FolderOpen, Folder, FileCode, ChevronRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChatSkeleton } from './chat-skeleton';
 import { Button } from '@/components/ui/button';
@@ -12,19 +12,12 @@ interface ProjectInfo {
   name: string;
   description: string;
   status: 'active' | 'planning' | 'completed';
-  collaborators: string[];
 }
 
 interface Message {
   id: string;
   role: 'user' | 'agent';
   content: string;
-}
-
-interface ClarifyingQuestion {
-  id: string;
-  question: string;
-  options?: string[];
 }
 
 function normalizePreviewErrors(
@@ -56,20 +49,10 @@ interface LeftSidebarProps {
   isCollapsed: boolean;
   onToggle: (collapsed: boolean) => void;
   project: ProjectInfo;
-  /** When provided, chat uses planning LLM API. Required for real planning. */
   projectId?: string;
-  // Ideation/chat props
-  isIdeationMode?: boolean;
-  onIdeationComplete?: (request: string) => void;
   /** Called when user accepts preview and actions are applied (map should refresh) */
   onPlanningApplied?: () => void;
 }
-
-const initialQuestions: ClarifyingQuestion[] = [
-  { id: 'q1', question: 'Who are the primary users of this product?', options: ['Small business owners', 'Enterprise teams', 'Consumers', 'Field workers'] },
-  { id: 'q2', question: "What's the most critical workflow they need to accomplish?" },
-  { id: 'q3', question: 'Do you have existing systems this needs to integrate with?', options: ['Accounting software', 'CRM', 'Calendar/scheduling', 'Payment processing', 'None yet'] },
-];
 
 function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: FileNode; depth?: number; selectedFiles: string[]; onToggleFile: (path: string) => void }) {
   const [isOpen, setIsOpen] = useState(depth < 1);
@@ -97,37 +80,18 @@ function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: 
   );
 }
 
-const DEMO_FILE_TREE: FileNode[] = [
-  { name: 'src', type: 'folder', path: '/src', children: [
-    { name: 'components', type: 'folder', path: '/src/components', children: [
-      { name: 'Dashboard.tsx', type: 'file', path: '/src/components/Dashboard.tsx' },
-      { name: 'CustomerList.tsx', type: 'file', path: '/src/components/CustomerList.tsx' },
-    ]},
-    { name: 'api', type: 'folder', path: '/src/api', children: [
-      { name: 'customers.ts', type: 'file', path: '/src/api/customers.ts' },
-    ]},
-  ]},
-  { name: 'prisma', type: 'folder', path: '/prisma', children: [
-    { name: 'schema.prisma', type: 'file', path: '/prisma/schema.prisma' },
-  ]},
-];
-
-export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeationMode = false, onIdeationComplete, onPlanningApplied }: LeftSidebarProps) {
+export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlanningApplied }: LeftSidebarProps) {
   const { data: projectFiles } = useProjectFiles(projectId);
-  const isDemoMode = !projectId;
-  const contextFileTree = projectFiles && projectFiles.length > 0 ? projectFiles : (isDemoMode ? DEMO_FILE_TREE : []);
+  const contextFileTree = projectFiles && projectFiles.length > 0 ? projectFiles : [];
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['overview', 'chat', 'github'])
+    new Set(['chat', 'github'])
   );
   
   // Chat state
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
-  const [phase, setPhase] = useState<'input' | 'questions' | 'generating'>('input');
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [userIdea, setUserIdea] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Planning LLM state
@@ -148,17 +112,6 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
     setMessages(prev => [...prev, { id: crypto.randomUUID(), role, content }]);
   };
 
-  const askQuestion = (index: number) => {
-    if (index >= initialQuestions.length) {
-      setPhase('generating');
-      addMessage('agent', 'Perfect! Generating your implementation roadmap...');
-      setTimeout(() => onIdeationComplete?.(userIdea), 2000);
-      return;
-    }
-    setCurrentQuestionIndex(index);
-    setTimeout(() => addMessage('agent', initialQuestions[index].question), 400);
-  };
-
   const handleSubmit = async () => {
     if (!input.trim()) return;
     const text = input.trim();
@@ -166,50 +119,37 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
     setInput('');
     setIsThinking(true);
 
-    if (projectId) {
-      try {
-        const res = await fetch(`/api/projects/${projectId}/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text }),
-        });
-        const data = (await res.json()) as ChatPreviewResponse;
-        if (!res.ok) {
-          addMessage('agent', data.message ?? 'Planning service error. Try again.');
-          return;
-        }
-        setPendingActions(data.actions ?? []);
-        setPendingPreview(data.preview ?? null);
-        setPendingErrors(data.errors ?? []);
-        if (data.preview) {
-          addMessage('agent', data.preview.summary);
-        } else if (data.errors?.length) {
-          addMessage('agent', `${data.errors.length} action(s) could not be applied. Check the preview.`);
-        } else {
-          addMessage('agent', 'No changes suggested. Try rephrasing your request.');
-        }
-      } catch (e) {
-        addMessage('agent', 'Planning service unavailable. Check your connection.');
-      } finally {
-        setIsThinking(false);
-      }
+    if (!projectId) {
+      setIsThinking(false);
+      addMessage('agent', 'No project selected. Please select or create a project first.');
       return;
     }
 
-    if (phase === 'input') {
-      setUserIdea(text);
-      setTimeout(() => {
-        setIsThinking(false);
-        addMessage('agent', "Great! Let me ask a few questions to understand your vision better.");
-        setTimeout(() => { setPhase('questions'); askQuestion(0); }, 600);
-      }, 1000);
-    } else if (phase === 'questions') {
-      setTimeout(() => {
-        setIsThinking(false);
-        const acks = ['Got it!', 'Thanks!', 'Understood!', 'Great!'];
-        addMessage('agent', acks[currentQuestionIndex % acks.length]);
-        setTimeout(() => askQuestion(currentQuestionIndex + 1), 400);
-      }, 800);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
+      const data = (await res.json()) as ChatPreviewResponse;
+      if (!res.ok) {
+        addMessage('agent', data.message ?? 'Planning service error. Try again.');
+        return;
+      }
+      setPendingActions(data.actions ?? []);
+      setPendingPreview(data.preview ?? null);
+      setPendingErrors(data.errors ?? []);
+      if (data.preview) {
+        addMessage('agent', data.preview.summary);
+      } else if (data.errors?.length) {
+        addMessage('agent', `${data.errors.length} action(s) could not be applied. Check the preview.`);
+      } else {
+        addMessage('agent', data.message ?? 'No changes suggested. Try rephrasing your request.');
+      }
+    } catch {
+      addMessage('agent', 'Planning service unavailable. Check your connection.');
+    } finally {
+      setIsThinking(false);
     }
   };
 
@@ -245,22 +185,9 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
     setPendingErrors([]);
   };
 
-  const handleQuickAnswer = (answer: string) => {
-    addMessage('user', answer);
-    setIsThinking(true);
-    setTimeout(() => {
-      setIsThinking(false);
-      const acks = ['Got it!', 'Thanks!', 'Understood!', 'Great!'];
-      addMessage('agent', acks[currentQuestionIndex % acks.length]);
-      setTimeout(() => askQuestion(currentQuestionIndex + 1), 400);
-    }, 600);
-  };
-
   const toggleContextFile = (path: string) => {
     setSelectedContextFiles(prev => prev.includes(path) ? prev.filter(p => p !== path) : [...prev, path]);
   };
-
-  const currentQuestion = phase === 'questions' ? initialQuestions[currentQuestionIndex] : null;
 
   const toggleSection = (section: string) => {
     const newExpanded = new Set(expandedSections);
@@ -293,8 +220,6 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
     );
   }
 
-  const schemas = ['User Schema', 'Product Schema', 'Event Schema'];
-
   return (
     <div className="w-64 border-r border-grid-line bg-background overflow-y-auto flex flex-col">
       {/* Header */}
@@ -322,39 +247,6 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
         </p>
       </div>
 
-      {/* Overview Section */}
-      <div className="border-b border-grid-line">
-        <button
-          onClick={() => toggleSection('overview')}
-          className="w-full flex items-center justify-between p-4 hover:bg-secondary transition-colors"
-        >
-          <span className="text-xs uppercase tracking-wider font-mono font-bold">Overview</span>
-          {expandedSections.has('overview') ? (
-            <ChevronDown className="h-3 w-3" />
-          ) : (
-            <ChevronUp className="h-3 w-3" />
-          )}
-        </button>
-        {expandedSections.has('overview') && (
-          <div className="px-4 pb-4 space-y-3 border-t border-grid-line pt-3">
-            <div>
-              <p className="text-xs uppercase tracking-wider font-mono text-muted-foreground mb-1">
-                Collaborators
-              </p>
-              <div className="flex gap-1">
-                {project.collaborators.map((collab, i) => (
-                  <div
-                    key={i}
-                    className="h-6 w-6 rounded-full bg-accent text-primary text-xs flex items-center justify-center font-bold"
-                  >
-                    {collab[0]}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Agent Chat Section */}
       <div className="border-b border-grid-line flex-1 flex flex-col min-h-0">
@@ -412,34 +304,23 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
               <div ref={messagesEndRef} />
             </div>
             
-            {/* Quick options */}
-            {currentQuestion?.options && !isThinking && phase === 'questions' && (
-              <div className="px-3 pb-2 flex flex-wrap gap-1">
-                {currentQuestion.options.map((opt) => (
-                  <button key={opt} onClick={() => handleQuickAnswer(opt)} className="px-2 py-1 text-[10px] bg-secondary hover:bg-secondary/80 rounded-full border border-grid-line">{opt}</button>
-                ))}
-              </div>
-            )}
-            
             {/* Input */}
-            {phase !== 'generating' && (
-              <div className="p-3 border-t border-grid-line">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSubmit())}
-                    placeholder={phase === 'input' ? 'Describe your idea...' : 'Your answer...'}
-                    className="flex-1 px-2 py-1.5 text-xs bg-secondary border border-grid-line rounded focus:outline-none focus:ring-1 focus:ring-primary/50"
-                    disabled={isThinking}
-                  />
-                  <Button size="sm" className="h-7 w-7 p-0" onClick={handleSubmit} disabled={!input.trim() || isThinking}>
-                    <Send className="h-3 w-3" />
-                  </Button>
-                </div>
+            <div className="p-3 border-t border-grid-line">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSubmit())}
+                  placeholder="Describe what you want to build..."
+                  className="flex-1 px-2 py-1.5 text-xs bg-secondary border border-grid-line rounded focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  disabled={isThinking}
+                />
+                <Button size="sm" className="h-7 w-7 p-0" onClick={handleSubmit} disabled={!input.trim() || isThinking}>
+                  <Send className="h-3 w-3" />
+                </Button>
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>
@@ -465,13 +346,8 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
                   <span className="text-[11px] font-mono flex-1 truncate">{repoName}</span>
                   <Check className="h-3 w-3 text-green-500" />
                 </div>
-                <p className="text-[10px] text-muted-foreground mb-2 flex items-center gap-2">
+                <p className="text-[10px] text-muted-foreground mb-2">
                   Select files for context:
-                  {isDemoMode && (
-                    <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-mono">
-                      Demo
-                    </span>
-                  )}
                 </p>
                 <div className="border border-grid-line rounded bg-background max-h-32 overflow-y-auto">
                   {contextFileTree.map((node) => (
@@ -491,35 +367,6 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, isIdeat
         )}
       </div>
 
-      {/* Schemas Section */}
-      <div className="border-b border-grid-line">
-        <button
-          onClick={() => toggleSection('schemas')}
-          className="w-full flex items-center justify-between p-4 hover:bg-secondary transition-colors"
-        >
-          <span className="text-xs uppercase tracking-wider font-mono font-bold">
-            Schemas ({schemas.length})
-          </span>
-          {expandedSections.has('schemas') ? (
-            <ChevronDown className="h-3 w-3" />
-          ) : (
-            <ChevronUp className="h-3 w-3" />
-          )}
-        </button>
-        {expandedSections.has('schemas') && (
-          <div className="px-4 pb-4 space-y-2 border-t border-grid-line pt-3">
-            {schemas.map((schema) => (
-              <div
-                key={schema}
-                className="flex items-center gap-2 p-2 rounded border border-grid-line hover:bg-secondary cursor-pointer transition-colors"
-              >
-                <BookOpen className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs font-mono text-foreground">{schema}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

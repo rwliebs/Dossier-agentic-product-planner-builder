@@ -1,6 +1,6 @@
 'use client';
 
-import { Zap, Share2, Settings, Eye, Database } from 'lucide-react';
+import { Zap, Settings, Eye, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface DossierHeaderProps {
@@ -66,10 +66,6 @@ export function Header({ viewMode, onViewModeChange, agentStatus, onBuildAll, fi
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 gap-2 bg-transparent">
-              <Share2 className="h-3 w-3" />
-              <span className="text-xs uppercase tracking-widest font-mono">Share</span>
-            </Button>
             <Button variant="outline" size="sm" className="h-8 gap-2 bg-transparent">
               <Settings className="h-3 w-3" />
             </Button>

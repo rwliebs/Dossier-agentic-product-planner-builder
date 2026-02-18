@@ -389,6 +389,12 @@ CREATE TABLE IF NOT EXISTS memory_retrieval_log (
 CREATE INDEX IF NOT EXISTS idx_memory_retrieval_log_scope ON memory_retrieval_log (scope_entity_type, scope_entity_id, created_at DESC);
 `,
   },
+  {
+    name: "004_project_description.sql",
+    sql: /* sql */ `
+ALTER TABLE project ADD COLUMN description TEXT;
+`,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

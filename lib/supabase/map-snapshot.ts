@@ -35,6 +35,7 @@ export async function fetchMapSnapshot(
   const project: Project = {
     id: projectRow.id,
     name: projectRow.name,
+    description: projectRow.description ?? null,
     repo_url: projectRow.repo_url ?? null,
     default_branch: projectRow.default_branch ?? "main",
   };

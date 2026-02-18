@@ -66,6 +66,10 @@ export function validateReferentialIntegrity(
   const target_ref = action.target_ref as Record<string, string>;
 
   switch (action.action_type) {
+    case "updateProject":
+      // project_id is implicit from context
+      break;
+
     case "createWorkflow":
       // project_id must exist (implicit: we're in a project context)
       break;

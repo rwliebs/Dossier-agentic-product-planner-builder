@@ -57,7 +57,7 @@ export default function DossierPage() {
   const [viewMode, setViewMode] = useState<'functionality' | 'architecture'>('functionality');
   const [agentStatus, setAgentStatus] = useState<'idle' | 'building' | 'reviewing'>('idle');
   const { data: snapshot, loading: mapLoading, error: mapError, refetch } = useMapSnapshot(
-    appMode === 'active' ? projectId : undefined
+    projectId || undefined
   );
   const { submit: submitAction } = useSubmitAction(appMode === 'active' ? projectId : undefined);
   const { triggerBuild } = useTriggerBuild(appMode === 'active' ? projectId : undefined);
@@ -193,6 +193,23 @@ export default function DossierPage() {
     refetch();
   }, [refetch]);
 
+  const handleProjectUpdate = useCallback(
+    async (updates: { name?: string; description?: string | null }) => {
+      if (!projectId) return;
+      try {
+        const res = await fetch(`/api/projects/${projectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        });
+        if (res.ok) refetch();
+      } catch {
+        // silently fail — the sidebar will revert on next refetch
+      }
+    },
+    [projectId, refetch]
+  );
+
   return (
     <div className="h-screen w-screen flex flex-col bg-background">
       <Header
@@ -201,6 +218,8 @@ export default function DossierPage() {
         agentStatus={agentStatus}
         onBuildAll={handleBuildAll}
         firstWorkflowId={snapshot?.workflows?.[0]?.id ?? null}
+        selectedProjectId={projectId}
+        onSelectProjectId={handleSelectProjectId}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -210,7 +229,7 @@ export default function DossierPage() {
           onToggle={setLeftSidebarCollapsed}
           project={{
             name: snapshot?.project?.name ?? 'Dossier',
-            description: 'Break vision into flow maps. Bundle context. Ship at AI speed.',
+            description: snapshot?.project?.description ?? null,
             status: appMode === 'ideation' ? 'planning' : 'active',
           }}
           projectId={projectId || undefined}
@@ -223,6 +242,7 @@ export default function DossierPage() {
             }
             refetch();
           }}
+          onProjectUpdate={handleProjectUpdate}
         />
         </ChatErrorBoundary>
 

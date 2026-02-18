@@ -1,7 +1,8 @@
 'use client';
 
-import { Zap, Settings, Eye, Database } from 'lucide-react';
+import { Zap, Eye, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SettingsMenu } from '@/components/dossier/settings-menu';
 
 interface DossierHeaderProps {
   viewMode: 'functionality' | 'architecture';
@@ -9,9 +10,11 @@ interface DossierHeaderProps {
   agentStatus: 'idle' | 'building' | 'reviewing';
   onBuildAll?: (workflowId: string) => void;
   firstWorkflowId?: string | null;
+  selectedProjectId: string;
+  onSelectProjectId: (id: string) => void;
 }
 
-export function Header({ viewMode, onViewModeChange, agentStatus, onBuildAll, firstWorkflowId }: DossierHeaderProps) {
+export function Header({ viewMode, onViewModeChange, agentStatus, onBuildAll, firstWorkflowId, selectedProjectId, onSelectProjectId }: DossierHeaderProps) {
   const statusColors = {
     idle: 'text-muted-foreground',
     building: 'text-green-400 animate-pulse',
@@ -66,9 +69,10 @@ export function Header({ viewMode, onViewModeChange, agentStatus, onBuildAll, fi
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 gap-2 bg-transparent">
-              <Settings className="h-3 w-3" />
-            </Button>
+            <SettingsMenu
+              selectedProjectId={selectedProjectId}
+              onSelectProjectId={onSelectProjectId}
+            />
             {onBuildAll && firstWorkflowId && (
               <Button
                 className="h-8 gap-2 bg-primary text-primary-foreground"

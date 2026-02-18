@@ -37,6 +37,13 @@ export function previewAction(
 
   // Analyze what changed
   switch (action.action_type) {
+    case "updateProject":
+      delta.updated_ids.push(
+        (action.target_ref as Record<string, unknown>).project_id as string,
+      );
+      delta.summary = `Updated project: ${action.payload.name || "metadata"}`;
+      break;
+
     case "createWorkflow":
     case "createActivity":
     case "createStep":

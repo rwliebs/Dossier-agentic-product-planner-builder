@@ -1,16 +1,14 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Bot, User, Send, Github, Check, FolderOpen, Folder, FileCode, ChevronRight } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ChatSkeleton } from './chat-skeleton';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { ChevronDown, ChevronUp, Bot, User, Send, Github, Check, FolderOpen, Folder, FileCode, ChevronRight, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChatPreviewPanel } from '@/components/dossier/chat-preview-panel';
 import { useProjectFiles, type FileNode } from '@/lib/hooks/use-project-files';
 
 interface ProjectInfo {
   name: string;
-  description: string;
+  description: string | null;
   status: 'active' | 'planning' | 'completed';
 }
 
@@ -52,6 +50,8 @@ interface LeftSidebarProps {
   projectId?: string;
   /** Called when user accepts preview and actions are applied (map should refresh) */
   onPlanningApplied?: () => void;
+  /** Called when user edits the project name or description */
+  onProjectUpdate?: (updates: { name?: string; description?: string | null }) => void;
 }
 
 function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: FileNode; depth?: number; selectedFiles: string[]; onToggleFile: (path: string) => void }) {
@@ -80,7 +80,7 @@ function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: 
   );
 }
 
-export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlanningApplied }: LeftSidebarProps) {
+export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlanningApplied, onProjectUpdate }: LeftSidebarProps) {
   const { data: projectFiles } = useProjectFiles(projectId);
   const contextFileTree = projectFiles && projectFiles.length > 0 ? projectFiles : [];
 
@@ -100,6 +100,33 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
   const [pendingErrors, setPendingErrors] = useState<ChatPreviewResponse['errors']>([]);
   const [isApplying, setIsApplying] = useState(false);
   
+  // Inline editing state for project header
+  const [editingName, setEditingName] = useState(false);
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [draftName, setDraftName] = useState(project.name);
+  const [draftDesc, setDraftDesc] = useState(project.description ?? '');
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const descInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => { setDraftName(project.name); }, [project.name]);
+  useEffect(() => { setDraftDesc(project.description ?? ''); }, [project.description]);
+  useEffect(() => { if (editingName) nameInputRef.current?.focus(); }, [editingName]);
+  useEffect(() => { if (editingDesc) descInputRef.current?.focus(); }, [editingDesc]);
+
+  const commitName = useCallback(() => {
+    setEditingName(false);
+    const trimmed = draftName.trim();
+    if (!trimmed || trimmed === project.name) { setDraftName(project.name); return; }
+    onProjectUpdate?.({ name: trimmed });
+  }, [draftName, project.name, onProjectUpdate]);
+
+  const commitDesc = useCallback(() => {
+    setEditingDesc(false);
+    const trimmed = draftDesc.trim();
+    if (trimmed === (project.description ?? '')) return;
+    onProjectUpdate?.({ description: trimmed || null });
+  }, [draftDesc, project.description, onProjectUpdate]);
+
   // GitHub state
   const [githubConnected, setGithubConnected] = useState(false);
   const [selectedContextFiles, setSelectedContextFiles] = useState<string[]>([]);
@@ -222,13 +249,31 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
 
   return (
     <div className="w-64 border-r border-grid-line bg-background overflow-y-auto flex flex-col">
-      {/* Header */}
+      {/* Header — editable project name & description */}
       <div className="p-4 border-b border-grid-line">
         <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="flex-1">
-            <h2 className="font-mono text-sm font-bold uppercase tracking-wider text-foreground">
-              {project.name}
-            </h2>
+          <div className="flex-1 min-w-0">
+            {editingName ? (
+              <input
+                ref={nameInputRef}
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onBlur={commitName}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitName(); if (e.key === 'Escape') { setDraftName(project.name); setEditingName(false); } }}
+                className="w-full font-mono text-sm font-bold uppercase tracking-wider text-foreground bg-secondary border border-grid-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary/50"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingName(true)}
+                className="group flex items-center gap-1.5 text-left w-full"
+              >
+                <h2 className="font-mono text-sm font-bold uppercase tracking-wider text-foreground truncate">
+                  {project.name}
+                </h2>
+                <Pencil className="h-2.5 w-2.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+              </button>
+            )}
             <span className={`inline-block mt-2 px-2 py-1 text-xs uppercase tracking-wider font-mono ${statusColors[project.status]}`}>
               {project.status}
             </span>
@@ -237,14 +282,34 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
             variant="ghost"
             size="sm"
             onClick={() => onToggle(true)}
-            className="h-6 w-6 p-0"
+            className="h-6 w-6 p-0 shrink-0"
           >
             <ChevronUp className="h-3 w-3" />
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground leading-relaxed mt-2">
-          {project.description}
-        </p>
+        {editingDesc ? (
+          <textarea
+            ref={descInputRef}
+            value={draftDesc}
+            onChange={(e) => setDraftDesc(e.target.value)}
+            onBlur={commitDesc}
+            onKeyDown={(e) => { if (e.key === 'Escape') { setDraftDesc(project.description ?? ''); setEditingDesc(false); } }}
+            rows={3}
+            className="w-full text-xs text-foreground leading-relaxed mt-2 bg-secondary border border-grid-line rounded px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+            placeholder="Describe your project..."
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingDesc(true)}
+            className="group flex items-start gap-1.5 text-left w-full mt-2"
+          >
+            <p className="text-xs text-muted-foreground leading-relaxed flex-1">
+              {project.description || 'Click to add a description...'}
+            </p>
+            <Pencil className="h-2.5 w-2.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
+          </button>
+        )}
       </div>
 
 
@@ -281,16 +346,21 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
                 </div>
               ))}
               {isThinking && (
-                messages.length === 0 ? (
-                  <ChatSkeleton />
-                ) : (
-                  <div className="flex gap-2">
-                    <div className="h-5 w-5 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                      <Bot className="h-2.5 w-2.5" />
-                    </div>
-                    <Skeleton className="h-12 w-48 rounded-lg shrink-0" />
+                <div className="flex gap-2">
+                  <div className="h-5 w-5 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                    <Bot className="h-2.5 w-2.5 animate-pulse" />
                   </div>
-                )
+                  <div className="bg-secondary rounded px-2 py-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex gap-0.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground ml-1">Thinking...</span>
+                    </div>
+                  </div>
+                </div>
               )}
               {pendingPreview && (
                 <ChatPreviewPanel

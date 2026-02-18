@@ -54,7 +54,7 @@ export interface MapWorkflow {
 }
 
 export interface MapSnapshot {
-  project: { id: string; name: string; repo_url: string | null; default_branch: string };
+  project: { id: string; name: string; description: string | null; repo_url: string | null; default_branch: string };
   workflows: MapWorkflow[];
 }
 
@@ -145,6 +145,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       project: {
         id: project.id as string,
         name: project.name as string,
+        description: (project.description as string) ?? null,
         repo_url: (project.repo_url as string) ?? null,
         default_branch: (project.default_branch as string) ?? "main",
       },

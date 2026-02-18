@@ -9,6 +9,7 @@ import {
   getStepCards,
 } from "@/lib/schemas/planning-state";
 import type {
+  UpdateProjectPayload,
   CreateWorkflowPayload,
   CreateActivityPayload,
   CreateStepPayload,
@@ -52,6 +53,9 @@ export function applyAction(
 
   try {
     switch (action.action_type) {
+      case "updateProject":
+        return applyUpdateProject(action, newState);
+
       case "createWorkflow":
         return applyCreateWorkflow(action, newState);
 
@@ -109,12 +113,27 @@ export function applyAction(
 // Handler functions for each action type
 // ============================================================================
 
+function applyUpdateProject(
+  action: PlanningAction,
+  state: PlanningState,
+): MutationResult {
+  const payload = action.payload as UpdateProjectPayload;
+
+  state.project = {
+    ...state.project,
+    name: payload.name ?? state.project.name,
+    description: payload.description !== undefined ? payload.description : state.project.description,
+  };
+
+  return { success: true, newState: state };
+}
+
 function applyCreateWorkflow(
   action: PlanningAction,
   state: PlanningState,
 ): MutationResult {
   const payload = action.payload as CreateWorkflowPayload & { id?: string };
-  const workflowId = payload.id ?? uuidv4();
+  const workflowId = payload.id ?? action.id ?? uuidv4();
 
   state.workflows.set(workflowId, {
     id: workflowId,
@@ -134,7 +153,7 @@ function applyCreateActivity(
 ): MutationResult {
   const payload = action.payload as CreateActivityPayload & { id?: string };
   const target_ref = action.target_ref as { workflow_id: string };
-  const activityId = payload.id ?? uuidv4();
+  const activityId = payload.id ?? action.id ?? uuidv4();
 
   state.activities.set(activityId, {
     id: activityId,
@@ -153,7 +172,7 @@ function applyCreateStep(
 ): MutationResult {
   const payload = action.payload as CreateStepPayload & { id?: string };
   const target_ref = action.target_ref as { workflow_activity_id: string };
-  const stepId = payload.id ?? uuidv4();
+  const stepId = payload.id ?? action.id ?? uuidv4();
 
   state.steps.set(stepId, {
     id: stepId,
@@ -171,7 +190,7 @@ function applyCreateCard(
 ): MutationResult {
   const payload = action.payload as CreateCardPayload & { id?: string };
   const target_ref = action.target_ref as { workflow_activity_id: string };
-  const cardId = payload.id ?? uuidv4();
+  const cardId = payload.id ?? action.id ?? uuidv4();
 
   state.cards.set(cardId, {
     id: cardId,

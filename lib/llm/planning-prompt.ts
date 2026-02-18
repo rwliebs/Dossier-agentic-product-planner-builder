@@ -35,6 +35,7 @@ export function buildPlanningSystemPrompt(): string {
 
 ## Your Role
 - Convert user ideas into structured PlanningAction[] payloads
+- Update the project name and description as you learn about the user's product
 - Create workflows, activities, steps, and cards based on user intent
 - Update existing cards when users request refinements
 - Link context artifacts to cards when relevant
@@ -51,11 +52,17 @@ export function buildPlanningSystemPrompt(): string {
 ## PlanningAction Schema
 Each action has: { "id": "uuid", "project_id": "uuid", "action_type": string, "target_ref": object, "payload": object }
 
-Action types: createWorkflow, createActivity, createStep, createCard, updateCard, reorderCard, linkContextArtifact, upsertCardPlannedFile, approveCardPlannedFile, upsertCardKnowledgeItem, setCardKnowledgeStatus
+Action types: updateProject, createWorkflow, createActivity, createStep, createCard, updateCard, reorderCard, linkContextArtifact, upsertCardPlannedFile, approveCardPlannedFile, upsertCardKnowledgeItem, setCardKnowledgeStatus
+
+## updateProject
+Use this to set or update the project name and description as you learn about what the user is building. Always include an updateProject action when the user first describes their idea.
+- target_ref: { "project_id": "<project_id>" }
+- payload: { "name": "Short Project Name", "description": "A concise description of what the project does and who it's for." }
 
 ## Example (user: "Add a login flow for the app")
 \`\`\`json
 [
+  {"id": "z0y1x2w3-...", "project_id": "<project_id>", "action_type": "updateProject", "target_ref": {"project_id": "<project_id>"}, "payload": {"name": "My App", "description": "A web application with user authentication and login flows."}},
   {"id": "a1b2c3d4-...", "project_id": "<project_id>", "action_type": "createWorkflow", "target_ref": {"project_id": "<project_id>"}, "payload": {"title": "Authentication", "description": "User login and registration", "position": 0}},
   {"id": "e5f6g7h8-...", "project_id": "<project_id>", "action_type": "createActivity", "target_ref": {"workflow_id": "<new_workflow_id>"}, "payload": {"title": "Login", "position": 0}},
   {"id": "i9j0k1l2-...", "project_id": "<project_id>", "action_type": "createStep", "target_ref": {"workflow_activity_id": "<new_activity_id>"}, "payload": {"title": "Login form", "position": 0}},

@@ -53,6 +53,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const updates: Record<string, unknown> = {};
     if (parsed.data.name !== undefined) updates.name = parsed.data.name;
+    if (parsed.data.description !== undefined) updates.description = parsed.data.description;
     if (parsed.data.repo_url !== undefined) updates.repo_url = parsed.data.repo_url;
     if (parsed.data.default_branch !== undefined)
       updates.default_branch = parsed.data.default_branch;

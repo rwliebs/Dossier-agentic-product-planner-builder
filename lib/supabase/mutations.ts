@@ -140,6 +140,8 @@ export async function applyAction(
   }
 
   switch (action.action_type) {
+    case "updateProject":
+      return applyUpdateProjectAction(db, projectId, action);
     case "createWorkflow":
       return applyCreateWorkflow(db, projectId, action);
     case "createActivity":
@@ -165,6 +167,32 @@ export async function applyAction(
     default:
       return { applied: false, rejectionReason: `Unsupported action type: ${action.action_type}` };
   }
+}
+
+async function applyUpdateProjectAction(
+  db: DbAdapter,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const project = await getProject(db, projectId);
+  if (!project) {
+    return { applied: false, rejectionReason: "Project not found" };
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (action.payload.name !== undefined) updates.name = action.payload.name;
+  if (action.payload.description !== undefined) updates.description = action.payload.description;
+
+  if (Object.keys(updates).length === 0) {
+    return { applied: false, rejectionReason: "No fields to update" };
+  }
+
+  try {
+    await db.updateProject(projectId, updates);
+  } catch (error) {
+    return { applied: false, rejectionReason: error instanceof Error ? error.message : String(error) };
+  }
+  return { applied: true };
 }
 
 async function applyCreateWorkflow(

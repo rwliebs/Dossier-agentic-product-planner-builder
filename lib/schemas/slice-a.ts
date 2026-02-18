@@ -29,6 +29,7 @@ export const runStatusSchema = z.enum([
 export const buildScopeSchema = z.enum(["workflow", "card"]);
 
 export const planningActionTypeSchema = z.enum([
+  "updateProject",
   "createWorkflow",
   "createActivity",
   "createStep",
@@ -45,6 +46,7 @@ export const planningActionTypeSchema = z.enum([
 export const projectSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
+  description: z.string().nullable().optional(),
   repo_url: z.string().url().nullable().optional(),
   default_branch: z.string().min(1).default("main"),
 });

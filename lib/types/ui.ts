@@ -76,6 +76,7 @@ export interface MapSnapshot {
   project: {
     id: string;
     name: string;
+    description: string | null;
     repo_url: string | null;
     default_branch: string;
   };

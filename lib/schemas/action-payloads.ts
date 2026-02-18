@@ -12,6 +12,19 @@ import { plannedFileActionSchema, plannedFileKindSchema } from "./slice-b";
  */
 
 // ============================================================================
+// updateProject: Update project name and/or description
+// ============================================================================
+
+export const updateProjectPayloadSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+});
+
+export const updateProjectTargetRefSchema = z.object({
+  project_id: z.string().uuid(),
+});
+
+// ============================================================================
 // createWorkflow: Create a new workflow in a project
 // ============================================================================
 
@@ -183,6 +196,7 @@ export const setCardKnowledgeStatusTargetRefSchema = z.object({
 // ============================================================================
 
 export const actionPayloadsSchema = z.union([
+  updateProjectPayloadSchema,
   createWorkflowPayloadSchema,
   createActivityPayloadSchema,
   createStepPayloadSchema,
@@ -197,6 +211,7 @@ export const actionPayloadsSchema = z.union([
 ]);
 
 export const actionTargetRefsSchema = z.union([
+  updateProjectTargetRefSchema,
   createWorkflowTargetRefSchema,
   createActivityTargetRefSchema,
   createStepTargetRefSchema,
@@ -224,6 +239,7 @@ export const validatedPlanningActionSchema = planningActionSchema.extend({
 // Type exports
 // ============================================================================
 
+export type UpdateProjectPayload = z.infer<typeof updateProjectPayloadSchema>;
 export type CreateWorkflowPayload = z.infer<typeof createWorkflowPayloadSchema>;
 export type CreateActivityPayload = z.infer<typeof createActivityPayloadSchema>;
 export type CreateStepPayload = z.infer<typeof createStepPayloadSchema>;

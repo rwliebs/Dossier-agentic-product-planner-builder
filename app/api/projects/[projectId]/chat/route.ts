@@ -101,17 +101,30 @@ export async function POST(
     });
   } catch (e) {
     const err = e instanceof Error ? e.message : "Planning service error";
-    return json(
-      {
-        status: "error",
-        message: err.includes("ANTHROPIC_API_KEY")
-          ? "Planning LLM not configured. Set ANTHROPIC_API_KEY."
-          : err.includes("timed out")
-            ? "Planning request timed out. Try again."
-            : "Planning service temporarily unavailable.",
-      },
-      502,
-    );
+    console.error("[chat] Planning LLM error:", err);
+
+    let userMessage: string;
+    if (err.includes("ANTHROPIC_API_KEY")) {
+      userMessage = "Planning LLM not configured. Set ANTHROPIC_API_KEY.";
+    } else if (err.includes("timed out")) {
+      userMessage = "Planning request timed out. Try again.";
+    } else if (err.includes("credit balance") || err.includes("billing")) {
+      userMessage =
+        "Anthropic API credit balance is too low. Add credits at console.anthropic.com.";
+    } else if (
+      err.includes("401") ||
+      err.includes("authentication") ||
+      err.includes("invalid.*api.*key")
+    ) {
+      userMessage =
+        "Anthropic API key is invalid. Check ANTHROPIC_API_KEY in your config.";
+    } else if (err.includes("429") || err.includes("rate limit")) {
+      userMessage = "Rate limit exceeded. Please try again in a moment.";
+    } else {
+      userMessage = "Planning service temporarily unavailable.";
+    }
+
+    return json({ status: "error", message: userMessage }, 502);
   }
 
   const parseResult = parsePlanningResponse(llmResponse.text);

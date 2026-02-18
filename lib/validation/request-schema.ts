@@ -19,12 +19,14 @@ import {
 // Project create/update
 export const createProjectSchema = z.object({
   name: z.string().min(1),
+  description: z.string().nullable().optional(),
   repo_url: z.string().url().nullable().optional(),
   default_branch: z.string().min(1).optional(),
 });
 
 export const updateProjectSchema = z.object({
   name: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
   repo_url: z.string().url().nullable().optional(),
   default_branch: z.string().min(1).optional(),
 });

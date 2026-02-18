@@ -140,6 +140,12 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
   useEffect(() => { if (editingName) nameInputRef.current?.focus(); }, [editingName]);
   useEffect(() => { if (editingDesc) descInputRef.current?.focus(); }, [editingDesc]);
 
+  useEffect(() => {
+    if (isThinking || isPopulating) {
+      setExpandedSections(prev => (prev.has('chat') ? prev : new Set([...prev, 'chat'])));
+    }
+  }, [isThinking, isPopulating]);
+
   const commitName = useCallback(() => {
     setEditingName(false);
     const trimmed = draftName.trim();
@@ -242,8 +248,17 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
   useEffect(() => { scrollToBottom(); }, [messages]);
 
   const addMessage = (role: 'user' | 'agent', content: string) => {
+    if (!content?.trim()) return;
     setMessages(prev => [...prev, { id: crypto.randomUUID(), role, content }]);
   };
+
+  const lastRefetchRef = useRef<number>(0);
+  const throttledPlanningApplied = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRefetchRef.current < 800) return;
+    lastRefetchRef.current = now;
+    onPlanningApplied?.();
+  }, [onPlanningApplied]);
 
   const handleSubmit = async () => {
     if (!input.trim()) return;
@@ -309,7 +324,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
             }
             if (eventType === 'action') {
               actionCount++;
-              onPlanningApplied?.();
+              throttledPlanningApplied();
             }
             if (eventType === 'error' && data.reason) {
               addMessage('agent', `Error: ${data.reason}`);
@@ -322,11 +337,12 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
                 lastPopulateConfirm = data.workflow_ids;
                 setPopulateConfirmWorkflowIds(data.workflow_ids);
                 setPopulateOriginalMessage(text);
+                const wfIds = Array.isArray(data.workflow_ids) ? data.workflow_ids : [];
                 setPendingPreview({
-                  added: { workflows: data.workflow_ids, activities: [], steps: [], cards: [] },
+                  added: { workflows: wfIds, activities: [], steps: [], cards: [] },
                   modified: { cards: [], artifacts: [] },
                   reordered: [],
-                  summary: `Populate ${data.workflow_ids.length} workflow(s) with activities and cards?`,
+                  summary: `Populate ${wfIds.length} workflow(s) with activities and cards?`,
                 });
                 setPendingActions([]);
                 setPendingErrors([]);
@@ -345,9 +361,14 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
 
       if (agentMessage && !lastPopulateConfirm) {
         addMessage('agent', agentMessage);
+      } else if (actionCount > 0 && !lastPopulateConfirm) {
+        addMessage('agent', `Applied ${actionCount} change(s).`);
       }
-    } catch {
-      addMessage('agent', 'Planning service unavailable. Check your connection.');
+      throttledPlanningApplied();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Planning service unavailable. Check your connection.';
+      addMessage('agent', msg);
+      throttledPlanningApplied();
     } finally {
       setIsThinking(false);
     }
@@ -399,7 +420,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, onPlann
                 if (line.startsWith('data: ')) dataStr = line.slice(6);
               }
               if (eventType === 'action') {
-                onPlanningApplied?.();
+                throttledPlanningApplied();
               }
             }
           }

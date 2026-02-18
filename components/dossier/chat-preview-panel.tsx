@@ -30,14 +30,16 @@ export function ChatPreviewPanel({
   onCancel,
   isApplying = false,
 }: ChatPreviewPanelProps) {
+  const added = preview?.added ?? {};
+  const modified = preview?.modified ?? {};
   const hasChanges =
-    preview.added.workflows.length > 0 ||
-    preview.added.activities.length > 0 ||
-    preview.added.steps.length > 0 ||
-    preview.added.cards.length > 0 ||
-    preview.modified.cards.length > 0 ||
-    preview.modified.artifacts.length > 0 ||
-    preview.reordered.length > 0;
+    (added.workflows?.length ?? 0) > 0 ||
+    (added.activities?.length ?? 0) > 0 ||
+    (added.steps?.length ?? 0) > 0 ||
+    (added.cards?.length ?? 0) > 0 ||
+    (modified.cards?.length ?? 0) > 0 ||
+    (modified.artifacts?.length ?? 0) > 0 ||
+    (preview?.reordered?.length ?? 0) > 0;
 
   return (
     <div className="rounded border border-grid-line bg-secondary/50 p-3 space-y-3">
@@ -48,48 +50,48 @@ export function ChatPreviewPanel({
       </div>
 
       <p className="text-[11px] text-foreground leading-relaxed">
-        {preview.summary}
+        {preview?.summary ?? ''}
       </p>
 
       {hasChanges && (
         <div className="space-y-2 text-[10px]">
-          {preview.added.workflows.length > 0 && (
+          {(added.workflows?.length ?? 0) > 0 && (
             <div>
               <span className="text-muted-foreground">Workflows: </span>
               <span className="text-foreground">
-                +{preview.added.workflows.length}
+                +{added.workflows!.length}
               </span>
             </div>
           )}
-          {preview.added.activities.length > 0 && (
+          {(added.activities?.length ?? 0) > 0 && (
             <div>
               <span className="text-muted-foreground">Activities: </span>
               <span className="text-foreground">
-                +{preview.added.activities.length}
+                +{added.activities!.length}
               </span>
             </div>
           )}
-          {preview.added.steps.length > 0 && (
+          {(added.steps?.length ?? 0) > 0 && (
             <div>
               <span className="text-muted-foreground">Steps: </span>
               <span className="text-foreground">
-                +{preview.added.steps.length}
+                +{added.steps!.length}
               </span>
             </div>
           )}
-          {preview.added.cards.length > 0 && (
+          {(added.cards?.length ?? 0) > 0 && (
             <div>
               <span className="text-muted-foreground">Cards: </span>
               <span className="text-foreground">
-                +{preview.added.cards.length}
+                +{added.cards!.length}
               </span>
             </div>
           )}
-          {preview.modified.cards.length > 0 && (
+          {(modified.cards?.length ?? 0) > 0 && (
             <div>
               <span className="text-muted-foreground">Modified: </span>
               <span className="text-foreground">
-                {preview.modified.cards.length} card(s)
+                {modified.cards!.length} card(s)
               </span>
             </div>
           )}

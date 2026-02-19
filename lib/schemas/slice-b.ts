@@ -24,6 +24,7 @@ export const artifactTypeSchema = z.enum([
   "prompt",
   "spec",
   "runbook",
+  "test",
 ]);
 
 export const plannedFileActionSchema = z.enum(["create", "edit"]);

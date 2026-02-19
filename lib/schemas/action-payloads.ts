@@ -4,7 +4,7 @@ import {
   planningActionTypeSchema,
   planningActionSchema,
 } from "./slice-a";
-import { plannedFileActionSchema, plannedFileKindSchema } from "./slice-b";
+import { artifactTypeSchema, plannedFileActionSchema, plannedFileKindSchema } from "./slice-b";
 
 /**
  * Action Payload Schemas
@@ -120,6 +120,22 @@ export const linkContextArtifactTargetRefSchema = z.object({
 });
 
 // ============================================================================
+// createContextArtifact: Create a project-level context artifact (optionally linked to a card)
+// ============================================================================
+
+export const createContextArtifactPayloadSchema = z.object({
+  name: z.string().min(1),
+  type: artifactTypeSchema,
+  title: z.string().nullable().optional(),
+  content: z.string().min(1),
+  card_id: z.string().uuid().nullable().optional(),
+});
+
+export const createContextArtifactTargetRefSchema = z.object({
+  project_id: z.string().uuid(),
+});
+
+// ============================================================================
 // upsertCardPlannedFile: Create or update a planned file
 // ============================================================================
 
@@ -196,6 +212,7 @@ export const payloadSchemaByActionType: Record<
   updateCard: updateCardPayloadSchema,
   reorderCard: reorderCardPayloadSchema,
   linkContextArtifact: linkContextArtifactPayloadSchema,
+  createContextArtifact: createContextArtifactPayloadSchema,
   upsertCardPlannedFile: upsertCardPlannedFilePayloadSchema,
   approveCardPlannedFile: approveCardPlannedFilePayloadSchema,
   upsertCardKnowledgeItem: upsertCardKnowledgeItemPayloadSchema,
@@ -213,6 +230,7 @@ export const targetRefSchemaByActionType: Record<
   updateCard: updateCardTargetRefSchema,
   reorderCard: reorderCardTargetRefSchema,
   linkContextArtifact: linkContextArtifactTargetRefSchema,
+  createContextArtifact: createContextArtifactTargetRefSchema,
   upsertCardPlannedFile: upsertCardPlannedFileTargetRefSchema,
   approveCardPlannedFile: approveCardPlannedFileTargetRefSchema,
   upsertCardKnowledgeItem: upsertCardKnowledgeItemTargetRefSchema,
@@ -231,6 +249,7 @@ export const actionPayloadsSchema = z.union([
   updateCardPayloadSchema,
   reorderCardPayloadSchema,
   linkContextArtifactPayloadSchema,
+  createContextArtifactPayloadSchema,
   upsertCardPlannedFilePayloadSchema,
   approveCardPlannedFilePayloadSchema,
   upsertCardKnowledgeItemPayloadSchema,
@@ -245,6 +264,7 @@ export const actionTargetRefsSchema = z.union([
   updateCardTargetRefSchema,
   reorderCardTargetRefSchema,
   linkContextArtifactTargetRefSchema,
+  createContextArtifactTargetRefSchema,
   upsertCardPlannedFileTargetRefSchema,
   approveCardPlannedFileTargetRefSchema,
   upsertCardKnowledgeItemTargetRefSchema,
@@ -273,6 +293,9 @@ export type UpdateCardPayload = z.infer<typeof updateCardPayloadSchema>;
 export type ReorderCardPayload = z.infer<typeof reorderCardPayloadSchema>;
 export type LinkContextArtifactPayload = z.infer<
   typeof linkContextArtifactPayloadSchema
+>;
+export type CreateContextArtifactPayload = z.infer<
+  typeof createContextArtifactPayloadSchema
 >;
 export type UpsertCardPlannedFilePayload = z.infer<
   typeof upsertCardPlannedFilePayloadSchema

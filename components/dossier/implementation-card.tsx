@@ -45,6 +45,7 @@ interface ImplementationCardProps {
   availableFilePaths?: string[];
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
+  onFinalizeCard?: (cardId: string) => void;
   onSelectDoc?: (doc: ContextArtifact) => void;
   onSelectFile?: (file: CodeFileForPanel) => void;
   codeFiles?: CodeFileForPanel[];
@@ -122,6 +123,7 @@ export function ImplementationCard({
   availableFilePaths = [],
   onApprovePlannedFile,
   onBuildCard,
+  onFinalizeCard,
   onSelectDoc,
   onSelectFile,
   codeFiles = [],
@@ -433,13 +435,32 @@ export function ImplementationCard({
               <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Code Files to Create/Edit</h5>
               {plannedFiles.length > 0 && plannedFiles.some((pf) => pf.status === 'approved') && onBuildCard && (
                 <div className="mb-2">
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onBuildCard(card.id); }}
-                    className="w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                  >
-                    Build
-                  </button>
+                  {(() => {
+                    const buildState = (card as { build_state?: string }).build_state;
+                    const isActive = buildState === 'queued' || buildState === 'running' || buildState === 'blocked';
+                    const label =
+                      buildState === 'queued'
+                        ? 'Queued...'
+                        : buildState === 'running'
+                          ? 'Building...'
+                          : buildState === 'blocked'
+                            ? 'Blocked — answer questions'
+                            : 'Build';
+                    return (
+                      <button
+                        type="button"
+                        disabled={isActive}
+                        onClick={(e) => { e.stopPropagation(); if (!isActive) onBuildCard(card.id); }}
+                        className={`w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold rounded transition-colors ${
+                          isActive
+                            ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                            : 'bg-green-600 text-white hover:bg-green-700'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })()}
                 </div>
               )}
               {plannedFiles.length > 0 ? (
@@ -507,6 +528,24 @@ export function ImplementationCard({
               )}
             </div>
 
+            {onFinalizeCard && requirements.length > 0 && plannedFiles.length > 0 && !(card as Record<string, unknown>).finalized_at && (
+              <div>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onFinalizeCard(card.id); }}
+                  className="w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                >
+                  {ACTION_BUTTONS.FINALIZE_CARD}
+                </button>
+              </div>
+            )}
+            {(card as Record<string, unknown>).finalized_at && (
+              <div className="flex items-center gap-2 px-2 py-1.5 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 font-mono">
+                <Check className="h-3 w-3" />
+                Finalized
+              </div>
+            )}
+
             {(card.build_state != null || card.last_built_at != null) && (
             <>
             <div>
@@ -542,7 +581,7 @@ export function ImplementationCard({
               )}
             </div>
 
-            <div>
+            <div className={card.build_state === 'blocked' ? 'rounded border-2 border-amber-400 bg-amber-50/50 p-2 -m-0.5' : ''}>
               <h5 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700 mb-2">Questions</h5>
               {questions.length > 0 ? (
                 <ul className="space-y-1 mb-3">

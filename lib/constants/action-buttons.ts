@@ -7,6 +7,10 @@ export const ACTION_BUTTONS = {
   BUILD_ALL: "Build All",
   POPULATE: "Populate",
   POPULATING: "Populating…",
+  FINALIZE_PROJECT: "Finalize Project",
+  FINALIZING_PROJECT: "Finalizing…",
+  FINALIZE_CARD: "Finalize",
+  FINALIZING_CARD: "Finalizing…",
   VIEW_DETAILS_EDIT: "View Details & Edit",
   /** Card action labels by status (implementation-card) */
   CARD_ACTION: {

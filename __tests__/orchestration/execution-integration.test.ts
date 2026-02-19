@@ -32,6 +32,8 @@ vi.mock("@/lib/supabase/queries", () => ({
   getCardById: vi.fn(),
   getCardPlannedFiles: vi.fn(),
   getCardRequirements: vi.fn(),
+  getCardContextArtifacts: vi.fn().mockResolvedValue([]),
+  getArtifactById: vi.fn(),
 }));
 
 describe("Claude-flow mock client", () => {

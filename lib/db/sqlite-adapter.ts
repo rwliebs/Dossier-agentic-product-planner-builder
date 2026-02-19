@@ -237,7 +237,7 @@ export function createSqliteAdapter(dbPath: string | ":memory:"): DbAdapter {
       );
     },
     async updateCard(cardId: string, updates: DbRow) {
-      const allowed = ["title", "description", "status", "priority", "position", "quick_answer"];
+      const allowed = ["title", "description", "status", "priority", "position", "quick_answer", "finalized_at", "build_state", "last_built_at", "last_build_ref"];
       const set: string[] = ["updated_at = datetime('now')"];
       const vals: unknown[] = [];
       for (const [k, v] of Object.entries(updates)) {

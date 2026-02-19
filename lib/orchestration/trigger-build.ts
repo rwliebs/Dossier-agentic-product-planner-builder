@@ -119,6 +119,8 @@ export async function triggerBuild(
     );
     if (approved.length === 0) continue;
 
+    await db.updateCard(cardId, { build_state: "queued" });
+
     const allowedPaths = approved.map(
       (f) => (f as { logical_file_name: string }).logical_file_name
     );

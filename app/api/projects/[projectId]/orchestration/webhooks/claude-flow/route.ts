@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
       "commit_created",
       "execution_completed",
       "execution_failed",
+      "execution_blocked",
     ];
     if (!validEvents.includes(event_type)) {
       return validationError(

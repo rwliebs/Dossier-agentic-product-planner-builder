@@ -1,7 +1,9 @@
 'use client';
 
 import { useMemo, useState, useRef, useCallback } from 'react';
-import { Pencil } from 'lucide-react';
+import { Pencil, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ACTION_BUTTONS } from '@/lib/constants/action-buttons';
 import { StoryMapCanvas, type StoryMapCanvasProps } from './story-map-canvas';
 import { ArchitectureView } from './architecture-view';
 import type { MapSnapshot, MapCard, ContextArtifact, CardKnowledgeForDisplay, CodeFile } from '@/lib/types/ui';
@@ -64,6 +66,7 @@ interface WorkflowBlockProps {
   availableFilePaths?: string[];
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
+  onFinalizeCard?: (cardId: string) => void;
   onSelectDoc?: (doc: ContextArtifact) => void;
   onFileClick?: (file: CodeFileForPanel | CodeFile) => void;
   onUpdateFileDescription?: (fileId: string, description: string) => void;
@@ -71,6 +74,8 @@ interface WorkflowBlockProps {
   getCardKnowledgeLoading?: (cardId: string) => boolean;
   onPopulateWorkflow?: (workflowId: string, workflowTitle: string, workflowDescription: string | null) => void;
   populatingWorkflowId?: string | null;
+  onFinalizeProject?: () => void;
+  finalizingProject?: boolean;
   /** Called when user edits project context (description, personas, tech stack, deployment, design inspiration) */
   onProjectUpdate?: (updates: {
     description?: string | null;
@@ -97,6 +102,7 @@ export function WorkflowBlock({
   availableFilePaths = [],
   onApprovePlannedFile,
   onBuildCard,
+  onFinalizeCard,
   onSelectDoc,
   onFileClick,
   onUpdateFileDescription,
@@ -104,6 +110,8 @@ export function WorkflowBlock({
   getCardKnowledgeLoading,
   onPopulateWorkflow,
   populatingWorkflowId,
+  onFinalizeProject,
+  finalizingProject,
   onProjectUpdate,
 }: WorkflowBlockProps) {
   const allCards = useMemo(() => allCardsFromSnapshot(snapshot), [snapshot]);
@@ -171,12 +179,24 @@ export function WorkflowBlock({
               <h2 className="font-mono text-lg font-bold uppercase tracking-widest text-foreground shrink-0">
                 Implementation Map
               </h2>
-              <div className="flex gap-4 text-xs font-mono shrink-0">
+              <div className="flex items-center gap-4 text-xs font-mono shrink-0">
                 {statusCounts.active > 0 && <div className="text-green-400"><span className="font-bold">{statusCounts.active}</span> active</div>}
                 {statusCounts.questions > 0 && <div className="text-yellow-400"><span className="font-bold">{statusCounts.questions}</span> blocked</div>}
                 {statusCounts.review > 0 && <div className="text-blue-400"><span className="font-bold">{statusCounts.review}</span> review</div>}
                 {statusCounts.production > 0 && <div className="text-green-600"><span className="font-bold">{statusCounts.production}</span> live</div>}
                 {statusCounts.todo > 0 && <div className="text-muted-foreground"><span className="text-foreground font-bold">{statusCounts.todo}</span> pending</div>}
+                {onFinalizeProject && allCards.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 text-[11px] font-mono uppercase tracking-wider ml-2 bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100"
+                    onClick={onFinalizeProject}
+                    disabled={finalizingProject}
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    {finalizingProject ? ACTION_BUTTONS.FINALIZING_PROJECT : ACTION_BUTTONS.FINALIZE_PROJECT}
+                  </Button>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
@@ -254,6 +274,7 @@ export function WorkflowBlock({
             availableFilePaths={availableFilePaths}
             onApprovePlannedFile={onApprovePlannedFile}
             onBuildCard={onBuildCard}
+            onFinalizeCard={onFinalizeCard}
             onSelectDoc={onSelectDoc}
             onSelectFile={onFileClick}
             getCardKnowledge={getCardKnowledge}

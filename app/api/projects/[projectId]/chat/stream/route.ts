@@ -10,6 +10,8 @@ import {
   buildScaffoldUserMessage,
   buildPopulateWorkflowPrompt,
   buildPopulateWorkflowUserMessage,
+  buildFinalizeSystemPrompt,
+  buildFinalizeUserMessage,
 } from "@/lib/llm/planning-prompt";
 import { PLANNING_LLM } from "@/lib/feature-flags";
 import { chatStreamRequestSchema } from "@/lib/validation/request-schema";
@@ -89,7 +91,10 @@ export async function POST(
   let systemPrompt: string;
   let userMessage: string;
 
-  if (mode === "populate" && workflow_id) {
+  if (mode === "finalize") {
+    systemPrompt = buildFinalizeSystemPrompt();
+    userMessage = buildFinalizeUserMessage(state);
+  } else if (mode === "populate" && workflow_id) {
     const workflow = Array.from(state.workflows.values()).find((w) => w.id === workflow_id);
     if (!workflow) {
       return new Response(JSON.stringify({ error: "Workflow not found" }), {
@@ -178,8 +183,10 @@ export async function POST(
           if (result.type !== "action") continue;
 
           const action = result.action;
-          // In populate mode, only apply createActivity and createCard; skip other action types
           if (mode === "populate" && action.action_type !== "createActivity" && action.action_type !== "createCard") {
+            continue;
+          }
+          if (mode === "finalize" && action.action_type !== "createContextArtifact") {
             continue;
           }
           const targetRef = action.target_ref as Record<string, unknown>;
@@ -258,6 +265,11 @@ export async function POST(
           emit("phase_complete", {
             responseType: "populate_complete",
             workflow_id,
+          });
+        } else if (mode === "finalize") {
+          emit("phase_complete", {
+            responseType: "finalize_complete",
+            artifacts_created: actionCount,
           });
         }
 

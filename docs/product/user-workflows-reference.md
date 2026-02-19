@@ -26,6 +26,7 @@ ttl_expires_on: null
 ### Invariants
 - INVARIANT: Map structure is Workflow → Activity → Step → Card; all mutations via PlanningAction
 - INVARIANT: Build cannot trigger without at least one approved CardPlannedFile per targeted card
+- INVARIANT: Build cannot trigger without card.finalized_at set (card finalization confirmed)
 - INVARIANT: Orchestration retrieval excludes rejected knowledge items; approved items are authoritative
 
 ### Boundaries
@@ -113,6 +114,30 @@ ttl_expires_on: null
 - Approved items authoritative over draft
 
 **Data flow**: `upsertCardKnowledgeItem`, `setCardKnowledgeStatus` actions
+
+---
+
+## Workflow E: Finalization (Build Readiness)
+
+**User intent**: Generate context documents and e2e tests, then review and finalize each card before build.
+
+| Step | Actor | Action |
+|------|-------|--------|
+| 1 | User | Triggers "Finalize Project" after planning phases 1-3 |
+| 2 | Planning LLM (finalize mode) | Produces project-wide context docs (architectural summary, data contracts, domain summaries, workflow summaries, design system) + per-card e2e tests |
+| 3 | System | Saves as ContextArtifact records; tests linked to cards |
+| 4 | User | Clicks "Finalize" on individual card |
+| 5 | System | Assembles finalization package (project docs + card context + tests) |
+| 6 | User | Reviews and edits context; confirms finalization |
+| 7 | System | Sets card.finalized_at; card is build-ready |
+
+**Success outcomes**:
+- 5 project-wide context documents exist after project finalization
+- Each card with requirements has a linked e2e test artifact (type: test)
+- User can review and edit all finalization output before confirming
+- Build trigger requires finalized_at in addition to approved planned files
+
+**Data flow**: `POST /chat/stream (mode: finalize) → createContextArtifact actions → GET /cards/[id]/finalize → POST /cards/[id]/finalize`
 
 ---
 

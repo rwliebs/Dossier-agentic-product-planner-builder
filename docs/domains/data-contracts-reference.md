@@ -109,7 +109,7 @@ Project
 | id | uuid | |
 | project_id | uuid | |
 | name | string (min 1) | |
-| type | enum | doc\|design\|code\|research\|link\|image\|skill\|mcp\|cli\|api\|prompt\|spec\|runbook |
+| type | enum | doc\|design\|code\|research\|link\|image\|skill\|mcp\|cli\|api\|prompt\|spec\|runbook\|test |
 | content | string \| null | at least one of content, uri, integration_ref |
 | uri | string \| null | |
 | integration_ref | object \| null | |
@@ -154,6 +154,7 @@ All actions: `{ id, project_id, action_type, target_ref, payload }`
 | updateCard | `{ card_id }` | `{ title?, description?, status?, priority?, quick_answer? }` |
 | reorderCard | `{ card_id }` | `{ new_position }` |
 | linkContextArtifact | `{ card_id }` | `{ context_artifact_id, linked_by?, usage_hint? }` |
+| createContextArtifact | `{ project_id }` | `{ name, type, title?, content, card_id? }` |
 | upsertCardPlannedFile | `{ card_id }` | `{ logical_file_name, artifact_kind, action, intent_summary, contract_notes?, position, planned_file_id? }` |
 | approveCardPlannedFile | `{ card_id }` | `{ planned_file_id, status: "approved"\|"proposed" }` |
 | upsertCardKnowledgeItem | `{ card_id }` | `{ item_type, text, evidence_source?, confidence?, position, knowledge_item_id? }` |

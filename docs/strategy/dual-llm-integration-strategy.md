@@ -236,6 +236,20 @@ The system uses a split storage model to maximize both relational integrity and 
   - Only request PR-impacting approvals after required checks complete.
   - Never allow per-build overrides to bypass system-mandated checks.
 
+### Finalization Phase (Phase 4: Project-Wide Context + E2E Tests)
+
+After planning phases 1-3 produce a complete story map, a finalization phase synthesizes build-ready assets:
+
+- **Project-wide context documents**: architectural summary, data contracts, domain summaries, user workflow summaries, design system. These are `ContextArtifact` records that orient build agents.
+- **Per-card e2e tests**: actual runnable Playwright test code stored as `ContextArtifact` with `type: 'test'`. Each test validates a card requirement as an outcome-based acceptance criterion.
+- **Per-card finalize gate**: before build trigger, users review and can edit the assembled context package (project-wide docs + card-specific context + tests). Card is marked `finalized_at` on confirmation.
+
+**Test code exception**: Finalize mode is permitted to produce e2e test code because tests are executable specifications of requirements, not implementation code. They define "what must be true" without prescribing "how to build it." The constraint "never production code" remains in force for all non-test outputs.
+
+**Action type**: `createContextArtifact` — creates a `ContextArtifact` at the project level, optionally linked to a card. Used by the finalize LLM to produce context documents and test files.
+
+See [finalization-phase-strategy.md](./finalization-phase-strategy.md) for full design.
+
 ### Planning Agent Reliability for Visual Build Execution
 - We do not depend on Mermaid or diagram DSLs as execution truth.
 - The visual build is driven by canonical structured state + mutation actions:
@@ -647,14 +661,14 @@ RuVector is the memory substrate, embedded in claude-flow on the dedicated host.
 - `allowed_paths` must be non-empty for all coding assignments.
 - `CardAssignment.assignment_input_snapshot` must include all context/materialized IDs used for prompt construction.
 - `CardAssignment.forbidden_paths` must be enforced when present.
-- Planning actions with code-generation intents must be rejected (`validation_status = rejected`).
+- Planning actions with code-generation intents must be rejected (`validation_status = rejected`). Exception: `createContextArtifact` with `type: 'test'` in finalize mode may contain e2e test code.
 - `ContextArtifact` requires at least one of `content`, `uri`, or `integration_ref`.
 - Planning services are read-only against connected repositories.
 - Build execution for a card requires at least one `CardPlannedFile` with `status = approved`.
 - Only orchestration/subagent execution may write to connected repositories.
 - Memory retrieval ranking must prioritize card-scoped approved `MemoryUnit` records before broader project records.
 - Session/invocation data must not override approved project/card artifacts.
-- `CardPlannedFile.artifact_kind` must not include test artifacts; tests are generated at build-time by orchestration.
+- `CardPlannedFile.artifact_kind` must not include test artifacts. E2e tests are generated during the finalization phase as `ContextArtifact` records with `type: 'test'` and refined/adapted at build-time by orchestration.
 - `OrchestrationRun.scope = workflow` requires `workflow_id` and null `card_id`.
 - `OrchestrationRun.scope = card` requires `card_id` and may include optional `workflow_id`.
 - `CardRequirement`, `CardKnownFact`, `CardAssumption`, and `CardQuestion` must have explicit `status`.

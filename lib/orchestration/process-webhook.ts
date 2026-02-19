@@ -18,7 +18,8 @@ export type WebhookEventType =
   | "execution_started"
   | "commit_created"
   | "execution_completed"
-  | "execution_failed";
+  | "execution_failed"
+  | "execution_blocked";
 
 export interface WebhookPayload {
   event_type: WebhookEventType;
@@ -37,11 +38,67 @@ export interface WebhookPayload {
   };
   /** Learnings from swarm memory (when real claude-flow wired). Empty = harvest no-op. */
   learnings?: string[];
+  /** Knowledge items discovered by the agent (facts, assumptions, questions) */
+  knowledge?: {
+    facts?: Array<{ text: string; evidence_source?: string }>;
+    assumptions?: Array<{ text: string }>;
+    questions?: Array<{ text: string }>;
+  };
+  /** Completion verification evidence (when execution_completed) */
+  completion_evidence?: string;
 }
 
 export interface ProcessWebhookResult {
   success: boolean;
   error?: string;
+}
+
+/**
+ * Writes knowledge items from webhook payload to the card.
+ * Uses source: 'agent' and status: 'draft'.
+ */
+async function writeKnowledgeToCard(
+  db: DbAdapter,
+  cardId: string,
+  knowledge: WebhookPayload["knowledge"]
+): Promise<void> {
+  if (!knowledge) return;
+  const now = new Date().toISOString();
+  let position = 0;
+  for (const fact of knowledge.facts ?? []) {
+    await db.insertCardFact({
+      card_id: cardId,
+      text: fact.text,
+      evidence_source: fact.evidence_source ?? null,
+      status: "draft",
+      source: "agent",
+      position: position++,
+      created_at: now,
+      updated_at: now,
+    });
+  }
+  for (const assumption of knowledge.assumptions ?? []) {
+    await db.insertCardAssumption({
+      card_id: cardId,
+      text: assumption.text,
+      status: "draft",
+      source: "agent",
+      position: position++,
+      created_at: now,
+      updated_at: now,
+    });
+  }
+  for (const question of knowledge.questions ?? []) {
+    await db.insertCardQuestion({
+      card_id: cardId,
+      text: question.text,
+      status: "draft",
+      source: "agent",
+      position: position++,
+      created_at: now,
+      updated_at: now,
+    });
+  }
 }
 
 /**
@@ -151,6 +208,13 @@ export async function processWebhook(
         status: "completed",
       });
 
+      const cardId = (assignment as { card_id: string }).card_id;
+      await db.updateCard(cardId, {
+        build_state: "completed",
+        last_built_at: new Date().toISOString(),
+      });
+      await writeKnowledgeToCard(db, cardId, payload.knowledge);
+
       await logEvent(db, {
         project_id: projectId,
         run_id: runId,
@@ -174,7 +238,6 @@ export async function processWebhook(
       // Harvest build learnings into memory (M4.5) — skip when memory plane disabled
       const { MEMORY_PLANE } = await import("@/lib/feature-flags");
       if (MEMORY_PLANE) {
-        const cardId = (assignment as { card_id: string }).card_id;
         await harvestBuildLearnings(db, {
           assignmentId: assignment_id,
           runId,
@@ -200,6 +263,10 @@ export async function processWebhook(
         status: "failed",
       });
 
+      const failedCardId = (assignment as { card_id: string }).card_id;
+      await db.updateCard(failedCardId, { build_state: "failed" });
+      await writeKnowledgeToCard(db, failedCardId, payload.knowledge);
+
       await logEvent(db, {
         project_id: projectId,
         run_id: runId,
@@ -214,6 +281,37 @@ export async function processWebhook(
       await db.updateOrchestrationRun(runId, {
         status: "failed",
         ended_at: new Date().toISOString(),
+      });
+      break;
+    }
+
+    case "execution_blocked": {
+      if (agentExec) {
+        await db.updateAgentExecution((agentExec as { id: string }).id, {
+          status: "blocked",
+          ended_at: payload.ended_at ?? new Date().toISOString(),
+          summary: payload.summary ?? null,
+          error: payload.error ?? null,
+        });
+      }
+      await db.updateCardAssignment(assignment_id, {
+        status: "blocked",
+      });
+
+      const blockedCardId = (assignment as { card_id: string }).card_id;
+      await db.updateCard(blockedCardId, { build_state: "blocked" });
+      await writeKnowledgeToCard(db, blockedCardId, payload.knowledge);
+
+      await logEvent(db, {
+        project_id: projectId,
+        run_id: runId,
+        event_type: "execution_blocked",
+        actor: "claude-flow",
+        payload: {
+          assignment_id,
+          summary: payload.summary,
+          knowledge: payload.knowledge,
+        },
       });
       break;
     }

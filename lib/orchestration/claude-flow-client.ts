@@ -11,6 +11,22 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { buildTaskFromPayload } from "./build-task";
 
+export interface PlannedFileDetail {
+  logical_file_name: string;
+  action: string;
+  artifact_kind: string;
+  intent_summary: string;
+  contract_notes?: string;
+  module_hint?: string;
+}
+
+export interface ContextArtifactDetail {
+  name: string;
+  type: string;
+  title?: string;
+  content: string;
+}
+
 export interface DispatchPayload {
   run_id: string;
   assignment_id: string;
@@ -22,6 +38,10 @@ export interface DispatchPayload {
   assignment_input_snapshot: Record<string, unknown>;
   memory_context_refs?: string[];
   acceptance_criteria?: string[];
+  card_title?: string;
+  card_description?: string;
+  planned_files_detail?: PlannedFileDetail[];
+  context_artifacts?: ContextArtifactDetail[];
 }
 
 export interface DispatchResult {
@@ -225,6 +245,7 @@ export function createClaudeFlowClient(): ClaudeFlowClient {
 
 /**
  * Mock client — simulates dispatch and immediate completion.
+ * Simulates webhook callback with sample knowledge items to exercise the full feedback loop.
  */
 export function createMockClaudeFlowClient(): ClaudeFlowClient {
   const executions = new Map<
@@ -239,6 +260,41 @@ export function createMockClaudeFlowClient(): ClaudeFlowClient {
         payload,
         createdAt: new Date().toISOString(),
       });
+
+      // Simulate webhook callback after a short delay (exercises full feedback loop in dev)
+      // Skip in test environment — tests use mocked DB, real DB may not have the card
+      if (typeof process !== "undefined" && process.env?.VITEST) {
+        // no-op in tests
+      } else {
+        setImmediate(async () => {
+          try {
+            const { getDb } = await import("@/lib/db");
+            const { processWebhook } = await import("./process-webhook");
+            const db = getDb();
+            await processWebhook(db, {
+              event_type: "execution_completed",
+              assignment_id: payload.assignment_id,
+              execution_id: executionId,
+              ended_at: new Date().toISOString(),
+              summary: "[Mock] Execution completed (dry-run)",
+              knowledge: {
+                facts: [
+                  { text: "Mock: Codebase uses TypeScript", evidence_source: "tsconfig.json" },
+                ],
+                assumptions: [
+                  { text: "Mock: Assumed existing API patterns apply" },
+                ],
+                questions: [
+                  { text: "Mock: Should we add error boundaries for this component?" },
+                ],
+              },
+            });
+          } catch (err) {
+            console.warn("Mock webhook simulation failed:", err);
+          }
+        });
+      }
+
       return {
         success: true,
         execution_id: executionId,

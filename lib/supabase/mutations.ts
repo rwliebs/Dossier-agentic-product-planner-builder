@@ -137,7 +137,10 @@ export async function applyAction(
   projectId: string,
   action: ActionInput
 ): Promise<ApplyResult> {
-  if (isCodeGenerationIntent(action.payload)) {
+  const isTestArtifact =
+    action.action_type === "createContextArtifact" &&
+    (action.payload as Record<string, unknown>).type === "test";
+  if (!isTestArtifact && isCodeGenerationIntent(action.payload)) {
     return { applied: false, rejectionReason: "Code-generation intents are forbidden" };
   }
 
@@ -156,6 +159,8 @@ export async function applyAction(
       return applyReorderCard(db, projectId, action);
     case "linkContextArtifact":
       return applyLinkContextArtifact(db, projectId, action);
+    case "createContextArtifact":
+      return applyCreateContextArtifactAction(db, projectId, action);
     case "upsertCardPlannedFile":
       return applyUpsertCardPlannedFile(db, projectId, action);
     case "approveCardPlannedFile":
@@ -436,6 +441,62 @@ async function applyLinkContextArtifact(
       return { applied: true };
     }
     return { applied: false, rejectionReason: msg };
+  }
+  return { applied: true };
+}
+
+async function applyCreateContextArtifactAction(
+  db: DbAdapter,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const name = action.payload.name as string;
+  const type = action.payload.type as string;
+  const title = (action.payload.title as string) ?? null;
+  const content = action.payload.content as string;
+  const cardId = (action.payload.card_id as string) ?? null;
+
+  if (!name?.trim() || !content?.trim()) {
+    return { applied: false, rejectionReason: "name and content are required" };
+  }
+
+  const validTypes = [
+    "doc", "design", "code", "research", "link", "image",
+    "skill", "mcp", "cli", "api", "prompt", "spec", "runbook", "test",
+  ];
+  if (!validTypes.includes(type)) {
+    return { applied: false, rejectionReason: `Invalid artifact type: ${type}` };
+  }
+
+  if (cardId) {
+    const inProject = await verifyCardInProject(db, cardId, projectId);
+    if (!inProject) {
+      return { applied: false, rejectionReason: "Card not found or not in project" };
+    }
+  }
+
+  const artifactId = crypto.randomUUID();
+
+  try {
+    await db.insertContextArtifact({
+      id: artifactId,
+      project_id: projectId,
+      name: name.trim(),
+      type,
+      title,
+      content: content.trim(),
+    });
+
+    if (cardId) {
+      await db.insertCardContextArtifact({
+        card_id: cardId,
+        context_artifact_id: artifactId,
+        linked_by: "finalize",
+        usage_hint: null,
+      });
+    }
+  } catch (error) {
+    return { applied: false, rejectionReason: error instanceof Error ? error.message : String(error) };
   }
   return { applied: true };
 }

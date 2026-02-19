@@ -322,6 +322,187 @@ export function buildPopulateWorkflowUserMessage(
   return `## Current Map State\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow to Populate\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n- Description: ${workflowDescription ?? "—"}\n\n## Original User Request (for context)\n${userRequest}\n\n## Your Task\nGenerate createActivity and createCard actions for this workflow. Output ONLY the JSON object.`;
 }
 
+/**
+ * Serialize a summarized view of the map for the finalize prompt.
+ * Includes card requirements so the LLM can write tests against them.
+ */
+export function serializeMapStateForFinalize(state: PlanningState): string {
+  const workflows = Array.from(state.workflows.values());
+  const activities = Array.from(state.activities.values());
+  const cards = Array.from(state.cards.values());
+
+  const workflowSummaries = workflows.map((wf) => {
+    const wfActivities = activities
+      .filter((a) => a.workflow_id === wf.id)
+      .sort((a, b) => a.position - b.position);
+
+    const actSummaries = wfActivities.map((act) => {
+      const actCards = cards
+        .filter((c) => c.workflow_activity_id === act.id)
+        .sort((a, b) => a.position - b.position);
+
+      const cardSummaries = actCards.map((card) => {
+        const reqs = (state.cardRequirements.get(card.id) || [])
+          .filter((r) => r.status !== "rejected")
+          .map((r) => ({ text: r.text, status: r.status }));
+        const plannedFiles = (state.cardPlannedFiles.get(card.id) || [])
+          .map((f) => ({
+            logical_file_name: f.logical_file_name,
+            artifact_kind: f.artifact_kind,
+            action: f.action,
+            intent_summary: f.intent_summary,
+          }));
+        return {
+          id: card.id,
+          title: card.title,
+          description: card.description,
+          requirements: reqs,
+          planned_files: plannedFiles,
+        };
+      });
+
+      return {
+        id: act.id,
+        title: act.title,
+        cards: cardSummaries,
+      };
+    });
+
+    return {
+      id: wf.id,
+      title: wf.title,
+      description: wf.description,
+      activities: actSummaries,
+    };
+  });
+
+  return JSON.stringify(
+    {
+      project: {
+        id: state.project.id,
+        name: state.project.name,
+        description: state.project.description,
+        customer_personas: state.project.customer_personas,
+        tech_stack: state.project.tech_stack,
+        deployment: state.project.deployment,
+        design_inspiration: state.project.design_inspiration,
+      },
+      workflows: workflowSummaries,
+    },
+    null,
+    2,
+  );
+}
+
+/**
+ * Build the system prompt for FINALIZE mode.
+ * Produces project-wide context documents and per-card e2e tests as createContextArtifact actions.
+ */
+export function buildFinalizeSystemPrompt(): string {
+  return `You are a finalization assistant that produces build-ready context documents and e2e tests for a software project.
+
+## Your Task
+Given a fully planned story map (workflows, activities, cards with requirements and planned files), generate createContextArtifact actions that produce:
+
+### Part 1: Project-Wide Context Documents
+Create these 5 project-level documents. Each is a createContextArtifact action with content in markdown.
+
+1. **Architectural Summary** (type: "doc", name: "architectural-summary")
+   - Tech stack decisions and rationale
+   - Service topology (frontend, backend, database, external services)
+   - Key architectural patterns (state management, routing, data fetching)
+   - Deployment model
+   - Derived from: project tech_stack, deployment, design_inspiration, and the planned file intents across cards
+
+2. **Data Contracts** (type: "spec", name: "data-contracts")
+   - Entity schemas with fields and types
+   - API endpoint contracts (method, path, request/response shapes)
+   - Shared interfaces and data flow between components
+   - Derived from: card planned files (especially schema, endpoint, service kinds), card descriptions, requirements
+
+3. **Domain Summaries** (type: "doc", name: "domain-summaries")
+   - Bounded contexts identified from workflows
+   - Domain models and entity relationships
+   - Key terminology glossary
+   - Derived from: workflow titles/descriptions, activity titles, card titles/descriptions
+
+4. **User Workflow Summaries** (type: "doc", name: "user-workflow-summaries")
+   - Per workflow: user outcome, activity progression, how activities connect
+   - Cross-workflow dependencies and shared entities
+   - User journey narratives
+   - Derived from: workflow/activity/card structure and descriptions
+
+5. **Design System** (type: "design", name: "design-system")
+   - Component palette (which UI components are needed)
+   - Color tokens and typography conventions
+   - Layout patterns and spacing
+   - Interaction patterns (forms, navigation, feedback)
+   - Derived from: project design_inspiration, card planned files of kind component/hook
+
+### Part 2: Per-Card E2E Tests
+For each card that has requirements, create a createContextArtifact with:
+- type: "test"
+- name: test file path (e.g. "__tests__/e2e/<card-slug>.test.ts")
+- card_id: the card's id (links the test to its card)
+- content: actual runnable Playwright test code
+
+#### Test Guidelines
+- **Outcome-based**: each test validates that a requirement is realized as user-visible behavior
+- **One test case per requirement**: clear 1:1 mapping from requirement text to test
+- **Framework**: Playwright with vitest (import { test, expect } from '@playwright/test')
+- **Self-contained**: each test file can run independently
+- **Descriptive names**: test names read as acceptance criteria ("user can reset password via email link")
+- **Selectors**: use data-testid attributes and semantic roles, not CSS classes
+- **No implementation assumptions**: test observable outcomes (page content, navigation, API responses), not internal state
+
+#### Test Template
+Each test file should follow this structure:
+\`\`\`
+import { test, expect } from '@playwright/test';
+
+test.describe('<Card Title>', () => {
+  test('<requirement as test name>', async ({ page }) => {
+    // Arrange: navigate and set up
+    // Act: perform the user action
+    // Assert: verify the expected outcome
+  });
+  // ... one test per requirement
+});
+\`\`\`
+
+## createContextArtifact Action Schema
+- action_type: "createContextArtifact"
+- target_ref: { "project_id": "<project_id>" }
+- payload: { "name": "<artifact name>", "type": "<doc|spec|design|test>", "title": "<human title>", "content": "<full content>", "card_id": "<card_id or null>" }
+
+For project-wide documents: card_id should be null.
+For per-card tests: card_id should be the card's id.
+
+## Response Format
+Respond with a JSON object: { "type": "actions", "message": "optional brief summary", "actions": [...] }
+
+## Critical Constraints
+1. Generate ALL 5 project-wide documents — do not skip any
+2. Generate tests ONLY for cards that have at least one requirement
+3. Each test file must be syntactically valid TypeScript/Playwright
+4. Document content must be specific to THIS project — not generic boilerplate
+5. Use IDs from the provided map state — never invent IDs that don't exist
+6. Generate new UUIDs for each createContextArtifact action id
+7. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+}
+
+/**
+ * Build the user message for finalize mode.
+ */
+export function buildFinalizeUserMessage(
+  mapSnapshot: PlanningState,
+): string {
+  const stateJson = serializeMapStateForFinalize(mapSnapshot);
+  const projectId = mapSnapshot.project.id;
+
+  return `## Project Map State (with requirements and planned files)\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Your Task\nGenerate createContextArtifact actions for:\n1. All 5 project-wide context documents\n2. E2e test files for each card that has requirements\n\nUse project_id "${projectId}" in all target_ref and project_id fields.\n\nOutput ONLY the JSON object.`;
+}
+
 export interface ConversationMessage {
   role: "user" | "agent";
   content: string;

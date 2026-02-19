@@ -36,6 +36,7 @@ export const planningActionTypeSchema = z.enum([
   "updateCard",
   "reorderCard",
   "linkContextArtifact",
+  "createContextArtifact",
   "upsertCardPlannedFile",
   "approveCardPlannedFile",
   "upsertCardKnowledgeItem",
@@ -80,6 +81,7 @@ export const cardSchema = z.object({
   priority: z.number().int(),
   position: z.number().int(),
   quick_answer: z.string().nullable().optional(),
+  finalized_at: z.string().datetime().nullable().optional(),
 });
 
 export const planningActionSchema = z.object({

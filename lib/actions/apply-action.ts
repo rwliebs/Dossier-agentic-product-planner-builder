@@ -15,6 +15,7 @@ import type {
   UpdateCardPayload,
   ReorderCardPayload,
   LinkContextArtifactPayload,
+  CreateContextArtifactPayload,
   UpsertCardPlannedFilePayload,
   ApproveCardPlannedFilePayload,
   UpsertCardKnowledgeItemPayload,
@@ -71,6 +72,9 @@ export function applyAction(
 
       case "linkContextArtifact":
         return applyLinkContextArtifact(action, newState);
+
+      case "createContextArtifact":
+        return applyCreateContextArtifact(action, newState);
 
       case "upsertCardPlannedFile":
         return applyUpsertCardPlannedFile(action, newState);
@@ -259,6 +263,34 @@ function applyLinkContextArtifact(
   }
 
   state.cardContextLinks.get(target_ref.card_id)!.add(payload.context_artifact_id);
+
+  return { success: true, newState: state };
+}
+
+function applyCreateContextArtifact(
+  action: PlanningAction,
+  state: PlanningState,
+): MutationResult {
+  const payload = action.payload as CreateContextArtifactPayload;
+  const target_ref = action.target_ref as { project_id: string };
+  const artifactId = action.id ?? uuidv4();
+
+  state.contextArtifacts.set(artifactId, {
+    id: artifactId,
+    project_id: target_ref.project_id,
+    name: payload.name,
+    type: payload.type,
+    title: payload.title || null,
+    content: payload.content,
+  });
+
+  if (payload.card_id) {
+    const links = state.cardContextLinks.get(payload.card_id);
+    if (!links) {
+      state.cardContextLinks.set(payload.card_id, new Set());
+    }
+    state.cardContextLinks.get(payload.card_id)!.add(artifactId);
+  }
 
   return { success: true, newState: state };
 }

@@ -264,6 +264,105 @@ export default function DossierPage() {
     [projectId, snapshot?.project?.description, refetch]
   );
 
+  const [finalizingProject, setFinalizingProject] = useState(false);
+
+  const handleFinalizeProject = useCallback(
+    async () => {
+      if (!projectId) return;
+      setFinalizingProject(true);
+      try {
+        const res = await fetch(`/api/projects/${projectId}/chat/stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: 'Finalize project', mode: 'finalize' }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const msg = (err as { error?: string; message?: string }).error ?? (err as { message?: string }).message ?? `Finalize failed (${res.status})`;
+          const { toast } = await import('sonner');
+          toast.error(msg);
+          return;
+        }
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let actionCount = 0;
+        let streamError = '';
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const blocks = buffer.split(/\n\n+/);
+            buffer = blocks.pop() ?? '';
+            for (const block of blocks) {
+              let eventType = '';
+              let dataStr = '';
+              for (const line of block.split('\n')) {
+                if (line.startsWith('event: ')) eventType = line.slice(7).trim();
+                if (line.startsWith('data: ')) dataStr = line.slice(6);
+              }
+              if (eventType === 'error' && dataStr) {
+                try {
+                  const d = JSON.parse(dataStr);
+                  streamError = (d as { reason?: string }).reason ?? 'Finalize failed';
+                } catch {
+                  streamError = 'Finalize failed';
+                }
+              }
+              if (eventType === 'action') actionCount++;
+            }
+          }
+        }
+        if (streamError) {
+          const { toast } = await import('sonner');
+          toast.error(streamError);
+        } else if (actionCount === 0) {
+          const { toast } = await import('sonner');
+          toast.warning('No context documents or tests were generated.');
+        } else {
+          const { toast } = await import('sonner');
+          toast.success(`Finalized: ${actionCount} context documents & tests created`);
+        }
+        refetch();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Finalize failed';
+        const { toast } = await import('sonner');
+        toast.error(msg);
+      } finally {
+        setFinalizingProject(false);
+      }
+    },
+    [projectId, refetch]
+  );
+
+  const handleFinalizeCard = useCallback(
+    async (cardId: string) => {
+      if (!projectId) return;
+      try {
+        const res = await fetch(`/api/projects/${projectId}/cards/${cardId}/finalize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const msg = (err as { message?: string }).message ?? `Finalize failed (${res.status})`;
+          const { toast } = await import('sonner');
+          toast.error(msg);
+          return;
+        }
+        const { toast } = await import('sonner');
+        toast.success('Card finalized — ready for build');
+        refetch();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Finalize failed';
+        const { toast } = await import('sonner');
+        toast.error(msg);
+      }
+    },
+    [projectId, refetch]
+  );
+
   const handleUpdateCardDescription = useCallback(
     async (cardId: string, description: string) => {
       const result = await submitAction({
@@ -513,8 +612,11 @@ export default function DossierPage() {
                     availableFilePaths={availableFilePaths}
                     onApprovePlannedFile={handleApprovePlannedFile}
                     onBuildCard={handleBuildCard}
+                    onFinalizeCard={handleFinalizeCard}
                     onPopulateWorkflow={handlePopulateWorkflow}
                     populatingWorkflowId={populatingWorkflowId}
+                    onFinalizeProject={handleFinalizeProject}
+                    finalizingProject={finalizingProject}
                     onProjectUpdate={handleProjectUpdate}
                     onSelectDoc={(doc) => {
                       setSelectedDoc(doc);

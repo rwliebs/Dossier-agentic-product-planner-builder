@@ -148,6 +148,19 @@ export function validateReferentialIntegrity(
       }
       break;
 
+    case "createContextArtifact":
+      // project_id in target_ref; optional card_id in payload
+      {
+        const ctxPayload = action.payload as Record<string, unknown>;
+        if (ctxPayload.card_id && !cardExists(state, ctxPayload.card_id as string)) {
+          errors.push({
+            code: "referential_integrity",
+            message: `Referenced card ${ctxPayload.card_id} does not exist`,
+          });
+        }
+      }
+      break;
+
     case "upsertCardPlannedFile":
     case "approveCardPlannedFile":
     case "upsertCardKnowledgeItem":
@@ -173,8 +186,10 @@ export function validatePolicies(
 ): ValidationError[] {
   const errors: ValidationError[] = [];
 
-  // Check for code generation intent
-  if (containsCodeGenerationIntent(action.action_type, action.payload)) {
+  const isTestArtifact =
+    action.action_type === "createContextArtifact" &&
+    (action.payload as Record<string, unknown>).type === "test";
+  if (!isTestArtifact && containsCodeGenerationIntent(action.action_type, action.payload)) {
     errors.push({
       code: "code_generation_detected",
       message:

@@ -27,8 +27,9 @@ ttl_expires_on: null
 - INVARIANT: IDs in actions must exist in current map state; new entities get fresh UUIDs
 
 ### Boundaries
-- ALLOWED: createWorkflow, createActivity, createCard, updateCard, linkContextArtifact, upsertCardPlannedFile, etc.
-- FORBIDDEN: Generating code; triggering builds; writing to GitHub; creating real files
+- ALLOWED: createWorkflow, createActivity, createCard, updateCard, linkContextArtifact, upsertCardPlannedFile, createContextArtifact, etc.
+- ALLOWED (finalize mode only): createContextArtifact with type 'test' containing e2e test code
+- FORBIDDEN: Generating implementation/production code; triggering builds; writing to GitHub; creating real files
 
 ---
 
@@ -40,17 +41,28 @@ ttl_expires_on: null
 | scaffold | Map empty or no workflows | updateProject + createWorkflow only |
 | populate | Workflows exist, activities/cards sparse | createActivity, createStep, createCard |
 | full | Map has structure | All action types; refinements, links, planned files |
+| finalize | Map fully planned; user triggers | createContextArtifact (project docs + card e2e tests) |
 
 Mode selected by `lib/llm/planning-prompt.ts` based on map state.
 
 ### Flow
 ```
 User message → POST /chat/stream
-  → buildPlanningSystemPrompt() | buildScaffoldSystemPrompt() | buildPopulateSystemPrompt()
+  → buildPlanningSystemPrompt() | buildScaffoldSystemPrompt() | buildPopulateSystemPrompt() | buildFinalizeSystemPrompt()
   → Claude API (streaming)
   → stream-action-parser (parse JSON blocks)
   → PlanningAction[] emitted
   → POST /actions (validate + apply)
+```
+
+### Per-Card Finalize Flow
+```
+User clicks "Finalize" on card → POST /cards/[cardId]/finalize
+  → Assemble: project-wide docs + card context + e2e tests
+  → Return finalization package for review
+  → User edits (optional)
+  → POST /cards/[cardId]/finalize/confirm
+  → Set card.finalized_at → card is build-ready
 ```
 
 ### Key Files
@@ -61,7 +73,8 @@ User message → POST /chat/stream
 | `lib/llm/build-preview-response.ts` | Preview response before apply |
 | `lib/llm/claude-client.ts` | Anthropic API client |
 | `app/api/projects/[id]/chat/route.ts` | Non-streaming chat |
-| `app/api/projects/[id]/chat/stream/route.ts` | Streaming chat |
+| `app/api/projects/[id]/chat/stream/route.ts` | Streaming chat (scaffold, populate, finalize) |
+| `app/api/projects/[id]/cards/[cardId]/finalize/route.ts` | Per-card finalize endpoint |
 
 ### Response Types
 - `clarification`: Questions only; `actions: []`

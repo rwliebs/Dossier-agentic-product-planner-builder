@@ -112,6 +112,8 @@ User trigger → OrchestrationRun → CardAssignment[] → claude-flow
 | GET | `/api/projects/[id]/artifacts` | List context artifacts |
 | GET | `/api/projects/[id]/cards/[cardId]/requirements` | Card requirements |
 | GET | `/api/projects/[id]/cards/[cardId]/planned-files` | Card planned files |
+| GET | `/api/projects/[id]/cards/[cardId]/finalize` | Card finalization package |
+| POST | `/api/projects/[id]/cards/[cardId]/finalize` | Confirm card finalization |
 
 Full API reference: [reference/api-endpoints.md](reference/api-endpoints.md)
 

@@ -44,6 +44,8 @@ vi.mock("@/lib/supabase/queries", () => ({
   getCardPlannedFiles: vi.fn(),
   getCardById: vi.fn(),
   getCardRequirements: vi.fn(),
+  getCardContextArtifacts: vi.fn().mockResolvedValue([]),
+  getArtifactById: vi.fn(),
 }));
 
 describe("Trigger build - single-build lock (O10.6)", () => {

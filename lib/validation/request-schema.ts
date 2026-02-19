@@ -144,7 +144,7 @@ export const chatRequestSchema = z.object({
 // Chat stream request (scaffold or populate mode)
 export const chatStreamRequestSchema = z.object({
   message: z.string().min(1, "Message is required").transform((s) => s.trim()),
-  mode: z.enum(["scaffold", "populate"]).optional().default("scaffold"),
+  mode: z.enum(["scaffold", "populate", "finalize"]).optional().default("scaffold"),
   workflow_id: z.string().uuid().optional(),
   /** Test-only: mock LLM response. Only used when PLANNING_MOCK_ALLOWED=1 */
   mock_response: z.string().optional(),

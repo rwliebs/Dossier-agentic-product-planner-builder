@@ -9,6 +9,7 @@ import { createAssignment } from "./create-assignment";
 import { dispatchAssignment } from "./dispatch";
 import { logEvent } from "./event-logger";
 import {
+  getCardById,
   getCardIdsByWorkflow,
   getCardPlannedFiles,
   getProject,
@@ -74,6 +75,27 @@ export async function triggerBuild(
     return {
       success: false,
       validationErrors: ["No cards in scope"],
+    };
+  }
+
+  const cardsWithoutFinalized: string[] = [];
+  for (const cardId of cardIds) {
+    const card = await getCardById(db, cardId);
+    const finalizedAt = (card as { finalized_at?: string | null } | null)?.finalized_at;
+    if (!finalizedAt) {
+      cardsWithoutFinalized.push(cardId);
+    }
+  }
+  if (cardsWithoutFinalized.length > 0) {
+    return {
+      success: false,
+      error: "Card(s) not finalized",
+      validationErrors: [
+        "Build requires finalized cards. Finalize each card (review context and confirm) before triggering build.",
+        ...(cardsWithoutFinalized.length <= 3
+          ? [`Cards not finalized: ${cardsWithoutFinalized.join(", ")}`]
+          : [`${cardsWithoutFinalized.length} cards not finalized`]),
+      ],
     };
   }
 

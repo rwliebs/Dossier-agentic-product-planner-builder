@@ -60,6 +60,10 @@ describe("Trigger build - single-build lock (O10.6)", () => {
       default_branch: "main",
     } as never);
     vi.mocked(queries.getCardIdsByWorkflow).mockResolvedValue([cardId]);
+    vi.mocked(queries.getCardById).mockResolvedValue({
+      id: cardId,
+      finalized_at: new Date().toISOString(),
+    } as never);
     vi.mocked(queries.getCardPlannedFiles).mockResolvedValue([
       { id: "pf-1", status: "approved", logical_file_name: "src/index.ts" },
     ] as never);
@@ -102,6 +106,29 @@ describe("Trigger build - single-build lock (O10.6)", () => {
     expect(result.error).not.toBe("Build in progress");
     expect(result.validationErrors).not.toContain(
       "A build is already running for this project. Wait for it to complete."
+    );
+  });
+
+  it("rejects when card(s) lack finalized_at", async () => {
+    vi.mocked(orchestrationQueries.listOrchestrationRunsByProject).mockResolvedValue([]);
+    vi.mocked(queries.getCardById).mockResolvedValue({
+      id: cardId,
+      finalized_at: null,
+    } as never);
+
+    const mockDb = createMockDbAdapter();
+    const result = await triggerBuild(mockDb, {
+      project_id: projectId,
+      scope: "card",
+      card_id: cardId,
+      trigger_type: "card",
+      initiated_by: "user",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Card(s) not finalized");
+    expect(result.validationErrors).toContain(
+      "Build requires finalized cards. Finalize each card (review context and confirm) before triggering build."
     );
   });
 });

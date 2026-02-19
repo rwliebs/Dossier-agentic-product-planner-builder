@@ -3,8 +3,8 @@
  * Covers GET (assemble package) and POST (confirm finalization) per Workflow E.
  *
  * Product outcomes (user-workflows-reference.md):
- * - Build trigger requires finalized_at in addition to approved planned files
- * - POST finalize validates requirements + planned files; sets finalized_at
+ * - Build trigger requires finalized_at; planned files optional
+ * - POST finalize validates requirements; planned files optional
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -119,7 +119,7 @@ describe("Card finalize API", () => {
     expect(mockDb.updateCard).not.toHaveBeenCalled();
   });
 
-  it("POST returns 400 when card has no planned files", async () => {
+  it("POST sets finalized_at when card has requirements but no planned files", async () => {
     vi.mocked(mockDb.getCardPlannedFiles).mockResolvedValue([]);
 
     const { POST } = await import(
@@ -133,10 +133,13 @@ describe("Card finalize API", () => {
       params: Promise.resolve({ projectId, cardId }),
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.message).toMatch(/planned file/i);
-    expect(mockDb.updateCard).not.toHaveBeenCalled();
+    expect(body).toHaveProperty("finalized_at");
+    expect(mockDb.updateCard).toHaveBeenCalledWith(
+      cardId,
+      expect.objectContaining({ finalized_at: expect.any(String) })
+    );
   });
 
   it("GET returns 404 when card not in project", async () => {

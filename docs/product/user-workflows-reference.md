@@ -27,7 +27,7 @@ ttl_expires_on: null
 
 ### Invariants
 - INVARIANT: Map structure is Workflow → Activity → Step → Card; all mutations via PlanningAction
-- INVARIANT: Build cannot trigger without at least one approved CardPlannedFile per targeted card
+- INVARIANT: Build cannot trigger without finalized cards (planned files are optional; agent infers from requirements when absent)
 - INVARIANT: Build cannot trigger without card.finalized_at set (card finalization confirmed)
 - INVARIANT: Orchestration retrieval excludes rejected knowledge items; approved items are authoritative
 
@@ -71,7 +71,7 @@ ttl_expires_on: null
 **Success outcomes**:
 - Context linked via CardContextArtifact
 - Planned files follow schema; artifact_kind excludes test artifacts
-- Build cannot trigger without approved planned files **and** finalized_at for targeted cards
+- Build cannot trigger without finalized_at; planned files are optional (agent uses requirements when none specified)
 
 **Data flow**: `linkContextArtifact`, `upsertCardPlannedFile`, `approveCardPlannedFile` actions
 
@@ -84,7 +84,7 @@ ttl_expires_on: null
 | Step | Actor | Action |
 |------|-------|--------|
 | 1 | User | Clicks **Build** on a card (or Build All for workflow) |
-| 2 | System | Validates: card has finalized_at and ≥1 approved planned file; rejects with toast if not |
+| 2 | System | Validates: card has finalized_at; rejects with toast if not (planned files optional) |
 | 3 | System | Resolves system-wide and per-build input contracts |
 | 4 | System | Memory retrieval (card-scoped first) |
 | 5 | Agents | Execute within assignment boundaries |
@@ -138,18 +138,18 @@ ttl_expires_on: null
 | 2 | Planning LLM (finalize mode) | Produces project-wide context docs (architectural summary, data contracts, domain summaries, workflow summaries, design system) + per-card e2e tests |
 | 3 | System | Saves as ContextArtifact records; tests linked to cards; toast shows count created |
 | 4 | User | Clicks **Finalize** on individual card (always visible when not finalized; API validates requirements + planned files) |
-| 5 | System | Validates requirements + planned files; sets card.finalized_at; card is build-ready |
+| 5 | System | Validates requirements; sets card.finalized_at; card is build-ready (planned files optional) |
 | 6 | UI | Shows "Finalized" badge on card; Build button becomes available |
 
 **UI elements**:
 - **Finalize Project** — Button in Implementation Map header (next to status counts). Triggers streaming LLM call; shows "Finalizing Project" while running.
-- **Finalize** — Per-card button (indigo). Visible when card is not yet finalized. User can always click; API validates requirements and planned files and returns a clear error if missing.
+- **Finalize** — Per-card button (indigo). Visible when card is not yet finalized. User can always click; API validates requirements (planned files optional).
 - **Finalized** — Badge on card after confirmation (indigo background, check icon).
 
 **Success outcomes**:
 - 5 project-wide context documents exist after project finalization
 - Each card with requirements gets a linked e2e test artifact (type: test)
-- Build trigger requires finalized_at in addition to approved planned files
+- Build trigger requires finalized_at; planned files optional (agent infers from requirements)
 - Build rejects with clear message if user tries to build non-finalized card
 
 **Data flow**: `POST /chat/stream (mode: finalize) → createContextArtifact actions → POST /cards/[id]/finalize` (confirms per-card finalization)

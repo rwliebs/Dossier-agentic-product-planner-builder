@@ -15,7 +15,7 @@ const workflowId = "22222222-2222-2222-2222-222222222222";
 const cardId = "33333333-3333-3333-3333-333333333333";
 
 const mockPolicy = {
-  id: "policy-1",
+  id: "55555555-5555-5555-5555-555555555555",
   project_id: projectId,
   required_checks: ["lint"],
   protected_paths: [],
@@ -132,15 +132,28 @@ describe("Trigger build - single-build lock (O10.6)", () => {
     );
   });
 
-  it("rejects when card(s) have no approved planned files", async () => {
+  it("succeeds when card(s) have no approved planned files (uses default allowed_paths)", async () => {
+    const runId = "66666666-6666-6666-6666-666666666666";
     vi.mocked(orchestrationQueries.listOrchestrationRunsByProject).mockResolvedValue([]);
+    vi.mocked(orchestrationQueries.getOrchestrationRun).mockResolvedValue({
+      id: runId,
+      project_id: projectId,
+      system_policy_snapshot: { forbidden_paths: [] },
+    } as never);
     vi.mocked(queries.getCardById).mockResolvedValue({
       id: cardId,
       finalized_at: new Date().toISOString(),
     } as never);
     vi.mocked(queries.getCardPlannedFiles).mockResolvedValue([]);
 
-    const mockDb = createMockDbAdapter();
+    const mockInsertRun = vi.fn().mockResolvedValue({ id: runId });
+    const mockInsertAssignment = vi.fn().mockResolvedValue({ id: "assign-123" });
+    const mockDb = createMockDbAdapter({
+      getProject: vi.fn().mockResolvedValue({ default_branch: "main" }),
+      insertOrchestrationRun: mockInsertRun,
+      insertCardAssignment: mockInsertAssignment,
+    });
+
     const result = await triggerBuild(mockDb, {
       project_id: projectId,
       scope: "card",
@@ -149,10 +162,12 @@ describe("Trigger build - single-build lock (O10.6)", () => {
       initiated_by: "user",
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toBe("No buildable cards");
-    expect(result.validationErrors).toContain(
-      "Build requires at least one card with approved planned files. Approve planned files for each card before triggering build."
+    expect(result.success).toBe(true);
+    expect(result.runId).toBe(runId);
+    expect(mockInsertAssignment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        allowed_paths: ["src", "app", "lib", "components"],
+      })
     );
   });
 });

@@ -1,41 +1,38 @@
 import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
 import { fetchMapSnapshot, getLinkedArtifactsForPrompt } from "@/lib/supabase/map-snapshot";
+import { claudePlanningRequest } from "@/lib/llm/claude-client";
+import { parsePlanningResponse } from "@/lib/llm/parse-planning-response";
+import { validatePlanningOutput } from "@/lib/llm/validate-planning-output";
+import { pipelineApply } from "@/lib/supabase/mutations";
 import {
-  claudePlanningRequest,
-  parsePlanningResponse,
-  validatePlanningOutput,
-  type ConversationMessage,
-} from "@/lib/llm";
-import { buildPreviewFromActions } from "@/lib/llm/build-preview-response";
+  buildPlanningSystemPrompt,
+  buildPlanningUserMessage,
+  buildScaffoldSystemPrompt,
+  buildScaffoldUserMessage,
+} from "@/lib/llm/planning-prompt";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
-import { json, validationError } from "@/lib/api/response-helpers";
+import { json } from "@/lib/api/response-helpers";
 import { PLANNING_LLM } from "@/lib/feature-flags";
 import { chatRequestSchema } from "@/lib/validation/request-schema";
-
-export interface ChatRequest {
-  message: string;
-  conversationHistory?: ConversationMessage[];
-}
 
 export interface ChatResponse {
   status: "success" | "error";
   responseType: "clarification" | "actions" | "mixed";
   message?: string;
-  actions: PlanningAction[];
-  preview: {
-    added: { workflows: string[]; activities: string[]; cards: string[] };
-    modified: { cards: string[]; artifacts: string[] };
-    reordered: string[];
-    summary: string;
-  } | null;
-  errors?: Array<{ action: PlanningAction; reason: string }>;
-  metadata: { tokens: number; model: string };
+  applied: number;
+  workflow_ids_created: string[];
+  errors?: Array<{ action_type: string; reason: string }>;
 }
 
 /**
  * POST /api/projects/[projectId]/chat
- * Planning LLM endpoint: user message -> validated actions + preview delta.
+ *
+ * Unified planning chat endpoint.
+ * - Empty map (no workflows) → scaffold prompt (updateProject + createWorkflow only)
+ * - Map has structure → full planning prompt (all action types)
+ *
+ * Actions are validated and applied directly to the DB.
  */
 export async function POST(
   request: NextRequest,
@@ -43,11 +40,7 @@ export async function POST(
 ) {
   if (!PLANNING_LLM) {
     return json(
-      {
-        status: "error",
-        error: "Planning LLM is disabled",
-        message: "Set NEXT_PUBLIC_PLANNING_LLM_ENABLED=true to enable.",
-      },
+      { status: "error", error: "Planning LLM is disabled" },
       503,
     );
   }
@@ -72,21 +65,16 @@ export async function POST(
       if (!details[path]) details[path] = [];
       details[path].push(e.message);
     });
-    return validationError("Invalid request body", details);
+    return json({ status: "error", message: "Invalid request body", details }, 400);
   }
-  const { message, conversationHistory } = parsed.data;
+
+  const { message, mock_response } = parsed.data;
 
   let db;
   try {
     db = getDb();
-  } catch (e) {
-    return json(
-      {
-        status: "error",
-        message: "Server configuration error. Database not configured.",
-      },
-      500,
-    );
+  } catch {
+    return json({ status: "error", message: "Database not configured" }, 500);
   }
 
   const state = await fetchMapSnapshot(db, projectId);
@@ -94,68 +82,78 @@ export async function POST(
     return json({ status: "error", message: "Project not found" }, 404);
   }
 
+  const hasStructure = state.workflows.size >= 1;
   const linkedArtifacts = getLinkedArtifactsForPrompt(state, 5);
 
-  let llmResponse;
-  try {
-    llmResponse = await claudePlanningRequest({
-      userRequest: message,
-      mapSnapshot: state,
-      linkedArtifacts,
-      conversationHistory: conversationHistory as ConversationMessage[],
-    });
-  } catch (e) {
-    const err = e instanceof Error ? e.message : "Planning service error";
-    console.error("[chat] Planning LLM error:", err);
+  let systemPrompt: string;
+  let userMessage: string;
 
-    let userMessage: string;
-    if (err.includes("ANTHROPIC_API_KEY")) {
-      userMessage = "Planning LLM not configured. Set ANTHROPIC_API_KEY.";
-    } else if (err.includes("timed out") || err.includes("aborted")) {
-      userMessage = "Planning request timed out. Try again.";
-    } else if (err.includes("credit balance") || err.includes("billing")) {
-      userMessage =
-        "Anthropic API credit balance is too low. Add credits at console.anthropic.com.";
-    } else if (
-      err.includes("401") ||
-      err.includes("authentication") ||
-      err.includes("invalid.*api.*key")
-    ) {
-      userMessage =
-        "Anthropic API key is invalid. Check ANTHROPIC_API_KEY in your config.";
-    } else if (err.includes("429") || err.includes("rate limit")) {
-      userMessage = "Rate limit exceeded. Please try again in a moment.";
-    } else {
-      userMessage = "Planning service temporarily unavailable.";
-    }
-
-    return json({ status: "error", message: userMessage }, 502);
+  if (hasStructure) {
+    systemPrompt = buildPlanningSystemPrompt();
+    userMessage = buildPlanningUserMessage(message, state, linkedArtifacts);
+  } else {
+    systemPrompt = buildScaffoldSystemPrompt();
+    userMessage = buildScaffoldUserMessage(message, state, linkedArtifacts);
   }
 
-  const parseResult = parsePlanningResponse(llmResponse.text);
+  // --- LLM call ---
+  const useMock =
+    process.env.PLANNING_MOCK_ALLOWED === "1" &&
+    typeof mock_response === "string" &&
+    mock_response.length > 0;
 
-  // For clarification-only responses, return early with the message
+  let llmText: string;
+
+  if (useMock) {
+    llmText = mock_response!;
+  } else {
+    try {
+      const llmResponse = await claudePlanningRequest({
+        userRequest: message,
+        mapSnapshot: state,
+        linkedArtifacts,
+      }, {
+        systemPromptOverride: systemPrompt,
+        userMessageOverride: userMessage,
+      });
+      llmText = llmResponse.text;
+    } catch (e) {
+      const err = e instanceof Error ? e.message : "Planning service error";
+      console.error("[chat] Planning LLM error:", err);
+
+      let userMsg: string;
+      if (err.includes("ANTHROPIC_API_KEY")) {
+        userMsg = "Planning LLM not configured. Set ANTHROPIC_API_KEY.";
+      } else if (err.includes("timed out") || err.includes("aborted")) {
+        userMsg = "Planning request timed out. Try again.";
+      } else if (err.includes("credit balance") || err.includes("billing")) {
+        userMsg = "Anthropic API credit balance is too low.";
+      } else if (err.includes("401") || err.includes("authentication")) {
+        userMsg = "Anthropic API key is invalid.";
+      } else if (err.includes("429") || err.includes("rate limit")) {
+        userMsg = "Rate limit exceeded. Please try again in a moment.";
+      } else {
+        userMsg = "Planning service temporarily unavailable.";
+      }
+      return json({ status: "error", message: userMsg }, 502);
+    }
+  }
+
+  // --- Parse ---
+  const parseResult = parsePlanningResponse(llmText);
+
   if (parseResult.responseType === "clarification" && parseResult.actions.length === 0) {
     const response: ChatResponse = {
       status: "success",
       responseType: "clarification",
       message: parseResult.message,
-      actions: [],
-      preview: null,
-      metadata: {
-        tokens: llmResponse.usage.inputTokens + llmResponse.usage.outputTokens,
-        model: llmResponse.model,
-      },
+      applied: 0,
+      workflow_ids_created: [],
     };
     return json(response);
   }
 
-  if (parseResult.actions.length === 0 && !parseResult.message) {
-    console.error("[chat] Parse returned 0 actions and no message. Confidence:", parseResult.confidence);
-    console.error("[chat] Parse error:", parseResult.parseError);
-    console.error("[chat] Raw LLM text (first 2000 chars):", llmResponse.text.slice(0, 2000));
-  }
-
+  // --- Validate ---
   const projectIdValue = state.project.id;
   const actionsWithProjectId = parseResult.actions.map((a) => {
     const targetRef = a.target_ref as Record<string, unknown>;
@@ -172,26 +170,44 @@ export async function POST(
   const { valid, rejected } = validatePlanningOutput(actionsWithProjectId, state);
 
   if (rejected.length > 0) {
-    console.error(`[chat] ${rejected.length} actions rejected:`, rejected.map(r => `${r.action.action_type}: ${r.reason}`));
+    console.error(
+      `[chat] ${rejected.length} actions rejected:`,
+      rejected.map((r) => `${r.action.action_type}: ${r.reason}`),
+    );
   }
-  console.log(`[chat] Parsed: ${parseResult.actions.length} actions, Valid: ${valid.length}, Rejected: ${rejected.length}, Type: ${parseResult.responseType}`);
 
-  const preview = buildPreviewFromActions(valid, state);
+  // --- Apply ---
+  let applied = 0;
+  const workflowIdsCreated: string[] = [];
+
+  if (valid.length > 0) {
+    const applyResult = await pipelineApply(db, projectId, valid);
+    if (applyResult.failedAt !== undefined) {
+      console.error("[chat] pipelineApply failed at index", applyResult.failedAt, applyResult.rejectionReason);
+    }
+    applied = applyResult.applied;
+
+    // Collect created workflow IDs for scaffold → populate flow
+    const finalState = await fetchMapSnapshot(db, projectId);
+    if (finalState) {
+      for (const wf of finalState.workflows.values()) {
+        if (!state.workflows.has(wf.id)) {
+          workflowIdsCreated.push(wf.id);
+        }
+      }
+    }
+  }
 
   const response: ChatResponse = {
     status: valid.length > 0 || rejected.length === 0 ? "success" : "error",
     responseType: parseResult.responseType,
     message: parseResult.message,
-    actions: valid,
-    preview,
+    applied,
+    workflow_ids_created: workflowIdsCreated,
     errors:
       rejected.length > 0
-        ? rejected.map((r) => ({ action: r.action, reason: r.reason }))
+        ? rejected.map((r) => ({ action_type: r.action.action_type, reason: r.reason }))
         : undefined,
-    metadata: {
-      tokens: llmResponse.usage.inputTokens + llmResponse.usage.outputTokens,
-      model: llmResponse.model,
-    },
   };
 
   return json(response);

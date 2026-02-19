@@ -139,6 +139,8 @@ export const chatRequestSchema = z.object({
     role: z.enum(["user", "agent"]),
     content: z.string(),
   })).optional().default([]),
+  /** Test-only: mock LLM response. Only used when PLANNING_MOCK_ALLOWED=1 */
+  mock_response: z.string().optional(),
 });
 
 // Chat stream request (scaffold or populate mode)

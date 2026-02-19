@@ -136,8 +136,8 @@ After project-wide finalization, each card needs a "last mile" preparation step 
 
 User clicks "Finalize" on an individual card in the UI. Only available when the card has:
 - At least one requirement (draft or approved).
-- At least one planned file.
 - Project-wide finalization has completed (project-level context docs exist).
+- Planned files are optional — agent infers from requirements when absent.
 
 ### API Endpoint
 
@@ -164,7 +164,7 @@ POST /api/projects/[projectId]/cards/[cardId]/finalize
 ALTER TABLE cards ADD COLUMN finalized_at timestamptz;
 ```
 
-A card with `finalized_at IS NOT NULL` is build-ready. Build trigger validation checks this in addition to approved planned files.
+A card with `finalized_at IS NOT NULL` is build-ready. Build trigger validation checks this; planned files are optional (agent uses default allowed_paths when none specified).
 
 ## Decision-Making Principles
 
@@ -236,7 +236,7 @@ A card with `finalized_at IS NOT NULL` is build-ready. Build trigger validation 
 ### Step 5: Card Finalize Endpoint
 - `POST /api/projects/[projectId]/cards/[cardId]/finalize` — assemble context package.
 - `POST /api/projects/[projectId]/cards/[cardId]/finalize/confirm` — set finalized_at.
-- Validation: require requirements + planned files + project-level docs.
+- Validation: require requirements; planned files optional.
 
 ### Step 6: Frontend
 - "Finalize Project" button (triggers phase 4).
@@ -253,7 +253,7 @@ A card with `finalized_at IS NOT NULL` is build-ready. Build trigger validation 
 - Project-wide finalization produces 5 context documents covering architecture, data contracts, domains, workflows, and design system.
 - Each card with requirements gets an e2e test file with one test per requirement.
 - Users can review and edit all finalization outputs before confirming.
-- Confirmed cards are build-ready (finalized_at set, planned files approved).
+- Confirmed cards are build-ready (finalized_at set; planned files optional).
 - Build trigger rejects cards without finalized_at.
 
 ## AI Development Timeline

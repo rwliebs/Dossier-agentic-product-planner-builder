@@ -319,18 +319,25 @@ describe("Dispatch assignment", () => {
     expect(result.error).toContain("not queued");
   });
 
-  it("returns error when card has no approved planned files", async () => {
+  it("dispatches successfully when no approved planned files (uses assignment allowed_paths)", async () => {
     vi.mocked(queries.getCardPlannedFiles).mockResolvedValue([
       { id: "pf-1", status: "proposed" },
     ] as never);
+    vi.mocked(orchestrationQueries.getCardAssignment).mockResolvedValue({
+      ...mockAssignment,
+      allowed_paths: ["src", "app", "lib"],
+    } as never);
 
-    const result = await dispatchAssignment(createMockDbAdapter(), {
+    const mockDb = createMockDbAdapter({
+      insertAgentExecution: vi.fn().mockResolvedValue({ id: "agent-exec-no-pf" }),
+    });
+    const result = await dispatchAssignment(mockDb, {
       assignment_id: assignmentId,
       actor: "user",
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("no approved planned files");
+    expect(result.success).toBe(true);
+    expect(result.executionId).toBeDefined();
   });
 
   it("dispatches successfully with mock client", async () => {

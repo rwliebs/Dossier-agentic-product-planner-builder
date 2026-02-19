@@ -99,24 +99,7 @@ export async function triggerBuild(
     };
   }
 
-  const cardsWithApprovedPlannedFiles: string[] = [];
-  for (const cardId of cardIds) {
-    const plannedFiles = await getCardPlannedFiles(db, cardId);
-    const approved = plannedFiles.filter(
-      (f) => (f as { status?: string }).status === "approved"
-    );
-    if (approved.length > 0) cardsWithApprovedPlannedFiles.push(cardId);
-  }
-  if (cardsWithApprovedPlannedFiles.length === 0) {
-    return {
-      success: false,
-      error: "No buildable cards",
-      validationErrors: [
-        "Build requires at least one card with approved planned files. Approve planned files for each card before triggering build.",
-      ],
-    };
-  }
-
+  // Code file creation (planned files) is optional — all finalized cards are buildable
   const runResult = await createRun(db, {
     project_id: input.project_id,
     scope: input.scope,
@@ -128,6 +111,8 @@ export async function triggerBuild(
     base_branch: baseBranch,
     run_input_snapshot: {
       card_ids: cardIds,
+      card_id: input.card_id ?? null,
+      workflow_id: input.workflow_id ?? null,
       triggered_at: new Date().toISOString(),
     },
   });
@@ -152,18 +137,21 @@ export async function triggerBuild(
 
   const assignmentIds: string[] = [];
 
+  const DEFAULT_ALLOWED_PATHS = ["src", "app", "lib", "components"];
+
   for (const cardId of cardIds) {
     const plannedFiles = await getCardPlannedFiles(db, cardId);
     const approved = plannedFiles.filter(
       (f) => (f as { status?: string }).status === "approved"
     );
-    if (approved.length === 0) continue;
+    const allowedPaths =
+      approved.length > 0
+        ? approved.map(
+            (f) => (f as { logical_file_name: string }).logical_file_name
+          )
+        : DEFAULT_ALLOWED_PATHS;
 
     await db.updateCard(cardId, { build_state: "queued" });
-
-    const allowedPaths = approved.map(
-      (f) => (f as { logical_file_name: string }).logical_file_name
-    );
     const runIdShort = runId.slice(0, 8);
     const cardIdShort = cardId.slice(0, 8);
     const featureBranch = `feat/run-${runIdShort}-${cardIdShort}`;

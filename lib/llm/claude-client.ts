@@ -58,6 +58,8 @@ export async function claudePlanningRequest(
     model?: string;
     maxTokens?: number;
     timeoutMs?: number;
+    systemPromptOverride?: string;
+    userMessageOverride?: string;
   },
 ): Promise<ClaudePlanningResponse> {
   const apiKey = options?.apiKey ?? process.env.ANTHROPIC_API_KEY;
@@ -73,21 +75,23 @@ export async function claudePlanningRequest(
 
   const client = new Anthropic({ apiKey });
 
-  const systemPrompt = buildPlanningSystemPrompt();
+  const systemPrompt = options?.systemPromptOverride ?? buildPlanningSystemPrompt();
   const history = input.conversationHistory ?? [];
 
-  const messages = history.length > 0
-    ? buildConversationMessages(
-        input.userRequest,
-        input.mapSnapshot,
-        input.linkedArtifacts ?? [],
-        history,
-      )
-    : [{ role: "user" as const, content: buildPlanningUserMessage(
-        input.userRequest,
-        input.mapSnapshot,
-        input.linkedArtifacts ?? [],
-      )}];
+  const messages = options?.userMessageOverride
+    ? [{ role: "user" as const, content: options.userMessageOverride }]
+    : history.length > 0
+      ? buildConversationMessages(
+          input.userRequest,
+          input.mapSnapshot,
+          input.linkedArtifacts ?? [],
+          history,
+        )
+      : [{ role: "user" as const, content: buildPlanningUserMessage(
+          input.userRequest,
+          input.mapSnapshot,
+          input.linkedArtifacts ?? [],
+        )}];
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);

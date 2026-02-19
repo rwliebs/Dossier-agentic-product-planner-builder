@@ -80,12 +80,7 @@ export async function dispatchAssignment(
   const approvedPlannedFiles = plannedFiles.filter(
     (f) => (f as { status?: string }).status === "approved"
   );
-  if (approvedPlannedFiles.length === 0) {
-    return {
-      success: false,
-      error: "Card has no approved planned files",
-    };
-  }
+  // Planned files are optional — use assignment's allowed_paths when none approved
 
   const requirements = await getCardRequirements(db, cardId);
   const acceptanceCriteria = requirements.map(

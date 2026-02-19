@@ -82,11 +82,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       return validationError("Card must have at least one requirement before finalization");
     }
 
-    const plannedFiles = await getCardPlannedFiles(db, cardId);
-    if (plannedFiles.length === 0) {
-      return validationError("Card must have at least one planned file before finalization");
-    }
-
+    // Planned files (code file creation) are optional — agent can infer from requirements
     const now = new Date().toISOString();
     await db.updateCard(cardId, { finalized_at: now });
 

@@ -350,108 +350,50 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
     }
 
     try {
-      const res = await fetch(`/api/projects/${projectId}/chat/stream`, {
+      const res = await fetch(`/api/projects/${projectId}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, mode: 'scaffold' }),
+        body: JSON.stringify({ message: text }),
       });
 
+      const data = await res.json() as ChatPreviewResponse & {
+        applied?: number;
+        workflow_ids_created?: string[];
+      };
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        addMessage('agent', (err as { error?: string }).error ?? 'Planning service error. Try again.');
-        setIsThinking(false);
+        addMessage('agent', data.message ?? 'Planning service error. Try again.');
         return;
       }
 
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) {
-        addMessage('agent', 'Stream not available. Try again.');
-        setIsThinking(false);
-        return;
+      if (data.responseType === 'clarification') {
+        addMessage('agent', data.message || 'Could you tell me more about what you want to build?');
+      } else if (data.workflow_ids_created?.length) {
+        addMessage('agent', data.message || `Created ${data.workflow_ids_created.length} workflow(s).`);
+        setPopulateConfirmWorkflowIds(data.workflow_ids_created);
+        setPopulateOriginalMessage(text);
+        setPendingPreview({
+          added: { workflows: data.workflow_ids_created, activities: [], cards: [] },
+          modified: { cards: [], artifacts: [] },
+          reordered: [],
+          summary: `Populate ${data.workflow_ids_created.length} workflow(s) with activities and cards?`,
+        });
+        setPendingActions([]);
+        setPendingErrors([]);
+      } else if ((data.applied ?? 0) > 0) {
+        addMessage('agent', data.message || `Applied ${data.applied} change(s).`);
+      } else if (data.message) {
+        addMessage('agent', data.message);
+      } else {
+        addMessage('agent', "I wasn't able to generate a structure yet. Could you tell me more?");
       }
 
-      let buffer = '';
-      let agentMessage = '';
-      let actionCount = 0;
-      let lastPopulateConfirm: string[] | null = null;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const blocks = buffer.split(/\n\n+/);
-        buffer = blocks.pop() ?? '';
-
-        for (const block of blocks) {
-          let eventType = '';
-          let dataStr = '';
-          for (const line of block.split('\n')) {
-            if (line.startsWith('event: ')) eventType = line.slice(7).trim();
-            if (line.startsWith('data: ')) dataStr = line.slice(6);
-          }
-          if (!eventType || !dataStr) continue;
-
-          try {
-            const data = JSON.parse(dataStr);
-            if (eventType === 'message' && data.message) {
-              agentMessage = data.message;
-            }
-            if (eventType === 'action') {
-              actionCount++;
-              throttledPlanningApplied();
-            }
-            if (eventType === 'error' && data.reason) {
-              addMessage('agent', `Error: ${data.reason}`);
-            }
-            if (eventType === 'phase_complete') {
-              if (data.responseType === 'clarification') {
-                addMessage('agent', agentMessage || 'Could you tell me more about what you want to build?');
-              } else if (data.responseType === 'scaffold_complete') {
-                if (data.workflow_ids?.length) {
-                  addMessage('agent', agentMessage || `Created ${data.workflow_ids.length} workflow(s).`);
-                  lastPopulateConfirm = data.workflow_ids;
-                  setPopulateConfirmWorkflowIds(data.workflow_ids);
-                  setPopulateOriginalMessage(text);
-                  const wfIds = Array.isArray(data.workflow_ids) ? data.workflow_ids : [];
-                  setPendingPreview({
-                    added: { workflows: wfIds, activities: [], cards: [] },
-                    modified: { cards: [], artifacts: [] },
-                    reordered: [],
-                    summary: `Populate ${wfIds.length} workflow(s) with activities and cards?`,
-                  });
-                  setPendingActions([]);
-                  setPendingErrors([]);
-                } else {
-                  addMessage('agent', agentMessage || "I wasn't able to generate a structure yet. Could you tell me more about what you want to build?");
-                }
-              }
-            }
-            if (eventType === 'done') {
-              if (!lastPopulateConfirm && actionCount > 0 && !agentMessage) {
-                addMessage('agent', `Applied ${actionCount} change(s).`);
-              }
-            }
-          } catch {
-            // skip parse errors
-          }
-        }
-      }
-
-      if (agentMessage && !lastPopulateConfirm) {
-        addMessage('agent', agentMessage);
-      } else if (actionCount > 0 && !lastPopulateConfirm) {
-        addMessage('agent', `Applied ${actionCount} change(s).`);
-      }
-      throttledPlanningApplied();
+      onPlanningApplied?.();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Planning service unavailable. Check your connection.';
       addMessage('agent', msg);
-      throttledPlanningApplied();
     } finally {
       setIsThinking(false);
-      onPlanningApplied?.();
     }
   };
 
@@ -673,7 +615,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
               {messages.length === 0 && (
                 <div className="text-center py-4">
                   <Bot className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-[11px] text-muted-foreground">Describe what you want to build</p>
+                  <p className="text-[11px] text-muted-foreground">Describe your idea or request changes</p>
                 </div>
               )}
               {messages.map((msg) => (
@@ -701,7 +643,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
                       <span className="text-[10px] text-muted-foreground ml-1">
                         {isPopulating && populateProgress
                           ? `Populating workflow ${populateProgress.current}/${populateProgress.total}...`
-                          : 'Creating project structure...'}
+                          : 'Thinking...'}
                       </span>
                     </div>
                   </div>
@@ -727,7 +669,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSubmit())}
-                  placeholder="Describe what you want to build..."
+                  placeholder="Describe your idea or ask for changes..."
                   className="flex-1 px-2 py-1.5 text-xs bg-secondary border border-grid-line rounded focus:outline-none focus:ring-1 focus:ring-primary/50"
                   disabled={isThinking || isPopulating}
                 />

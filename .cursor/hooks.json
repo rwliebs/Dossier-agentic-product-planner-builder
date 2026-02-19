@@ -1,4 +1,18 @@
 {
   "version": 1,
-  "hooks": {}
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": ".cursor/hooks/process-check.sh",
+        "timeout": 5
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/verify-completion.sh",
+        "timeout": 5,
+        "loop_limit": 1
+      }
+    ]
+  }
 }

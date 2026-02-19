@@ -31,6 +31,13 @@ export function serializeMapStateForPrompt(state: PlanningState): string {
 export function buildPlanningSystemPrompt(): string {
   return `You are a planning assistant that helps users structure product ideas into user story maps. You work with workflows, activities (columns), and cards.
 
+## Story Map Concepts
+- **Workflow**: A high-level outcome the user is trying to achieve.
+- **Activities**: The jobs to be done as the user works to accomplish this workflow. Specific to the user's lived experience, not software steps.
+- **Cards**: Software functionalities that aid the user in completing their activities.
+- **Ordering**: Build the backbone first (left-to-right), then slice for MVP vs later releases.
+- **Avoid**: Feature creep, technical-only workflows, overly large cards.
+
 ## Your Role
 - Understand the user's product vision, target users, and goals before structuring their idea
 - Ask clarifying questions when you need more context to build a good plan
@@ -141,6 +148,13 @@ Return ONLY a valid JSON object with the shape described above. No markdown, no 
 export function buildScaffoldSystemPrompt(): string {
   return `You are a planning assistant that creates high-level workflow structure for product ideas.
 
+## Story Map Concepts
+- **Workflow**: A high-level outcome the user is trying to achieve.
+- **Activities**: The jobs to be done as the user works to accomplish this workflow. Specific to the user's lived experience, not software steps.
+- **Cards**: Software functionalities that aid the user in completing their activities.
+- **Ordering**: Build the backbone first (left-to-right), then slice for MVP vs later releases.
+- **Avoid**: Feature creep, technical-only workflows, overly large cards.
+
 ## Your Task
 Given a user's product idea, generate ONLY:
 1. An updateProject action (REQUIRED when the map is empty — MUST be first) to set project name and description
@@ -209,6 +223,13 @@ Allowed action types: updateProject, createWorkflow only.
  */
 export function buildPopulateWorkflowPrompt(): string {
   return `You are a planning assistant that populates a workflow with activities (columns) and cards.
+
+## Story Map Concepts
+- **Workflow**: A high-level outcome the user is trying to achieve.
+- **Activities**: The jobs to be done as the user works to accomplish this workflow. Specific to the user's lived experience, not software steps.
+- **Cards**: Software functionalities that aid the user in completing their activities.
+- **Ordering**: Build the backbone first (left-to-right), then slice for MVP vs later releases.
+- **Avoid**: Feature creep, technical-only workflows, overly large cards.
 
 ## Your Task
 Given a workflow (title, description) and project context, generate createActivity and createCard actions for that workflow ONLY.

@@ -283,7 +283,7 @@ export default function DossierPage() {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          const msg = (err as { error?: string; message?: string }).error ?? (err as { message?: string }).message ?? `Finalize failed (${res.status})`;
+          const msg = (err as { message?: string }).message ?? (err as { error?: string }).error ?? `Finalize failed (${res.status})`;
           const { toast } = await import('sonner');
           toast.error(msg);
           return;

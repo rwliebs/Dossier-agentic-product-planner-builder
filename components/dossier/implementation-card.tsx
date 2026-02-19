@@ -262,6 +262,11 @@ export function ImplementationCard({
               {card.build_state === 'running' ? 'Agent building…' : 'Build queued…'}
             </span>
           )}
+          {card.build_state === 'blocked' && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-200 text-amber-900">
+              Blocked — answer questions
+            </span>
+          )}
           {card.build_state === 'completed' && (
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-green-100 text-green-800">
               Built {card.last_built_at ? new Date(card.last_built_at).toLocaleDateString() : ''}
@@ -325,7 +330,7 @@ export function ImplementationCard({
           )}
           <button
             type="button"
-            disabled={buildingCardId === card.id}
+            disabled={buildingCardId === card.id || card.build_state === 'blocked'}
             onClick={(e) => {
               e.stopPropagation();
               const action = status === 'active' ? 'monitor' : status === 'review' ? 'test' : 'build';
@@ -338,10 +343,12 @@ export function ImplementationCard({
             className={`w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold text-white rounded transition-colors ${
               buildingCardId === card.id
                 ? 'bg-amber-500 cursor-not-allowed animate-pulse'
-                : config.button
+                : card.build_state === 'blocked'
+                  ? 'bg-amber-400 cursor-not-allowed opacity-60'
+                  : config.button
             }`}
           >
-            {buildingCardId === card.id ? 'Building…' : getActionButtonText()}
+            {buildingCardId === card.id ? 'Building…' : card.build_state === 'blocked' ? 'Blocked' : getActionButtonText()}
           </button>
         </div>
       </div>

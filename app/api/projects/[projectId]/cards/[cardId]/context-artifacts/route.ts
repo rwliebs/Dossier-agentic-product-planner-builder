@@ -4,7 +4,7 @@ import {
   getCardContextArtifacts,
   getArtifactById,
   verifyCardInProject,
-} from "@/lib/supabase/queries";
+} from "@/lib/db/queries";
 import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
 
 type RouteParams = {

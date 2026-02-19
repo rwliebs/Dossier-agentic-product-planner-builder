@@ -17,14 +17,14 @@ import {
   getCardAssignment,
   getOrchestrationRun,
   updateCardAssignmentStatus,
-} from "@/lib/supabase/queries/orchestration";
+} from "@/lib/db/queries/orchestration";
 import {
   getArtifactById,
   getCardById,
   getCardContextArtifacts,
   getCardPlannedFiles,
   getCardRequirements,
-} from "@/lib/supabase/queries";
+} from "@/lib/db/queries";
 import { getMemoryStore } from "@/lib/memory";
 
 export interface DispatchAssignmentInput {

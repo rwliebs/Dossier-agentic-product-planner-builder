@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
 import { createApprovalRequest } from "@/lib/orchestration";
-import { getApprovalRequestsByRun } from "@/lib/supabase/queries/orchestration";
+import { getApprovalRequestsByRun } from "@/lib/db/queries/orchestration";
 import { json, validationError, notFoundError, internalError } from "@/lib/api/response-helpers";
 import { createApprovalRequestSchema } from "@/lib/validation/request-schema";
 

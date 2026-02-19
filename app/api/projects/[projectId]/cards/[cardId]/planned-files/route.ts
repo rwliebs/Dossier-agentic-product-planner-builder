@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import {
   getCardPlannedFiles,
   verifyCardInProject,
-} from "@/lib/supabase/queries";
+} from "@/lib/db/queries";
 import {
   json,
   validationError,

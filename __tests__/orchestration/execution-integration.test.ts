@@ -11,8 +11,8 @@ import { createMockAgenticFlowClient } from "@/lib/orchestration/agentic-flow-cl
 import { logEvent } from "@/lib/orchestration/event-logger";
 import { processWebhook } from "@/lib/orchestration/process-webhook";
 import { dispatchAssignment } from "@/lib/orchestration/dispatch";
-import * as orchestrationQueries from "@/lib/supabase/queries/orchestration";
-import * as queries from "@/lib/supabase/queries";
+import * as orchestrationQueries from "@/lib/db/queries/orchestration";
+import * as queries from "@/lib/db/queries";
 import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
 
 const projectId = "11111111-1111-1111-1111-111111111111";
@@ -20,7 +20,7 @@ const runId = "22222222-2222-2222-2222-222222222222";
 const assignmentId = "33333333-3333-3333-3333-333333333333";
 const cardId = "44444444-4444-4444-4444-444444444444";
 
-vi.mock("@/lib/supabase/queries/orchestration", () => ({
+vi.mock("@/lib/db/queries/orchestration", () => ({
   getCardAssignment: vi.fn(),
   getOrchestrationRun: vi.fn(),
   updateCardAssignmentStatus: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock("@/lib/supabase/queries/orchestration", () => ({
   getRunChecksByRun: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("@/lib/supabase/queries", () => ({
+vi.mock("@/lib/db/queries", () => ({
   getCardById: vi.fn(),
   getCardPlannedFiles: vi.fn(),
   getCardRequirements: vi.fn(),
@@ -338,7 +338,7 @@ describe("Dispatch assignment", () => {
 
     expect(result.success).toBe(true);
     expect(result.executionId).toBeDefined();
-  });
+  }, 30_000);
 
   it("dispatches successfully with mock client", async () => {
     const mockDb = createMockDbAdapter({
@@ -353,5 +353,5 @@ describe("Dispatch assignment", () => {
     expect(result.success).toBe(true);
     expect(result.executionId).toBeDefined();
     expect(result.agentExecutionId).toBe("agent-exec-123");
-  });
+  }, 30_000);
 });

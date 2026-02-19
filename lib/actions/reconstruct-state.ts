@@ -9,8 +9,8 @@ import type { PlanningAction } from "@/lib/schemas/slice-a";
 import type { PlanningState } from "@/lib/schemas/planning-state";
 import { createEmptyPlanningState } from "@/lib/schemas/planning-state";
 import { applyAction } from "./apply-action";
-import { getProject, getPlanningActionsByProject } from "@/lib/supabase/queries";
-import { fetchMapSnapshot } from "@/lib/supabase/map-snapshot";
+import { getProject, getPlanningActionsByProject } from "@/lib/db/queries";
+import { fetchMapSnapshot } from "@/lib/db/map-snapshot";
 
 export interface ReconstructResult {
   success: boolean;

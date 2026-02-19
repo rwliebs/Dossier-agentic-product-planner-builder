@@ -18,6 +18,7 @@ export interface ActivityColumnProps {
   availableFilePaths?: string[];
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
+  buildingCardId?: string | null;
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
   cardFinalizeProgress?: string;
@@ -43,6 +44,7 @@ export function ActivityColumn({
   availableFilePaths = [],
   onApprovePlannedFile,
   onBuildCard,
+  buildingCardId,
   onFinalizeCard,
   finalizingCardId,
   cardFinalizeProgress,
@@ -82,6 +84,7 @@ export function ActivityColumn({
               availableFilePaths={availableFilePaths}
               onApprovePlannedFile={onApprovePlannedFile}
               onBuildCard={onBuildCard}
+              buildingCardId={buildingCardId}
               onFinalizeCard={onFinalizeCard}
               finalizingCardId={finalizingCardId}
               cardFinalizeProgress={cardFinalizeProgress}

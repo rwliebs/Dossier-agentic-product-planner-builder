@@ -5,8 +5,8 @@ import {
   getPlanningActionsByProject,
   getPlanningActionsByIdempotencyKey,
   incrementProjectActionSequence,
-} from "@/lib/supabase/queries";
-import { pipelineApply } from "@/lib/supabase/mutations";
+} from "@/lib/db/queries";
+import { pipelineApply } from "@/lib/db/mutations";
 import {
   json,
   validationError,

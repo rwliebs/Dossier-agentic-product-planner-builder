@@ -2,6 +2,9 @@
  * Repo manager: clone, fetch, and branch operations for build execution.
  * Clones user repos to ~/.dossier/repos/<projectId>/ for agentic-flow to work in.
  *
+ * Handles empty (freshly-created) repos by seeding an initial commit so that
+ * downstream git operations (checkout, ls-tree, diff) have a valid base.
+ *
  * @see docs/strategy/worktree-management-flow.md
  */
 
@@ -20,6 +23,44 @@ function getGitHubToken(): string | null {
   return fromConfig ?? null;
 }
 
+function runGitSync(cwd: string, args: string): string {
+  return execSync(`git ${args}`, {
+    cwd,
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
+}
+
+/**
+ * Returns true when the local clone has zero commits (freshly-created remote).
+ */
+function isEmptyRepo(clonePath: string): boolean {
+  try {
+    runGitSync(clonePath, "rev-parse HEAD");
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Seeds an empty repo with a local initial commit so that branch creation,
+ * ls-tree, and diff all work. Does NOT push — the agent pushes when it
+ * creates a PR, and the token may not have write scope yet.
+ */
+function seedEmptyRepo(clonePath: string, baseBranch: string): void {
+  runGitSync(clonePath, `checkout -b ${baseBranch}`);
+  fs.writeFileSync(
+    path.join(clonePath, "README.md"),
+    "# New Project\n\nInitialized by Dossier.\n"
+  );
+  runGitSync(clonePath, "add README.md");
+  runGitSync(
+    clonePath,
+    'commit -m "chore: initialize repository (Dossier)" --author="Dossier <noreply@dossier.dev>"'
+  );
+}
+
 /**
  * Converts html_url (https://github.com/owner/repo) to authenticated clone URL.
  * Appends .git if needed; injects token for private repos.
@@ -31,7 +72,6 @@ export function repoUrlToCloneUrl(repoUrl: string, token?: string | null): strin
   let cloneUrl = trimmed.endsWith(".git") ? trimmed : isFile ? trimmed : `${trimmed}.git`;
 
   if (token && !isFile) {
-    // https://github.com/owner/repo.git -> https://<token>@github.com/owner/repo.git
     cloneUrl = cloneUrl.replace(/^https:\/\//, `https://${token}@`);
   }
 
@@ -48,12 +88,14 @@ export function getClonePath(projectId: string): string {
 
 /**
  * Ensures the repo is cloned locally. If it exists, fetches latest from origin.
+ * If the repo is empty (no commits), seeds it with an initial commit.
  * Returns the clone path on success.
  */
 export function ensureClone(
   projectId: string,
   repoUrl: string,
-  token?: string | null
+  token?: string | null,
+  baseBranch = "main"
 ): { success: boolean; clonePath?: string; error?: string } {
   const clonePath = getClonePath(projectId);
   const effectiveToken = token ?? getGitHubToken();
@@ -69,18 +111,19 @@ export function ensureClone(
     const gitDir = path.join(clonePath, ".git");
 
     if (fs.existsSync(gitDir)) {
-      // Already cloned — fetch latest
       execSync("git fetch origin", {
         cwd: clonePath,
         stdio: ["pipe", "pipe", "pipe"],
       });
-      return { success: true, clonePath };
+    } else {
+      execSync(`git clone "${cloneUrl}" "${clonePath}"`, {
+        stdio: ["pipe", "pipe", "pipe"],
+      });
     }
 
-    // Clone
-    execSync(`git clone --depth 1 "${cloneUrl}" "${clonePath}"`, {
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    if (isEmptyRepo(clonePath)) {
+      seedEmptyRepo(clonePath, baseBranch);
+    }
 
     return { success: true, clonePath };
   } catch (err) {
@@ -94,7 +137,8 @@ export function ensureClone(
 
 /**
  * Creates a feature branch from the base branch.
- * Assumes origin/<baseBranch> exists (from fetch).
+ * Tries origin/<baseBranch> first; falls back to local <baseBranch>
+ * (covers repos seeded locally that haven't been fetched yet).
  */
 export function createFeatureBranch(
   clonePath: string,
@@ -102,7 +146,12 @@ export function createFeatureBranch(
   baseBranch: string
 ): { success: boolean; error?: string } {
   try {
-    const baseRef = `origin/${baseBranch}`;
+    let baseRef = `origin/${baseBranch}`;
+    try {
+      runGitSync(clonePath, `rev-parse --verify ${baseRef}`);
+    } catch {
+      baseRef = baseBranch;
+    }
     execSync(`git checkout -b "${branchName}" "${baseRef}"`, {
       cwd: clonePath,
       stdio: ["pipe", "pipe", "pipe"],

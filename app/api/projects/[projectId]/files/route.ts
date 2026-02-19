@@ -3,11 +3,11 @@ import { getDb } from "@/lib/db";
 import {
   getProject,
   getPlannedFilesByProject,
-} from "@/lib/supabase/queries";
+} from "@/lib/db/queries";
 import {
   listOrchestrationRunsByProject,
   getCardAssignmentsByRun,
-} from "@/lib/supabase/queries/orchestration";
+} from "@/lib/db/queries/orchestration";
 import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
 import {
   getRepoFileTreeWithStatus,
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       if (!run) {
         return json(
           { error: "No build with repository available. Trigger a build first." },
-          { status: 404 }
+          404
         );
       }
       const runRow = run as {
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       if (!assignment) {
         return json(
           { error: "No assignment with worktree. Trigger a build first." },
-          { status: 404 }
+          404
         );
       }
 
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         if (!contentResult.success) {
           return json(
             { error: contentResult.error ?? "Failed to read file" },
-            { status: 404 }
+            404
           );
         }
         return new Response(contentResult.content ?? "", {
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         if (!diffResult.success) {
           return json(
             { error: diffResult.error ?? "Failed to get diff" },
-            { status: 404 }
+            404
           );
         }
         return new Response(diffResult.diff ?? "", {
@@ -143,7 +143,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       if (!result.success) {
         return json(
           { error: result.error ?? "Failed to read repository files" },
-          { status: 500 }
+          500
         );
       }
       return json(result.tree ?? []);

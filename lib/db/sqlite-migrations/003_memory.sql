@@ -1,5 +1,5 @@
 -- Memory Plane (Section 4)
--- Ported from supabase/migrations/20250218000000_slice_memory.sql
+-- Memory plane schema (originally from Postgres migration)
 -- Enums -> TEXT+CHECK, gen_random_uuid() -> app-generated, timestamptz -> TEXT
 -- UUID[] -> JSON TEXT for result_memory_ids
 

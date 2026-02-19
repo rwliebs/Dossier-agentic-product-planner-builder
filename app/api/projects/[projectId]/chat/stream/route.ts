@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
 import type { DbAdapter } from "@/lib/db/adapter";
-import { fetchMapSnapshot, getLinkedArtifactsForPrompt } from "@/lib/supabase/map-snapshot";
+import { fetchMapSnapshot, getLinkedArtifactsForPrompt } from "@/lib/db/map-snapshot";
 import type { PlanningState } from "@/lib/schemas/planning-state";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
 import {

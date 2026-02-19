@@ -31,7 +31,7 @@ async function ping() {
     if (parsedHost) console.error("Host used:", parsedHost);
     if (err.code === "ENOTFOUND" || err.message.includes("ENOTFOUND")) {
       console.error(
-        "Fix: Supabase Dashboard → Project Settings → Database. Use the 'Session pooler' connection string (URI, Node.js) for DATABASE_URL."
+        "Fix: Ensure DATABASE_URL points to a valid Postgres instance. Use the connection string from your provider's dashboard."
       );
     }
     await sql.end().catch(() => {});

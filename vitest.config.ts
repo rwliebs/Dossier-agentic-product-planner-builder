@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import { defineConfig } from "vitest/config";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-// Load .env.local before any test file runs (so DB tests see Supabase env vars)
+// Load .env.local before any test file runs (so DB tests see env vars)
 config({ path: ".env.local" });
 
 export default defineConfig({

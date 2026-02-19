@@ -59,8 +59,8 @@ PlanningAction[] → validateAction() → [errors] | []
 | `lib/actions/apply-action.ts` | Apply single action; delegate to persist-planning-state |
 | `lib/actions/preview-action.ts` | Dry-run apply; return proposed state diff |
 | `lib/actions/reconstruct-state.ts` | Build PlanningState from action history |
-| `lib/supabase/persist-planning-state.ts` | DB writes per action type |
-| `lib/supabase/mutations.ts` | applyAction entry point |
+| `lib/db/persist-planning-state.ts` | DB writes per action type |
+| `lib/db/mutations.ts` | applyAction entry point |
 
 ### Idempotency
 - `planning_action.idempotency_key` unique per (project_id, key)

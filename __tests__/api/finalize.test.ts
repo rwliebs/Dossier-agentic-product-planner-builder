@@ -39,7 +39,7 @@ vi.mock("@/lib/feature-flags", () => ({
   PLANNING_LLM: true,
 }));
 
-vi.mock("@/lib/supabase/map-snapshot", () => ({
+vi.mock("@/lib/db/map-snapshot", () => ({
   fetchMapSnapshot: vi.fn().mockResolvedValue({
     project: {
       id: projectId,

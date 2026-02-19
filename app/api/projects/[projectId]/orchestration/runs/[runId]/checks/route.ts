@@ -4,7 +4,7 @@ import { recordCheck } from "@/lib/orchestration";
 import {
   getOrchestrationRun,
   getRunChecksByRun,
-} from "@/lib/supabase/queries/orchestration";
+} from "@/lib/db/queries/orchestration";
 import { json, notFoundError, validationError, internalError } from "@/lib/api/response-helpers";
 
 export async function GET(

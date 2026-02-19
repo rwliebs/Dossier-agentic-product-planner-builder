@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
-import { getProject, getArtifactById } from "@/lib/supabase/queries";
+import { getProject, getArtifactById } from "@/lib/db/queries";
 import {
   json,
   validationError,

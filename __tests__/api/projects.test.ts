@@ -1,16 +1,13 @@
 /**
  * API contract tests for projects endpoints.
- * Requires dev server running (pnpm dev) and Supabase configured.
+ * Requires dev server running (pnpm dev) and DB configured (SQLite or Postgres).
  * Skips when server returns non-2xx or non-JSON (server unavailable).
  */
 
 const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 
 function canRunIntegrationTests(): boolean {
-  return !!(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  return true; // Run when server is up; DB (SQLite/Postgres) required
 }
 
 /** Skip when we cannot get a proper API response (connection error or non-JSON). */

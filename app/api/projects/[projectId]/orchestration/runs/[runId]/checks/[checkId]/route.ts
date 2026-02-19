@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
-import { getRunCheck } from "@/lib/supabase/queries/orchestration";
+import { getRunCheck } from "@/lib/db/queries/orchestration";
 import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
 
 export async function GET(

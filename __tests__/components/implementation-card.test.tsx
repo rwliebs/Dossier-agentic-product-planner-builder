@@ -4,7 +4,7 @@ import { ImplementationCard } from "@/components/dossier/implementation-card";
 import { ACTION_BUTTONS } from "@/lib/constants/action-buttons";
 import type { MapCard } from "@/lib/types/ui";
 
-const card: MapCard = {
+const baseCard: MapCard = {
   id: "card-1",
   workflow_activity_id: "activity-1",
   title: "Lead intake form",
@@ -14,13 +14,13 @@ const card: MapCard = {
 };
 
 describe("ImplementationCard", () => {
-  it("renders and triggers actions", () => {
+  it("renders and triggers expand", () => {
     const onExpand = vi.fn();
     const onAction = vi.fn();
 
     render(
       <ImplementationCard
-        card={card}
+        card={baseCard}
         isExpanded={false}
         onExpand={onExpand}
         onAction={onAction}
@@ -31,5 +31,116 @@ describe("ImplementationCard", () => {
     expect(screen.getByText("Lead intake form")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: new RegExp(ACTION_BUTTONS.VIEW_DETAILS_EDIT, "i") }));
     expect(onExpand).toHaveBeenCalledWith("card-1");
+  });
+
+  it("Monitor button calls onAction('monitor') for active cards", () => {
+    const onAction = vi.fn();
+
+    render(
+      <ImplementationCard
+        card={{ ...baseCard, status: "active" }}
+        isExpanded={false}
+        onExpand={() => {}}
+        onAction={onAction}
+        onUpdateDescription={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(ACTION_BUTTONS.CARD_ACTION.active, "i") }));
+    expect(onAction).toHaveBeenCalledWith("card-1", "monitor");
+  });
+
+  it("Test button calls onAction('test') for review cards", () => {
+    const onAction = vi.fn();
+
+    render(
+      <ImplementationCard
+        card={{ ...baseCard, status: "review" }}
+        isExpanded={false}
+        onExpand={() => {}}
+        onAction={onAction}
+        onUpdateDescription={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(ACTION_BUTTONS.CARD_ACTION.review, "i") }));
+    expect(onAction).toHaveBeenCalledWith("card-1", "test");
+  });
+
+  it("Build button calls onBuildCard (not onAction) for finalized todo cards", () => {
+    const onAction = vi.fn();
+    const onBuildCard = vi.fn();
+    const finalizedCard: MapCard = {
+      ...baseCard,
+      status: "todo",
+      finalized_at: "2026-02-18T00:00:00Z",
+    };
+
+    render(
+      <ImplementationCard
+        card={finalizedCard}
+        isExpanded={false}
+        onExpand={() => {}}
+        onAction={onAction}
+        onBuildCard={onBuildCard}
+        onUpdateDescription={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(ACTION_BUTTONS.CARD_ACTION.production, "i") }));
+    expect(onBuildCard).toHaveBeenCalledWith("card-1");
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it("Build button falls through to onAction when card is not finalized", () => {
+    const onAction = vi.fn();
+    const onBuildCard = vi.fn();
+    const unfinalizedCard: MapCard = {
+      ...baseCard,
+      status: "todo",
+      finalized_at: null,
+    };
+
+    render(
+      <ImplementationCard
+        card={unfinalizedCard}
+        isExpanded={false}
+        onExpand={() => {}}
+        onAction={onAction}
+        onBuildCard={onBuildCard}
+        onUpdateDescription={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(ACTION_BUTTONS.CARD_ACTION.production, "i") }));
+    expect(onAction).toHaveBeenCalledWith("card-1", "build");
+    expect(onBuildCard).not.toHaveBeenCalled();
+  });
+
+  it("expanded Code Files section has no Build button", () => {
+    const finalizedCard: MapCard = {
+      ...baseCard,
+      status: "todo",
+      finalized_at: "2026-02-18T00:00:00Z",
+    };
+
+    render(
+      <ImplementationCard
+        card={finalizedCard}
+        isExpanded={true}
+        onExpand={() => {}}
+        onAction={() => {}}
+        onBuildCard={() => {}}
+        onUpdateDescription={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Code Files to Create/Edit")).toBeInTheDocument();
+    const codeFilesSection = screen.getByText("Code Files to Create/Edit").closest("div")!;
+    const buttonsInSection = codeFilesSection.querySelectorAll("button");
+    const buildButtons = Array.from(buttonsInSection).filter(
+      (btn) => btn.textContent?.trim().toLowerCase() === "build"
+    );
+    expect(buildButtons).toHaveLength(0);
   });
 });

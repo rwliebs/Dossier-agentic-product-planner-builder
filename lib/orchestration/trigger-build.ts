@@ -14,8 +14,8 @@ import {
   getCardIdsByWorkflow,
   getCardPlannedFiles,
   getProject,
-} from "@/lib/supabase/queries";
-import { listOrchestrationRunsByProject } from "@/lib/supabase/queries/orchestration";
+} from "@/lib/db/queries";
+import { listOrchestrationRunsByProject } from "@/lib/db/queries/orchestration";
 
 export interface TriggerBuildInput {
   project_id: string;
@@ -43,11 +43,28 @@ export async function triggerBuild(
   input: TriggerBuildInput
 ): Promise<TriggerBuildResult> {
   // O10.6: Single-build lock — strategy-mandated safety
+  // Auto-expire runs stuck in "running" for >30 min (crash/disconnect recovery).
+  const STALE_RUN_MS = 30 * 60 * 1000;
   const runningRuns = await listOrchestrationRunsByProject(db, input.project_id, {
+    status: "running",
+    limit: 5,
+  });
+  for (const run of runningRuns) {
+    const startedAt = (run as { started_at?: string }).started_at;
+    const createdAt = (run as { created_at?: string }).created_at;
+    const ts = startedAt ?? createdAt;
+    if (ts && Date.now() - new Date(ts).getTime() > STALE_RUN_MS) {
+      await db.updateOrchestrationRun((run as { id: string }).id, {
+        status: "failed",
+        ended_at: new Date().toISOString(),
+      });
+    }
+  }
+  const stillRunning = await listOrchestrationRunsByProject(db, input.project_id, {
     status: "running",
     limit: 1,
   });
-  if (runningRuns.length > 0) {
+  if (stillRunning.length > 0) {
     return {
       success: false,
       error: "Build in progress",
@@ -112,7 +129,7 @@ export async function triggerBuild(
   // Clone repo for single-card builds (MVP); multi-card requires worktrees (deferred)
   let clonePath: string | null = null;
   if (cardIds.length === 1) {
-    const cloneResult = ensureClone(input.project_id, repoUrl);
+    const cloneResult = ensureClone(input.project_id, repoUrl, null, baseBranch);
     if (!cloneResult.success) {
       return {
         success: false,

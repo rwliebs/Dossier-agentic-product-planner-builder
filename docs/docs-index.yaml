@@ -116,13 +116,15 @@ docs_index:
 
     - id: doc.testing
       path: testing-reference.md
-      tokens_estimate: 800
+      tokens_estimate: 900
       tags: [testing, vitest, quality]
       anchors:
         - id: commands
           summary: "npm run test, test:watch, test:coverage"
+        - id: ruvector-integration
+          summary: "Temp dir isolation, 30s timeout, resetRuvectorForTesting"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-02-19"
 
     - id: doc.development
       path: development-reference.md
@@ -156,12 +158,14 @@ docs_index:
 
     - id: doc.memory
       path: domains/memory-reference.md
-      tokens_estimate: 600
+      tokens_estimate: 750
       tags: [memory, ruvector, embeddings]
       anchors:
         - id: contract
           summary: "RuVector local WASM; card-scoped approved first; never rejected"
         - id: flow
           summary: "ingestion → store; retrieval → card/project; harvest post-build"
+        - id: embedding-workaround
+          summary: "CJS copy workaround for ruvector-onnx-embeddings-wasm ESM bug"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-02-19"

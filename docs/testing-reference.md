@@ -1,7 +1,7 @@
 ---
 document_id: doc.testing
-last_verified: 2026-02-18
-tokens_estimate: 800
+last_verified: 2026-02-19
+tokens_estimate: 900
 tags:
   - testing
   - vitest
@@ -80,6 +80,13 @@ __tests__/
 ### Component Tests
 - `@testing-library/react`, `@testing-library/user-event`
 - `setup.ts` imports `@testing-library/jest-dom/vitest`
+
+### RuVector Integration Tests
+- Gate with `describe.skipIf(!ruvectorAvailable || !sqliteAvailable)`
+- Each test block sets `DOSSIER_DATA_DIR` to a unique temp dir (`fs.mkdtempSync`) to prevent parallel file contention on `vectors.db`
+- Clean up: `delete process.env.DOSSIER_DATA_DIR` in `afterEach`
+- Timeout: 30s per test (model download from HuggingFace competes for bandwidth in parallel runs)
+- Reset: call `resetRuvectorForTesting()` in `beforeEach` to clear the client singleton
 
 ### Coverage
 - Provider: v8

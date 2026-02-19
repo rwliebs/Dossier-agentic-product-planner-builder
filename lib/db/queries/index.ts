@@ -1,6 +1,5 @@
 /**
- * Supabase query helpers - re-exports for Step 4 API Layer.
- * Implementations are stubs until Step 4.
+ * Query helpers - re-exports for API Layer.
  */
 export * from "./projects";
 export * from "./workflows";

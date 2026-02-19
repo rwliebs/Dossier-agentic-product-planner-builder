@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
-import { fetchMapSnapshot, getLinkedArtifactsForPrompt } from "@/lib/supabase/map-snapshot";
+import { fetchMapSnapshot, getLinkedArtifactsForPrompt } from "@/lib/db/map-snapshot";
 import { claudePlanningRequest } from "@/lib/llm/claude-client";
 import { parsePlanningResponse } from "@/lib/llm/parse-planning-response";
 import { validatePlanningOutput } from "@/lib/llm/validate-planning-output";
-import { pipelineApply } from "@/lib/supabase/mutations";
+import { pipelineApply } from "@/lib/db/mutations";
 import {
   buildPlanningSystemPrompt,
   buildPlanningUserMessage,

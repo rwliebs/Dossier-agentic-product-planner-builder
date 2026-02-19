@@ -1,6 +1,6 @@
 /**
  * Orchestration CRUD (slice-c).
- * Uses DbAdapter - no Supabase dependency.
+ * Uses DbAdapter.
  */
 
 import type { DbAdapter } from "@/lib/db/adapter";

@@ -1,7 +1,7 @@
 ---
 document_id: doc.memory
-last_verified: 2026-02-18
-tokens_estimate: 600
+last_verified: 2026-02-19
+tokens_estimate: 750
 tags:
   - memory
   - ruvector
@@ -13,6 +13,8 @@ anchors:
     summary: "ingestion → store; retrieval → card/project; harvest post-build"
   - id: policy
     summary: "Approved items only for retrieval; rejected excluded"
+  - id: embedding-workaround
+    summary: "CJS copy workaround for ruvector-onnx-embeddings-wasm ESM bug"
 ttl_expires_on: null
 ---
 # Memory Domain Reference
@@ -57,8 +59,8 @@ Harvest: Post-build
 | `lib/memory/retrieval.ts` | retrieveForCard |
 | `lib/memory/harvest.ts` | Post-build learning extraction |
 | `lib/memory/store.ts` | MemoryStore interface; real/mock |
-| `lib/memory/embedding.ts` | Embedding via RuVector |
-| `lib/ruvector/client.ts` | RuVector client |
+| `lib/memory/embedding.ts` | Embedding via ruvector-onnx-embeddings-wasm |
+| `lib/ruvector/client.ts` | RuVector vector DB client (ruvector-core) |
 
 ### Tables
 - memory_unit: id, project_id, card_id, content, embedding_ref, status, source
@@ -69,12 +71,20 @@ Harvest: Post-build
 2. Project-scoped approved memory
 3. Never include rejected items
 
+### Embedding: CJS Workaround
+- `ruvector-onnx-embeddings-wasm` has upstream bug: declares `"type":"module"` but WASM JS glue uses CJS globals (`__dirname`, `require`, `module.exports`)
+- **Fix** (`embedding.ts` → `loadWasmModuleCjs()`): copies `.js` to `.cjs`, loads via `createRequire` so Node treats it as CJS, passes pre-loaded module to `createEmbedder(model, wasmModule)`
+- Singleton uses promise pattern (`_loadPromise`) so concurrent callers share one download
+- Model: `all-MiniLM-L6-v2` (384-dim, ~23MB, downloaded from HuggingFace on first use)
+- FORBIDDEN: Removing the CJS workaround without verifying the upstream package is fixed
+
 ---
 
 ## Verification
-- [ ] Retrieval excludes rejected knowledge items
-- [ ] Mock store used when RuVector unavailable
-- [ ] Harvest writes new MemoryUnit with embedding_ref
+- [x] Retrieval excludes rejected knowledge items
+- [x] Mock store used when RuVector unavailable
+- [x] Harvest writes new MemoryUnit with embedding_ref
+- [x] Real semantic embeddings load in Vitest (not hash fallback)
 
 ## Related
 - [memory-coordination-prompt.md](../reference/memory-coordination-prompt.md)

@@ -1,13 +1,24 @@
 /**
  * Agentic-flow execution plane client.
- * Real client uses subprocess adapter (agentic-flow CLI) when available;
- * falls back to mock when agentic-flow is not importable or ANTHROPIC_API_KEY is unset.
+ *
+ * Real client imports agentic-flow's `claudeAgent` function and `getAgent` loader,
+ * which wraps @anthropic-ai/claude-agent-sdk `query()` with:
+ *   - Agent definitions from .claude/agents/ (system prompts, hooks, capabilities)
+ *   - Multi-provider routing (Anthropic, Gemini, OpenRouter, ONNX)
+ *   - Retry/resilience via withRetry()
+ *   - MCP server orchestration (optional)
+ *
+ * IMPORTANT: We do NOT use the agentic-flow CLI (`npx agentic-flow --agent ...`)
+ * because the CLI path uses `claudeAgentDirect` which only calls
+ * `messages.create()` — a plain text completion with NO tool execution.
+ * The programmatic `claudeAgent()` function uses the SDK `query()` which provides
+ * real filesystem tools: Write, Edit, Bash, Read, Glob, Grep.
  *
  * @see REMAINING_WORK_PLAN.md §5 O10
- * @see https://github.com/ruvnet/agentic-flow
+ * @see docs/adr/0008-agentic-flow-execution-plane.md
  */
 
-import { spawn, execSync } from "node:child_process";
+import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -82,95 +93,174 @@ export interface AgenticFlowClient {
 /** Backward-compatible type alias */
 export type ClaudeFlowClient = AgenticFlowClient;
 
-/** Process registry for subprocess adapter: execution_id -> { pid, startedAt } */
-const processRegistry = new Map<
-  string,
-  { pid: number; startedAt: string }
->();
+interface ExecutionEntry {
+  abortController: AbortController;
+  startedAt: string;
+  status: "running" | "completed" | "failed" | "cancelled";
+  endedAt?: string;
+  summary?: string;
+  error?: string;
+}
 
-/** Default agent for build tasks (coder handles implementation) */
+/** Execution registry: execution_id -> entry */
+const executionRegistry = new Map<string, ExecutionEntry>();
+
+/** Default agent name from agentic-flow's agent registry */
 const DEFAULT_AGENT = "coder";
 
 /**
- * Real client — subprocess adapter that spawns agentic-flow CLI.
- * Uses buildTaskFromPayload to translate DispatchPayload into task description.
+ * Resolves the agentic-flow dist root inside node_modules.
+ * The alpha publishes with nested structure: agentic-flow/agentic-flow/dist/
+ */
+function getAgenticFlowDistRoot(): string {
+  return path.join(
+    process.cwd(),
+    "node_modules",
+    "agentic-flow",
+    "agentic-flow",
+    "dist"
+  );
+}
+
+/**
+ * Lazily imports agentic-flow's `claudeAgent` function and `getAgent` loader.
  *
- * CLI: npx agentic-flow --agent coder --task "<taskDescription>"
+ * `claudeAgent` wraps @anthropic-ai/claude-agent-sdk `query()` with:
+ *   - Agent system prompts from .claude/agents/ definitions
+ *   - permissionMode: 'bypassPermissions'
+ *   - allowedTools: Write, Edit, Bash, Read, Glob, Grep, WebFetch, WebSearch, etc.
+ *   - Multi-provider routing and retry logic
+ *
+ * We disable external MCP servers to avoid unnecessary npx spawns.
+ */
+async function importAgenticFlow(): Promise<{
+  claudeAgent: (
+    agent: { name: string; description: string; systemPrompt: string },
+    input: string,
+    onStream?: (chunk: string) => void,
+    modelOverride?: string
+  ) => Promise<{ output: string; agent: string }>;
+  getAgent: (name: string) => {
+    name: string;
+    description: string;
+    systemPrompt: string;
+  } | undefined;
+}> {
+  process.env.ENABLE_CLAUDE_FLOW_MCP = "false";
+  process.env.ENABLE_FLOW_NEXUS_MCP = "false";
+  process.env.ENABLE_AGENTIC_PAYMENTS_MCP = "false";
+  process.env.ENABLE_CLAUDE_FLOW_SDK = "false";
+
+  const distRoot = getAgenticFlowDistRoot();
+  const agentMod = await import(
+    /* webpackIgnore: true */
+    "file://" + path.join(distRoot, "agents", "claudeAgent.js")
+  );
+  const loaderMod = await import(
+    /* webpackIgnore: true */
+    "file://" + path.join(distRoot, "utils", "agentLoader.js")
+  );
+
+  return {
+    claudeAgent: agentMod.claudeAgent,
+    getAgent: loaderMod.getAgent,
+  };
+}
+
+/**
+ * Real client — uses agentic-flow's `claudeAgent()` function (programmatic API).
+ *
+ * This imports agentic-flow's agent loader to get the "coder" agent definition
+ * (system prompt, capabilities, hooks), then calls `claudeAgent()` which internally
+ * uses @anthropic-ai/claude-agent-sdk `query()` with real filesystem tools:
+ *   Write, Edit, Read, Bash, Glob, Grep, WebFetch, WebSearch
+ *
+ * Dispatch fires off the agent asynchronously; status/cancel use the
+ * AbortController and execution registry to track progress.
  */
 export function createRealAgenticFlowClient(): AgenticFlowClient {
   return {
     async dispatch(payload: DispatchPayload): Promise<DispatchResult> {
       const { taskDescription } = buildTaskFromPayload(payload);
       const executionId = randomUUID();
-      const cwd = payload.worktree_path ?? process.cwd();
-      const env = {
-        ...process.env,
-        AGENTIC_FLOW_NON_INTERACTIVE: "true",
-      };
 
-      try {
-        const child = spawn(
-          "npx",
-          [
-            "agentic-flow",
-            "--agent",
-            DEFAULT_AGENT,
-            "--task",
-            taskDescription,
-          ],
-          {
-            cwd,
-            env,
-            stdio: ["ignore", "pipe", "pipe"],
-            detached: true,
-          }
-        );
-
-        child.unref();
-        processRegistry.set(executionId, {
-          pid: child.pid!,
-          startedAt: new Date().toISOString(),
-        });
-
-        child.on("exit", () => {
-          processRegistry.delete(executionId);
-        });
-
-        return {
-          success: true,
-          execution_id: executionId,
-        };
-      } catch (err) {
+      const anthropicKey = process.env.ANTHROPIC_API_KEY ?? "";
+      if (!anthropicKey) {
         return {
           success: false,
           error:
-            err instanceof Error ? err.message : String(err),
+            "ANTHROPIC_API_KEY is not set — agentic-flow requires it for the Anthropic provider",
         };
       }
+
+      let agenticFlow: Awaited<ReturnType<typeof importAgenticFlow>>;
+      try {
+        agenticFlow = await importAgenticFlow();
+      } catch (err) {
+        return {
+          success: false,
+          error: `Failed to import agentic-flow: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        };
+      }
+
+      const agent = agenticFlow.getAgent(DEFAULT_AGENT);
+      if (!agent) {
+        return {
+          success: false,
+          error: `Agent "${DEFAULT_AGENT}" not found in agentic-flow registry`,
+        };
+      }
+
+      const abortController = new AbortController();
+      const entry: ExecutionEntry = {
+        abortController,
+        startedAt: new Date().toISOString(),
+        status: "running",
+      };
+      executionRegistry.set(executionId, entry);
+
+      const runExecution = async () => {
+        try {
+          const result = await agenticFlow.claudeAgent(
+            agent,
+            taskDescription,
+            (chunk: string) => {
+              if (abortController.signal.aborted) return;
+            }
+          );
+
+          entry.status = "completed";
+          entry.endedAt = new Date().toISOString();
+          entry.summary = result.output.substring(0, 500);
+        } catch (err) {
+          if (abortController.signal.aborted) {
+            entry.status = "cancelled";
+          } else {
+            entry.status = "failed";
+            entry.error =
+              err instanceof Error ? err.message : String(err);
+          }
+          entry.endedAt = new Date().toISOString();
+        }
+      };
+
+      runExecution().catch((err) => {
+        entry.status = "failed";
+        entry.endedAt = new Date().toISOString();
+        entry.error = err instanceof Error ? err.message : String(err);
+      });
+
+      return { success: true, execution_id: executionId };
     },
 
     async status(executionId: string): Promise<StatusResult> {
-      const entry = processRegistry.get(executionId);
+      const entry = executionRegistry.get(executionId);
       if (!entry) {
         return {
           success: false,
           error: `Execution not found: ${executionId}`,
-        };
-      }
-
-      try {
-        process.kill(entry.pid, 0);
-      } catch {
-        processRegistry.delete(executionId);
-        return {
-          success: true,
-          status: {
-            execution_id: executionId,
-            status: "completed",
-            started_at: entry.startedAt,
-            ended_at: new Date().toISOString(),
-            summary: "Process exited (status unknown after unref)",
-          },
         };
       }
 
@@ -178,14 +268,17 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
         success: true,
         status: {
           execution_id: executionId,
-          status: "running",
+          status: entry.status,
           started_at: entry.startedAt,
+          ended_at: entry.endedAt,
+          summary: entry.summary,
+          error: entry.error,
         },
       };
     },
 
     async cancel(executionId: string): Promise<CancelResult> {
-      const entry = processRegistry.get(executionId);
+      const entry = executionRegistry.get(executionId);
       if (!entry) {
         return {
           success: false,
@@ -193,22 +286,15 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
         };
       }
 
-      try {
-        process.kill(entry.pid, "SIGTERM");
-        processRegistry.delete(executionId);
-        return { success: true };
-      } catch (err) {
-        processRegistry.delete(executionId);
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : String(err),
-        };
-      }
+      entry.abortController.abort();
+      entry.status = "cancelled";
+      entry.endedAt = new Date().toISOString();
+      return { success: true };
     },
   };
 }
 
-/** Whether the real client is available (agentic-flow importable + ANTHROPIC_API_KEY set) */
+/** Whether the real client is available (SDK importable + ANTHROPIC_API_KEY set) */
 let realClientAvailable: boolean | null = null;
 
 /**
@@ -221,37 +307,78 @@ export function __setRealClientAvailableForTesting(
 }
 
 /**
- * Check if agentic-flow package is installed (avoids bundler pulling in the package).
+ * Check if agentic-flow (alpha) and @anthropic-ai/claude-agent-sdk are installed.
+ * Both are required: agentic-flow for agent definitions/routing, SDK for tool execution.
  */
-function isAgenticFlowInstalled(): boolean {
+function isAgenticFlowInstalled(): { hasPackage: boolean; hasSdk: boolean } {
+  let hasPackage = false;
+  let hasSdk = false;
+
   try {
-    const { existsSync } = require("node:fs");
-    const { join } = require("node:path");
-    const pkgPath = join(process.cwd(), "node_modules", "agentic-flow", "package.json");
-    return existsSync(pkgPath);
+    const distRoot = getAgenticFlowDistRoot();
+    hasPackage =
+      fs.existsSync(path.join(distRoot, "agents", "claudeAgent.js")) &&
+      fs.existsSync(path.join(distRoot, "utils", "agentLoader.js"));
   } catch {
-    return false;
+    /* not found */
   }
+
+  try {
+    require.resolve("@anthropic-ai/claude-agent-sdk");
+    hasSdk = true;
+  } catch {
+    try {
+      hasSdk = fs.existsSync(
+        path.join(
+          process.cwd(),
+          "node_modules",
+          "@anthropic-ai",
+          "claude-agent-sdk",
+          "sdk.mjs"
+        )
+      );
+    } catch {
+      /* not found */
+    }
+  }
+
+  return { hasPackage, hasSdk };
 }
 
 /**
  * Returns the execution client.
- * If agentic-flow is installed and ANTHROPIC_API_KEY is set, returns the real (subprocess) client.
- * Otherwise falls back to mock and logs a warning.
+ * If agentic-flow and @anthropic-ai/claude-agent-sdk are installed and ANTHROPIC_API_KEY
+ * is set, returns the real client that imports agentic-flow's claudeAgent() with
+ * Write/Edit/Bash tools.
+ * Otherwise falls back to mock and logs a warning with the specific reason.
  */
 export function createAgenticFlowClient(): AgenticFlowClient {
   if (realClientAvailable === null) {
     const hasKey = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
-    realClientAvailable = hasKey && isAgenticFlowInstalled();
+    const { hasPackage, hasSdk } = isAgenticFlowInstalled();
+    realClientAvailable = hasKey && hasPackage && hasSdk;
+
+    if (!realClientAvailable && typeof console !== "undefined" && console.warn) {
+      const reasons: string[] = [];
+      if (!hasKey) reasons.push("ANTHROPIC_API_KEY not set");
+      if (!hasPackage)
+        reasons.push(
+          "agentic-flow package not installed (run: pnpm add agentic-flow@alpha)"
+        );
+      if (!hasSdk)
+        reasons.push(
+          "@anthropic-ai/claude-agent-sdk not installed (run: pnpm add @anthropic-ai/claude-agent-sdk)"
+        );
+      console.warn(
+        `agentic-flow not available — using mock client. Reason: ${reasons.join("; ")}`
+      );
+    }
   }
 
   if (realClientAvailable) {
     return createRealAgenticFlowClient();
   }
 
-  if (typeof console !== "undefined" && console.warn) {
-    console.warn("agentic-flow not available — using mock client");
-  }
   return createMockAgenticFlowClient();
 }
 

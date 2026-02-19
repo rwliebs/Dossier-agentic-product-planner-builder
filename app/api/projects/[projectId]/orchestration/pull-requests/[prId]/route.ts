@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
 import { resolvePullRequestCandidate } from "@/lib/orchestration";
-import { getPullRequestCandidate } from "@/lib/supabase/queries/orchestration";
+import { getPullRequestCandidate } from "@/lib/db/queries/orchestration";
 import { json, notFoundError, validationError, internalError } from "@/lib/api/response-helpers";
 
 export async function GET(

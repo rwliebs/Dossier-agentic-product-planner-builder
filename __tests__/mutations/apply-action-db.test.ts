@@ -3,26 +3,13 @@
  * Tests validation and rejection paths without requiring a real DB.
  */
 
-import { applyAction } from "@/lib/supabase/mutations";
-
-const createMockSupabase = () =>
-  ({
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: async () => ({ data: null, error: null }),
-          order: () => ({ data: [], error: null }),
-        }),
-      }),
-      insert: () => ({ select: () => ({ single: async () => ({ data: {}, error: null }) }) }),
-      update: () => ({ eq: () => ({ data: null, error: null }) }),
-    }),
-  }) as unknown as Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>;
+import { applyAction } from "@/lib/db/mutations";
+import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
 
 describe("applyAction", () => {
   it("rejects code-generation intent in payload", async () => {
-    const supabase = createMockSupabase();
-    const result = await applyAction(supabase, "p1", {
+    const db = createMockDbAdapter();
+    const result = await applyAction(db, "p1", {
       action_type: "createCard",
       target_ref: { workflow_activity_id: "a1" },
       payload: {
@@ -37,8 +24,8 @@ describe("applyAction", () => {
   });
 
   it("rejects unsupported action type", async () => {
-    const supabase = createMockSupabase();
-    const result = await applyAction(supabase, "p1", {
+    const db = createMockDbAdapter();
+    const result = await applyAction(db, "p1", {
       action_type: "unknownAction",
       target_ref: {},
       payload: {},

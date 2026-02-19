@@ -5,7 +5,7 @@
 
 import type { DbAdapter } from "@/lib/db/adapter";
 import { createOrchestrationRunInputSchema } from "@/lib/schemas/slice-c";
-import { getSystemPolicyProfileByProject } from "@/lib/supabase/queries/orchestration";
+import { getSystemPolicyProfileByProject } from "@/lib/db/queries/orchestration";
 import {
   validateRunInputAgainstPolicy,
   validateScopeAgainstPolicy,

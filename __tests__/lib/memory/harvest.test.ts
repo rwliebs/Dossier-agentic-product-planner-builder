@@ -5,6 +5,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { harvestBuildLearnings } from "@/lib/memory/harvest";
 import { createMockDbAdapter } from "../mock-db-adapter";
 import { createTestDb } from "../create-test-db";
@@ -85,6 +88,7 @@ describe("Harvest pipeline (M8)", () => {
   describe.skipIf(!ruvectorAvailable || !sqliteAvailable)("integration with real RuVector", () => {
     let realGetRuvectorClient: typeof getRuvectorClient;
     let sqliteDb: ReturnType<typeof createTestDb>;
+    let tmpDir: string;
     const insertedIds: string[] = [];
 
     beforeAll(async () => {
@@ -93,6 +97,8 @@ describe("Harvest pipeline (M8)", () => {
     });
 
     beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "dossier-harvest-test-"));
+      process.env.DOSSIER_DATA_DIR = tmpDir;
       resetRuvectorForTesting();
       vi.mocked(getRuvectorClient).mockImplementation(realGetRuvectorClient);
       sqliteDb = createTestDb();
@@ -102,6 +108,7 @@ describe("Harvest pipeline (M8)", () => {
       const client = getRuvectorClient();
       if (client) await cleanupRuvectorTestVectors(insertedIds, client);
       insertedIds.length = 0;
+      delete process.env.DOSSIER_DATA_DIR;
     });
 
     it("harvestBuildLearnings: ingests learnings, count > 0, vectors searchable", async () => {
@@ -122,7 +129,7 @@ describe("Harvest pipeline (M8)", () => {
       const vec = await import("@/lib/memory/embedding").then((m) => m.embedText("Build learning one"));
       const results = await client!.search({ vector: vec, k: 5 });
       expect(results.length).toBeGreaterThan(0);
-    });
+    }, 30_000);
 
     it("skips empty/whitespace learnings (integration)", async () => {
       const count = await harvestBuildLearnings(sqliteDb, {

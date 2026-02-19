@@ -9,8 +9,8 @@ import {
   getCardRequirements,
   getCardPlannedFiles,
   getCardById,
-} from "@/lib/supabase/queries";
-import { fetchMapSnapshot } from "@/lib/supabase/map-snapshot";
+} from "@/lib/db/queries";
+import { fetchMapSnapshot } from "@/lib/db/map-snapshot";
 import {
   buildFinalizeTestsSystemPrompt,
   buildFinalizeTestsUserMessage,

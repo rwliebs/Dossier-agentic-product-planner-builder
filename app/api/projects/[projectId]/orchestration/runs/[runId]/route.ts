@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
-import { getOrchestrationRun } from "@/lib/supabase/queries/orchestration";
+import { getOrchestrationRun } from "@/lib/db/queries/orchestration";
 import { updateOrchestrationRunStatusSchema } from "@/lib/schemas/slice-c";
 import { json, notFoundError, validationError, internalError } from "@/lib/api/response-helpers";
 

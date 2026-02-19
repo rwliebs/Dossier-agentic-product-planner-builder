@@ -4,7 +4,7 @@ import { createAssignment } from "@/lib/orchestration";
 import {
   getOrchestrationRun,
   getCardAssignmentsByRun,
-} from "@/lib/supabase/queries/orchestration";
+} from "@/lib/db/queries/orchestration";
 import { json, notFoundError, validationError, internalError } from "@/lib/api/response-helpers";
 import { createAssignmentRequestSchema } from "@/lib/validation/request-schema";
 

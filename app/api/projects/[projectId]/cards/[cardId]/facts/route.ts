@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
-import { getCardFacts, verifyCardInProject } from "@/lib/supabase/queries";
+import { getCardFacts, verifyCardInProject } from "@/lib/db/queries";
 import {
   json,
   validationError,

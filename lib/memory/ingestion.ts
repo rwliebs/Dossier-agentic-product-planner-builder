@@ -18,7 +18,7 @@ import {
   getCardQuestions,
   getCardContextArtifacts,
   getArtifactById,
-} from "@/lib/supabase/queries";
+} from "@/lib/db/queries";
 
 export interface IngestScope {
   cardId: string;
@@ -104,7 +104,7 @@ export async function ingestMemoryUnit(
 
 /**
  * Ingest full card context: card + linked artifacts + approved knowledge.
- * No-op if RuVector unavailable. Uses DbAdapter only (no Supabase).
+ * No-op if RuVector unavailable. Uses DbAdapter only.
  */
 export async function ingestCardContext(
   db: DbAdapter,

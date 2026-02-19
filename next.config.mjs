@@ -7,7 +7,11 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  serverExternalPackages: ["better-sqlite3"],
+  serverExternalPackages: [
+    "better-sqlite3",
+    "ruvector-core",
+    "ruvector-onnx-embeddings-wasm",
+  ],
 }
 
 export default nextConfig

@@ -160,7 +160,7 @@ Action pipeline applies sequentially with no database transaction. Preview, idem
 
 | ID | Task | Details | Status |
 |----|------|---------|--------|
-| 6a | Server-side consolidation | `lib/supabase/mutations.ts` as single entry point. `pipelineApply()`. | ✅ Done |
+| 6a | Server-side consolidation | `lib/db/mutations.ts` as single entry point. `pipelineApply()`. | ✅ Done |
 | 6b | Transactional apply | Wrap `pipelineApply` in a SQLite/Postgres transaction via `DbAdapter.transaction()`. Rollback all on any failure. | ⏳ Unblocked by Section 3 |
 | 6c | Preview endpoint | `POST /api/projects/[id]/actions/preview` — dry-run, returns delta without writing. | ✅ Done |
 | 6d | Idempotency keys | `idempotency_key` column + unique index on `planning_action`. | ✅ Done |
@@ -188,12 +188,12 @@ All data access goes through the Supabase SDK (`supabase.from().select().eq()`).
 
 | File | `.from()` calls | Role |
 |------|----------------|------|
-| `lib/supabase/queries/orchestration.ts` | ~14 | Orchestration CRUD (runs, assignments, checks, approvals) |
-| `lib/supabase/mutations.ts` | ~8 | Action pipeline apply |
-| `lib/supabase/map-snapshot.ts` | ~6 | Story map tree fetch |
-| `lib/supabase/persist-planning-state.ts` | ~4 | Upsert planning entities |
+| `lib/db/queries/orchestration.ts` | ~14 | Orchestration CRUD (runs, assignments, checks, approvals) |
+| `lib/db/mutations.ts` | ~8 | Action pipeline apply |
+| `lib/db/map-snapshot.ts` | ~6 | Story map tree fetch |
+| `lib/db/persist-planning-state.ts` | ~4 | Upsert planning entities |
 | API route inline calls | ~5 | Direct inserts/updates in route handlers |
-| `lib/supabase/queries/{projects,workflows,cards,actions}.ts` | 0 | Stubs — `throw new Error("Not implemented")` |
+| `lib/db/queries/{projects,workflows,cards,actions}.ts` | 0 | Stubs — `throw new Error("Not implemented")` |
 
 Total: ~37 Supabase SDK calls to replace.
 

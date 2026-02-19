@@ -6,8 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { triggerBuild } from "@/lib/orchestration/trigger-build";
-import * as orchestrationQueries from "@/lib/supabase/queries/orchestration";
-import * as queries from "@/lib/supabase/queries";
+import * as orchestrationQueries from "@/lib/db/queries/orchestration";
+import * as queries from "@/lib/db/queries";
 import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
 
 const projectId = "11111111-1111-1111-1111-111111111111";
@@ -27,7 +27,7 @@ const mockPolicy = {
   updated_at: new Date().toISOString(),
 };
 
-vi.mock("@/lib/supabase/queries/orchestration", () => ({
+vi.mock("@/lib/db/queries/orchestration", () => ({
   listOrchestrationRunsByProject: vi.fn(),
   getSystemPolicyProfileByProject: vi.fn(),
   getCardAssignment: vi.fn(),
@@ -38,7 +38,7 @@ vi.mock("@/lib/supabase/queries/orchestration", () => ({
   getRunChecksByRun: vi.fn(),
 }));
 
-vi.mock("@/lib/supabase/queries", () => ({
+vi.mock("@/lib/db/queries", () => ({
   getProject: vi.fn(),
   getCardIdsByWorkflow: vi.fn(),
   getCardPlannedFiles: vi.fn(),

@@ -1,6 +1,6 @@
 /**
  * API contract tests for map snapshot endpoint.
- * Requires dev server and Supabase with at least one project.
+ * Requires dev server and DB with at least one project.
  */
 
 const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";

@@ -7,7 +7,7 @@ import { createPullRequestCandidateInputSchema } from "@/lib/schemas/slice-c";
 import {
   getOrchestrationRun,
   getPullRequestCandidateByRun,
-} from "@/lib/supabase/queries/orchestration";
+} from "@/lib/db/queries/orchestration";
 
 export interface CreatePullRequestCandidateInput {
   run_id: string;

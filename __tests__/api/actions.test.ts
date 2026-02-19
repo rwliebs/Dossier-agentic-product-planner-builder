@@ -1,15 +1,12 @@
 /**
  * API contract tests for actions endpoint.
- * Requires dev server and Supabase.
+ * Requires dev server and DB (SQLite or Postgres).
  */
 
 const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 
 function canRunIntegrationTests(): boolean {
-  return !!(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  return true; // Run when server is up
 }
 
 describe("actions API contract", () => {

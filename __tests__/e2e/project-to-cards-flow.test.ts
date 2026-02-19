@@ -16,132 +16,17 @@
  */
 
 import { describe, it, expect } from "vitest";
-
-const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
-const PROMPT =
-  "I want to build a trading card marketplace for canadian buyers and sellers of magic the gathering cards";
-
-function canRun(): boolean {
-  return !!(
-    process.env.ANTHROPIC_API_KEY &&
-    process.env.NEXT_PUBLIC_PLANNING_LLM_ENABLED !== "false"
-  );
-}
-
-async function consumeSSE(
-  res: Response
-): Promise<{ event: string; data: unknown }[]> {
-  const events: { event: string; data: unknown }[] = [];
-  const reader = res.body?.getReader();
-  if (!reader) return events;
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const blocks = buffer.split(/\n\n+/);
-    buffer = blocks.pop() ?? "";
-
-    for (const block of blocks) {
-      let eventType = "";
-      let dataStr = "";
-      for (const line of block.split("\n")) {
-        if (line.startsWith("event: ")) eventType = line.slice(7).trim();
-        if (line.startsWith("data: ")) dataStr = line.slice(6);
-      }
-      if (eventType && dataStr) {
-        try {
-          events.push({ event: eventType, data: JSON.parse(dataStr) });
-        } catch {
-          /* skip parse errors */
-        }
-      }
-    }
-  }
-
-  if (buffer.trim()) {
-    const lines = buffer.split("\n");
-    let eventType = "";
-    let dataStr = "";
-    for (const line of lines) {
-      if (line.startsWith("event: ")) eventType = line.slice(7).trim();
-      if (line.startsWith("data: ")) dataStr = line.slice(6);
-    }
-    if (eventType && dataStr) {
-      try {
-        events.push({ event: eventType, data: JSON.parse(dataStr) });
-      } catch {
-        /* skip */
-      }
-    }
-  }
-
-  return events;
-}
-
-interface MapCard {
-  id: string;
-  title: string;
-  description: string | null;
-}
-
-interface MapActivity {
-  id: string;
-  cards: MapCard[];
-}
-
-interface MapWorkflow {
-  id: string;
-  title: string;
-  activities: MapActivity[];
-}
-
-interface MapSnapshot {
-  project: { id: string; name: string };
-  workflows: MapWorkflow[];
-}
-
-interface PlannedFile {
-  id: string;
-  status: string;
-}
-
-async function fetchMapSnapshot(projectId: string): Promise<MapSnapshot | null> {
-  const res = await fetch(`${BASE_URL}/api/projects/${projectId}/map`).catch(
-    () => null
-  );
-  if (!res?.ok) return null;
-  return res.json();
-}
-
-async function fetchPlannedFiles(
-  projectId: string,
-  cardId: string
-): Promise<PlannedFile[]> {
-  const res = await fetch(
-    `${BASE_URL}/api/projects/${projectId}/cards/${cardId}/planned-files`
-  ).catch(() => null);
-  if (!res?.ok) return [];
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
-
-function getAllCards(map: MapSnapshot): MapCard[] {
-  const cards: MapCard[] = [];
-  for (const wf of map.workflows) {
-    for (const act of wf.activities) {
-      cards.push(...act.cards);
-    }
-  }
-  return cards;
-}
-
-function cardCount(wf: MapWorkflow): number {
-  return wf.activities.reduce((sum, act) => sum + act.cards.length, 0);
-}
+import {
+  BASE_URL,
+  MARKETPLACE_PROMPT,
+  canRunLLMTests,
+  consumeSSE,
+  fetchMapSnapshot,
+  getAllCards,
+  cardCount,
+  type MapSnapshot,
+  type MapWorkflow,
+} from "./helpers";
 
 interface OutcomeResult {
   ok: boolean;
@@ -150,10 +35,14 @@ interface OutcomeResult {
   cardsWithTitle: number;
   totalCards: number;
   cardsBuildReady: number;
-  workflowSummaries: { title: string; cards: number; withTitle: number; buildReady: number }[];
+  workflowSummaries: {
+    title: string;
+    cards: number;
+    withTitle: number;
+    buildReady: number;
+  }[];
 }
 
-/** Outcome: ≥2 workflows; ≥1 workflow with cards; cards have title; ≥2 cards build-ready (approved planned files + finalized_at). */
 function satisfiesOutcome(
   map: MapSnapshot,
   cardBuildReady: Set<string>
@@ -167,9 +56,11 @@ function satisfiesOutcome(
   const cardsWithTitle = allCards.filter(
     (c) => c.title != null && String(c.title).trim().length > 0
   ).length;
-  const cardsBuildReady = allCards.filter((c) => cardBuildReady.has(c.id)).length;
+  const cardsBuildReady = allCards.filter((c) =>
+    cardBuildReady.has(c.id)
+  ).length;
 
-  const workflowSummaries = map.workflows.map((wf) => {
+  const workflowSummaries = map.workflows.map((wf: MapWorkflow) => {
     const wfCards = wf.activities.flatMap((a) => a.cards);
     return {
       title: wf.title ?? "(no title)",
@@ -198,7 +89,6 @@ function satisfiesOutcome(
   };
 }
 
-/** Run full flow: create → scaffold → populate → create planned files → approve → add requirements → finalize → return map + build-ready card ids. */
 async function runFlow(): Promise<{
   map: MapSnapshot;
   cardBuildReady: Set<string>;
@@ -223,7 +113,10 @@ async function runFlow(): Promise<{
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: PROMPT, mode: "scaffold" }),
+      body: JSON.stringify({
+        message: MARKETPLACE_PROMPT,
+        mode: "scaffold",
+      }),
     }
   );
   if (!scaffoldRes.ok) {
@@ -246,7 +139,7 @@ async function runFlow(): Promise<{
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: PROMPT,
+          message: MARKETPLACE_PROMPT,
           mode: "populate",
           workflow_id: wf.id,
         }),
@@ -338,7 +231,7 @@ function formatDiagnostics(result: OutcomeResult): string {
 }
 
 describe("project to cards flow", () => {
-  it.skipIf(!canRun())(
+  it.skipIf(!canRunLLMTests())(
     "map has ≥2 workflows, cards with title, ≥2 cards build-ready (approved planned files + finalized)",
     async () => {
       const { map, cardBuildReady } = await runFlow();

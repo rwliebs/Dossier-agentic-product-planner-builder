@@ -1,6 +1,6 @@
 /**
  * Reusable query builders.
- * Uses DbAdapter (SQLite or Postgres) - no Supabase dependency.
+ * Uses DbAdapter (SQLite or Postgres).
  */
 
 import type { DbAdapter } from "@/lib/db/adapter";

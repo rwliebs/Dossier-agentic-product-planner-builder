@@ -176,27 +176,35 @@ export default function DossierPage() {
     document.addEventListener('mouseup', onMouseUp);
   }, [leftWidth, rightWidth]);
 
-  const handleCardAction = useCallback((cardId: string, action: string) => {
-    if (action === 'monitor' || action === 'test') {
-      setRightPanelTab('terminal');
-      setRightPanelOpen(true);
-    }
-  }, []);
-
   const handleBuildCard = useCallback(
     async (cardId: string) => {
-      const result = await triggerBuild({ scope: 'card', card_id: cardId });
-      if (result.runId) {
-        setRightPanelTab('files');
-        setRightPanelOpen(true);
-        refetch();
-      } else if (result.error) {
+      setBuildingCardId(cardId);
+      try {
+        const result = await triggerBuild({ scope: 'card', card_id: cardId });
         const { toast } = await import('sonner');
-        toast.error(result.error);
+        if (result.runId) {
+          toast.success('Build started — agent is working');
+          setRightPanelTab('files');
+          setRightPanelOpen(true);
+          refetch();
+        } else if (result.error) {
+          toast.error(result.error);
+        }
+      } finally {
+        setBuildingCardId(null);
       }
     },
     [triggerBuild, refetch]
   );
+
+  const handleCardAction = useCallback((cardId: string, action: string) => {
+    if (action === 'monitor' || action === 'test') {
+      setRightPanelTab('terminal');
+      setRightPanelOpen(true);
+    } else if (action === 'build') {
+      handleBuildCard(cardId);
+    }
+  }, [handleBuildCard]);
 
   const [populatingWorkflowId, setPopulatingWorkflowId] = useState<string | null>(null);
   const handlePopulateWorkflow = useCallback(
@@ -274,6 +282,7 @@ export default function DossierPage() {
   const [finalizingProject, setFinalizingProject] = useState(false);
   const [finalizeProgress, setFinalizeProgress] = useState('');
   const [finalizingCardId, setFinalizingCardId] = useState<string | null>(null);
+  const [buildingCardId, setBuildingCardId] = useState<string | null>(null);
   const [cardFinalizeProgress, setCardFinalizeProgress] = useState('');
 
   const handleFinalizeProject = useCallback(
@@ -696,6 +705,7 @@ export default function DossierPage() {
                     availableFilePaths={availableFilePaths}
                     onApprovePlannedFile={handleApprovePlannedFile}
                     onBuildCard={handleBuildCard}
+                    buildingCardId={buildingCardId}
                     onFinalizeCard={handleFinalizeCard}
                     finalizingCardId={finalizingCardId}
                     cardFinalizeProgress={cardFinalizeProgress}

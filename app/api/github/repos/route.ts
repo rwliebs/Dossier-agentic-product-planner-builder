@@ -19,7 +19,7 @@ export async function GET(_request: NextRequest) {
     if (!token) {
       return json(
         { error: "GitHub token not configured. Add GITHUB_TOKEN in Setup or environment." },
-        { status: 503 }
+        503
       );
     }
 
@@ -35,11 +35,11 @@ export async function GET(_request: NextRequest) {
       const text = await res.text();
       console.error("GitHub API list repos error:", res.status, text);
       if (res.status === 401) {
-        return json({ error: "GitHub token is invalid or expired." }, { status: 401 });
+        return json({ error: "GitHub token is invalid or expired." }, 401);
       }
       return json(
         { error: "Failed to list repositories." },
-        { status: res.status >= 500 ? 502 : 400 }
+        res.status >= 500 ? 502 : 400
       );
     }
 
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     if (!token) {
       return json(
         { error: "GitHub token not configured. Add GITHUB_TOKEN in Setup or environment." },
-        { status: 503 }
+        503
       );
     }
 
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     if (!name || !/^[a-zA-Z0-9._-]+$/.test(name)) {
       return json(
         { error: "Repository name is required and may only contain letters, numbers, ., _, -." },
-        { status: 400 }
+        400
       );
     }
 
@@ -105,20 +105,20 @@ export async function POST(request: NextRequest) {
       const text = await res.text();
       console.error("GitHub API create repo error:", res.status, text);
       if (res.status === 401) {
-        return json({ error: "GitHub token is invalid or expired." }, { status: 401 });
+        return json({ error: "GitHub token is invalid or expired." }, 401);
       }
       if (res.status === 422) {
         try {
           const err = JSON.parse(text) as { message?: string; errors?: Array<{ message?: string }> };
           const msg = err.message ?? err.errors?.[0]?.message ?? "Repository name may already exist or be invalid.";
-          return json({ error: msg }, { status: 422 });
+          return json({ error: msg }, 422);
         } catch {
-          return json({ error: "Repository name may already exist or be invalid." }, { status: 422 });
+          return json({ error: "Repository name may already exist or be invalid." }, 422);
         }
       }
       return json(
         { error: "Failed to create repository." },
-        { status: res.status >= 500 ? 502 : 400 }
+        res.status >= 500 ? 502 : 400
       );
     }
 

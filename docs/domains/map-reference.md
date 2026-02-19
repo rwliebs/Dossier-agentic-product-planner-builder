@@ -50,10 +50,10 @@ GET /api/projects/[id]/map
 ### Key Files
 | File | Purpose |
 |------|---------|
-| `lib/supabase/map-snapshot.ts` | fetchMapSnapshot, buildMapTree |
+| `lib/db/map-snapshot.ts` | fetchMapSnapshot, buildMapTree |
 | `lib/schemas/planning-state.ts` | PlanningState interface, createEmptyPlanningState |
-| `lib/supabase/queries.ts` | getProject, getWorkflowsByProject, getActivitiesByProject, getCardsByProject |
-| `lib/supabase/queries/workflows.ts` | Workflow + activity + step tree queries |
+| `lib/db/queries.ts` | getProject, getWorkflowsByProject, getActivitiesByProject, getCardsByProject |
+| `lib/db/queries/workflows.ts` | Workflow + activity + step tree queries |
 | `app/api/projects/[id]/map/route.ts` | Map endpoint |
 
 ### Tree Structure

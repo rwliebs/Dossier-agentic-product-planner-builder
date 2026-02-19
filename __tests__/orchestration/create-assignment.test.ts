@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createAssignment } from "@/lib/orchestration";
-import * as orchestrationQueries from "@/lib/supabase/queries/orchestration";
+import * as orchestrationQueries from "@/lib/db/queries/orchestration";
 import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
 
 const run = {
@@ -9,7 +9,7 @@ const run = {
   system_policy_snapshot: { forbidden_paths: [] as string[] },
 };
 
-vi.mock("@/lib/supabase/queries/orchestration", () => ({
+vi.mock("@/lib/db/queries/orchestration", () => ({
   getOrchestrationRun: vi.fn(),
 }));
 

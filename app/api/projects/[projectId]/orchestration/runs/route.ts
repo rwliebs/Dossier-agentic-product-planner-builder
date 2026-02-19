@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { createRun } from "@/lib/orchestration";
 import {
   listOrchestrationRunsByProject,
-} from "@/lib/supabase/queries/orchestration";
+} from "@/lib/db/queries/orchestration";
 import { json, validationError, notFoundError, internalError } from "@/lib/api/response-helpers";
 import { createRunRequestSchema } from "@/lib/validation/request-schema";
 

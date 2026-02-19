@@ -6,7 +6,7 @@ import type { DbAdapter } from "@/lib/db/adapter";
 import { createCardAssignmentInputSchema } from "@/lib/schemas/slice-c";
 import {
   getOrchestrationRun,
-} from "@/lib/supabase/queries/orchestration";
+} from "@/lib/db/queries/orchestration";
 
 export interface CreateAssignmentInput {
   run_id: string;

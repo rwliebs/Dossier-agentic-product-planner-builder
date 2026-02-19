@@ -108,7 +108,7 @@ You MUST complete this checklist before reporting execution_completed. Show evid
 - [ ] Timezone compliance
   - Evidence: new/changed records persist start_local, end_local, tzid; DB generating start_utc, end_utc
 - [ ] Migrations path compliance
-  - Evidence: only supabase/migrations/** changed (no Alembic)
+  - Evidence: only lib/db/sqlite-migrations/** changed (no Alembic)
 - [ ] Stable endpoints unchanged or documented
   - Evidence: list endpoints touched vs doc anchors in #stable-endpoints
 - [ ] Red-flag status and ADR (if any)

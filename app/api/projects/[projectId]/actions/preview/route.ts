@@ -6,8 +6,8 @@
 
 import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
-import { getProject } from "@/lib/supabase/queries";
-import { fetchMapSnapshot } from "@/lib/supabase/map-snapshot";
+import { getProject } from "@/lib/db/queries";
+import { fetchMapSnapshot } from "@/lib/db/map-snapshot";
 import { previewActionBatch } from "@/lib/actions/preview-action";
 import {
   json,

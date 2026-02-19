@@ -5,7 +5,7 @@ import {
   getWorkflowsByProject,
   getActivitiesByProject,
   getCardsByProject,
-} from "@/lib/supabase/queries";
+} from "@/lib/db/queries";
 import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
 
 type RouteParams = { params: Promise<{ projectId: string }> };

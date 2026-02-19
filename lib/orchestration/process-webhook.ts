@@ -9,7 +9,7 @@ import {
   getCardAssignment,
   getOrchestrationRun,
   getAgentExecutionsByAssignment,
-} from "@/lib/supabase/queries/orchestration";
+} from "@/lib/db/queries/orchestration";
 import { logEvent } from "./event-logger";
 import { executeRequiredChecks } from "./execute-checks";
 import { harvestBuildLearnings } from "@/lib/memory/harvest";

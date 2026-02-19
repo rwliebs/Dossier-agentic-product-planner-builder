@@ -17,7 +17,7 @@ Section 4 is **not blocked** on Section 3. Proceed in parallel using these coord
   - `getMemoryUnitRelationsByEntity(entityType, entityId)` → `Promise<DbRow[]>`
   - `insertMemoryRetrievalLog(row)` → `Promise<DbRow>`
 
-- **Memory migration** — `supabase/migrations/20250218000000_slice_memory.sql` added. Section 3 will port to SQLite when they implement D2/D7.
+- **Memory migration** — `lib/db/sqlite-migrations/003_memory.sql` contains the memory schema.
 
 ### What Section 4 Owns
 
@@ -32,7 +32,7 @@ Section 4 is **not blocked** on Section 3. Proceed in parallel using these coord
 
 ### How to Proceed
 
-1. **Code against the interface** — All memory logic uses `DbAdapter` memory methods and `MemoryStore`. Never import Supabase directly in memory code.
+1. **Code against the interface** — All memory logic uses `DbAdapter` memory methods and `MemoryStore`. Never bypass the adapter for direct DB access.
 
 2. **Use mock adapter until real one works** — `createMockMemoryStore()` returns empty results. Use it in:
    - Unit tests

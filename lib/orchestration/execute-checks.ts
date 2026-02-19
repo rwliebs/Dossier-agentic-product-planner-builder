@@ -11,7 +11,7 @@ import { createRunCheckInputSchema } from "@/lib/schemas/slice-c";
 import {
   getOrchestrationRun,
   getRunChecksByRun,
-} from "@/lib/supabase/queries/orchestration";
+} from "@/lib/db/queries/orchestration";
 
 export type RunCheckType =
   | "dependency"

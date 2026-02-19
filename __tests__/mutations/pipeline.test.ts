@@ -8,7 +8,7 @@ import {
   pipelineApply,
   applyAction,
   type ActionInput,
-} from "@/lib/supabase/mutations";
+} from "@/lib/db/mutations";
 import {
   reconstructStateFromActions,
   detectDrift,

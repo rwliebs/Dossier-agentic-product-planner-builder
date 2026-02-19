@@ -45,28 +45,61 @@ function embedTextFallback(text: string, dimensions = DEFAULT_DIMENSIONS): Float
   return vec;
 }
 
-let _embedder: { embedOne: (text: string) => Float32Array } | null = null;
-let _useFallback = false;
-let _initAttempted = false;
+type Embedder = { embedOne: (text: string) => Float32Array };
+let _loadPromise: Promise<Embedder | null> | null = null;
 
-async function loadEmbedder(): Promise<{ embedOne: (text: string) => Float32Array } | null> {
-  if (_useFallback || _initAttempted) return _embedder;
-  _initAttempted = true;
-
+/**
+ * Load the WASM module via CJS to work around an upstream bug:
+ * ruvector-onnx-embeddings-wasm declares "type":"module" but the generated
+ * WASM JS glue uses CJS globals (__dirname, require, module.exports).
+ * We copy the file to .cjs and load via createRequire so Node treats it as CJS.
+ */
+function loadWasmModuleCjs(): Record<string, unknown> | null {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createRequire } = require("module");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require("path");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require("fs");
+
+    const pkgDir = path.dirname(require.resolve("ruvector-onnx-embeddings-wasm"));
+    const src = path.join(pkgDir, "ruvector_onnx_embeddings_wasm.js");
+    const cjsCopy = path.join(pkgDir, "ruvector_onnx_embeddings_wasm.cjs");
+    if (!fs.existsSync(cjsCopy)) {
+      fs.copyFileSync(src, cjsCopy);
+    }
+    const pkgRequire = createRequire(path.join(pkgDir, "index.js"));
+    return pkgRequire("./ruvector_onnx_embeddings_wasm.cjs") as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+async function doLoadEmbedder(): Promise<Embedder | null> {
+  try {
+    const wasmModule = loadWasmModuleCjs();
     const { createEmbedder } = await import("ruvector-onnx-embeddings-wasm/loader.js");
     const model = process.env.EMBEDDING_MODEL ?? DEFAULT_MODEL;
-    const embedder = await createEmbedder(model);
-    _embedder = embedder;
-    return _embedder;
+    return await createEmbedder(model, wasmModule) as Embedder;
   } catch (err) {
-    _useFallback = true;
     console.warn(
       "[embedding] Failed to load embedding model, using hash-based fallback:",
       err instanceof Error ? err.message : String(err)
     );
     return null;
   }
+}
+
+/**
+ * Singleton loader: all concurrent callers share the same promise so the
+ * model is downloaded exactly once and every caller waits for it.
+ */
+function loadEmbedder(): Promise<Embedder | null> {
+  if (!_loadPromise) {
+    _loadPromise = doLoadEmbedder();
+  }
+  return _loadPromise;
 }
 
 /**
@@ -100,9 +133,7 @@ export async function embedText(text: string, dimensions = DEFAULT_DIMENSIONS): 
 
 /** Reset for tests. */
 export function resetEmbeddingForTesting(): void {
-  _embedder = null;
-  _useFallback = false;
-  _initAttempted = false;
+  _loadPromise = null;
 }
 
 export { DEFAULT_DIMENSIONS };

@@ -48,8 +48,7 @@ docs/
 │   └── 0001-*.md, 0002-*.md, ...
 └── archive/                  # Historical / deprecated
     ├── README.md
-    ├── STEP_2_*.md
-    └── SUPABASE_SETUP.md
+    └── STEP_2_*.md
 ```
 
 ## Quick Links

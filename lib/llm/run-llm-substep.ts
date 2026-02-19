@@ -4,8 +4,8 @@ import type { PlanningAction } from "@/lib/schemas/slice-a";
 import { claudeStreamingRequest } from "@/lib/llm/claude-client";
 import { parseActionsFromStream } from "@/lib/llm/stream-action-parser";
 import { validatePlanningOutput } from "@/lib/llm/validate-planning-output";
-import { pipelineApply } from "@/lib/supabase/mutations";
-import { fetchMapSnapshot } from "@/lib/supabase/map-snapshot";
+import { pipelineApply } from "@/lib/db/mutations";
+import { fetchMapSnapshot } from "@/lib/db/map-snapshot";
 
 export type Emitter = (event: string, data: unknown) => void;
 

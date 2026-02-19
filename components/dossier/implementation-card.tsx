@@ -45,6 +45,7 @@ interface ImplementationCardProps {
   availableFilePaths?: string[];
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
+  buildingCardId?: string | null;
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
   cardFinalizeProgress?: string;
@@ -125,6 +126,7 @@ export function ImplementationCard({
   availableFilePaths = [],
   onApprovePlannedFile,
   onBuildCard,
+  buildingCardId,
   onFinalizeCard,
   finalizingCardId,
   cardFinalizeProgress,
@@ -255,14 +257,19 @@ export function ImplementationCard({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {card.build_state && (
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted text-muted-foreground">
-              build: {card.build_state}
-              {card.last_built_at && (
-                <span className="ml-1 opacity-75">
-                  {new Date(card.last_built_at).toLocaleDateString()}
-                </span>
-              )}
+          {(card.build_state === 'queued' || card.build_state === 'running' || buildingCardId === card.id) && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-100 text-amber-800 animate-pulse">
+              {card.build_state === 'running' ? 'Agent building…' : 'Build queued…'}
+            </span>
+          )}
+          {card.build_state === 'completed' && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-green-100 text-green-800">
+              Built {card.last_built_at ? new Date(card.last_built_at).toLocaleDateString() : ''}
+            </span>
+          )}
+          {card.build_state === 'failed' && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-100 text-red-800">
+              Build failed
             </span>
           )}
           {sortedArtifacts.slice(0, 2).map((doc) => (
@@ -318,10 +325,23 @@ export function ImplementationCard({
           )}
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onAction(card.id, status === 'active' ? 'monitor' : status === 'review' ? 'test' : 'build'); }}
-            className={`w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold text-white rounded transition-colors ${config.button}`}
+            disabled={buildingCardId === card.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              const action = status === 'active' ? 'monitor' : status === 'review' ? 'test' : 'build';
+              if (action === 'build' && onBuildCard && (card as Record<string, unknown>).finalized_at) {
+                onBuildCard(card.id);
+              } else {
+                onAction(card.id, action);
+              }
+            }}
+            className={`w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold text-white rounded transition-colors ${
+              buildingCardId === card.id
+                ? 'bg-amber-500 cursor-not-allowed animate-pulse'
+                : config.button
+            }`}
           >
-            {getActionButtonText()}
+            {buildingCardId === card.id ? 'Building…' : getActionButtonText()}
           </button>
         </div>
       </div>
@@ -461,36 +481,6 @@ export function ImplementationCard({
 
             <div>
               <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Code Files to Create/Edit</h5>
-              {(card as Record<string, unknown>).finalized_at && onBuildCard && (
-                <div className="mb-2">
-                  {(() => {
-                    const buildState = (card as { build_state?: string }).build_state;
-                    const isActive = buildState === 'queued' || buildState === 'running' || buildState === 'blocked';
-                    const label =
-                      buildState === 'queued'
-                        ? 'Queued...'
-                        : buildState === 'running'
-                          ? 'Building...'
-                          : buildState === 'blocked'
-                            ? 'Blocked — answer questions'
-                            : 'Build';
-                    return (
-                      <button
-                        type="button"
-                        disabled={isActive}
-                        onClick={(e) => { e.stopPropagation(); if (!isActive) onBuildCard(card.id); }}
-                        className={`w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold rounded transition-colors ${
-                          isActive
-                            ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                            : 'bg-green-600 text-white hover:bg-green-700'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })()}
-                </div>
-              )}
               {plannedFiles.length > 0 ? (
                 <div className="space-y-1">
                   {plannedFiles.map((pf) => (

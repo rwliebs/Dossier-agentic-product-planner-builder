@@ -17,7 +17,7 @@ export async function GET(
 
     const db = getDb();
     const { getPullRequestCandidateByRun } = await import(
-      "@/lib/supabase/queries/orchestration"
+      "@/lib/db/queries/orchestration"
     );
     const pr = await getPullRequestCandidateByRun(db, runId);
 

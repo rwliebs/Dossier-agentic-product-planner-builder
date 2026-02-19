@@ -5,6 +5,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import {
   createMockMemoryStore,
   createMemoryStore,
@@ -74,6 +77,7 @@ describe("MemoryStore (M8)", () => {
   describe.skipIf(!ruvectorAvailable || !sqliteAvailable)("integration with real RuVector", () => {
     let realGetRuvectorClient: typeof getRuvectorClient;
     let sqliteDb: ReturnType<typeof createTestDb>;
+    let tmpDir: string;
     const insertedIds: string[] = [];
 
     beforeAll(async () => {
@@ -82,6 +86,8 @@ describe("MemoryStore (M8)", () => {
     });
 
     beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "dossier-store-test-"));
+      process.env.DOSSIER_DATA_DIR = tmpDir;
       resetRuvectorForTesting();
       vi.mocked(getRuvectorClient).mockImplementation(realGetRuvectorClient);
       sqliteDb = createTestDb();
@@ -91,6 +97,7 @@ describe("MemoryStore (M8)", () => {
       const client = getRuvectorClient();
       if (client) await cleanupRuvectorTestVectors(insertedIds, client);
       insertedIds.length = 0;
+      delete process.env.DOSSIER_DATA_DIR;
     });
 
     it("full retrieval cycle: card-scoped results come first", async () => {
@@ -126,7 +133,7 @@ describe("MemoryStore (M8)", () => {
       if (cardScopedInResults.length > 0 && projectOnlyInResults.length > 0) {
         expect(ids.indexOf(cardScopedInResults[0])).toBeLessThan(ids.indexOf(projectOnlyInResults[0]));
       }
-    });
+    }, 30_000);
 
     it("retrieveForCard returns content strings (not just IDs)", async () => {
       const cardId = "store-retrieve-card";
@@ -143,7 +150,7 @@ describe("MemoryStore (M8)", () => {
       const content = await store.retrieveForCard(cardId, projectId, "retrievable content");
       expect(content.length).toBeGreaterThan(0);
       expect(content.some((s) => typeof s === "string" && s.includes("Retrievable content"))).toBe(true);
-    });
+    }, 30_000);
 
     it("logRetrieval writes to memory_retrieval_log table", async () => {
       const insertSpy = vi.spyOn(sqliteDb, "insertMemoryRetrievalLog");
@@ -157,7 +164,7 @@ describe("MemoryStore (M8)", () => {
         result_memory_ids: ["id1", "id2"],
       });
       insertSpy.mockRestore();
-    });
+    }, 30_000);
 
     it("rejected items are excluded from results", async () => {
       const cardId = "store-rejected-card";
@@ -200,6 +207,6 @@ describe("MemoryStore (M8)", () => {
       const store = createMemoryStore(sqliteDb, true);
       const ids = await store.search("content", { cardId, projectId }, { limit: 10 });
       expect(ids).not.toContain(rejectedId);
-    });
+    }, 30_000);
   });
 });

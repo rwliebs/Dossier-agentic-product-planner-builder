@@ -49,8 +49,6 @@ export {
 export {
   createAgenticFlowClient,
   createClaudeFlowClient,
-  createMockAgenticFlowClient,
-  createMockClaudeFlowClient,
   createRealAgenticFlowClient,
   type AgenticFlowClient,
   type ClaudeFlowClient,

@@ -1,13 +1,11 @@
 /**
  * Integration tests for orchestration execution:
- * - Agentic-flow mock client (dispatch, status, cancel)
  * - Webhook processing (execution_completed, execution_failed)
  * - Event logger
- * - Dispatch with mock agentic-flow
+ * - Dispatch with agentic-flow (mocked at module level)
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createMockAgenticFlowClient } from "@/lib/orchestration/agentic-flow-client";
 import { logEvent } from "@/lib/orchestration/event-logger";
 import { processWebhook } from "@/lib/orchestration/process-webhook";
 import { dispatchAssignment } from "@/lib/orchestration/dispatch";
@@ -19,6 +17,18 @@ const projectId = "11111111-1111-1111-1111-111111111111";
 const runId = "22222222-2222-2222-2222-222222222222";
 const assignmentId = "33333333-3333-3333-3333-333333333333";
 const cardId = "44444444-4444-4444-4444-444444444444";
+
+vi.mock("@/lib/orchestration/agentic-flow-client", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/orchestration/agentic-flow-client")>();
+  return {
+    ...original,
+    createAgenticFlowClient: vi.fn(() => ({
+      dispatch: vi.fn().mockResolvedValue({ success: true, execution_id: `test-exec-${Date.now()}` }),
+      status: vi.fn().mockResolvedValue({ success: true, status: { status: "completed" } }),
+      cancel: vi.fn().mockResolvedValue({ success: true }),
+    })),
+  };
+});
 
 vi.mock("@/lib/db/queries/orchestration", () => ({
   getCardAssignment: vi.fn(),
@@ -35,59 +45,6 @@ vi.mock("@/lib/db/queries", () => ({
   getCardContextArtifacts: vi.fn().mockResolvedValue([]),
   getArtifactById: vi.fn(),
 }));
-
-describe("Agentic-flow mock client", () => {
-  it("dispatch returns execution_id", async () => {
-    const client = createMockAgenticFlowClient();
-    const result = await client.dispatch({
-      run_id: runId,
-      assignment_id: assignmentId,
-      card_id: cardId,
-      feature_branch: "feat/test",
-      allowed_paths: ["src/"],
-      assignment_input_snapshot: {},
-    });
-
-    expect(result.success).toBe(true);
-    expect(result.execution_id).toBeDefined();
-    expect(result.execution_id).toMatch(/^mock-exec-/);
-  });
-
-  it("status returns completed for mock execution", async () => {
-    const client = createMockAgenticFlowClient();
-    const dispatchResult = await client.dispatch({
-      run_id: runId,
-      assignment_id: assignmentId,
-      card_id: cardId,
-      feature_branch: "feat/test",
-      allowed_paths: ["src/"],
-      assignment_input_snapshot: {},
-    });
-
-    const statusResult = await client.status(dispatchResult.execution_id!);
-    expect(statusResult.success).toBe(true);
-    expect(statusResult.status?.status).toBe("completed");
-  });
-
-  it("cancel removes execution", async () => {
-    const client = createMockAgenticFlowClient();
-    const dispatchResult = await client.dispatch({
-      run_id: runId,
-      assignment_id: assignmentId,
-      card_id: cardId,
-      feature_branch: "feat/test",
-      allowed_paths: ["src/"],
-      assignment_input_snapshot: {},
-    });
-
-    const cancelResult = await client.cancel(dispatchResult.execution_id!);
-    expect(cancelResult.success).toBe(true);
-
-    const statusResult = await client.status(dispatchResult.execution_id!);
-    expect(statusResult.success).toBe(false);
-    expect(statusResult.error).toContain("not found");
-  });
-});
 
 describe("Event logger", () => {
   it("writes event to event_log", async () => {
@@ -340,7 +297,7 @@ describe("Dispatch assignment", () => {
     expect(result.executionId).toBeDefined();
   }, 30_000);
 
-  it("dispatches successfully with mock client", async () => {
+  it("dispatches successfully with stubbed agentic-flow client", async () => {
     const mockDb = createMockDbAdapter({
       insertAgentExecution: vi.fn().mockResolvedValue({ id: "agent-exec-123" }),
     });

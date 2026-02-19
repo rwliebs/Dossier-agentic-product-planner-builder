@@ -10,6 +10,12 @@ export interface ActivityColumnProps {
   onCardAction: (cardId: string, action: string) => void;
   onUpdateCardDescription?: (cardId: string, description: string) => void;
   onUpdateQuickAnswer?: (cardId: string, quickAnswer: string) => void;
+  onUpdateRequirement?: (cardId: string, requirementId: string, text: string) => void | Promise<void>;
+  onAddRequirement?: (cardId: string, text: string) => void | Promise<void>;
+  onLinkContextArtifact?: (cardId: string, artifactId: string) => void | Promise<void>;
+  onAddPlannedFile?: (cardId: string, logicalFilePath: string) => void | Promise<void>;
+  availableArtifacts?: import('@/lib/types/ui').ContextArtifact[];
+  availableFilePaths?: string[];
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
   onSelectDoc?: (doc: ContextArtifact) => void;
@@ -26,6 +32,12 @@ export function ActivityColumn({
   onCardAction,
   onUpdateCardDescription,
   onUpdateQuickAnswer,
+  onUpdateRequirement,
+  onAddRequirement,
+  onLinkContextArtifact,
+  onAddPlannedFile,
+  availableArtifacts = [],
+  availableFilePaths = [],
   onApprovePlannedFile,
   onBuildCard,
   onSelectDoc,
@@ -56,6 +68,12 @@ export function ActivityColumn({
               onAction={onCardAction}
               onUpdateDescription={onUpdateCardDescription ?? (() => {})}
               onUpdateQuickAnswer={onUpdateQuickAnswer}
+              onUpdateRequirement={onUpdateRequirement}
+              onAddRequirement={onAddRequirement}
+              onLinkContextArtifact={onLinkContextArtifact}
+              onAddPlannedFile={onAddPlannedFile}
+              availableArtifacts={availableArtifacts}
+              availableFilePaths={availableFilePaths}
               onApprovePlannedFile={onApprovePlannedFile}
               onBuildCard={onBuildCard}
               onSelectDoc={onSelectDoc}

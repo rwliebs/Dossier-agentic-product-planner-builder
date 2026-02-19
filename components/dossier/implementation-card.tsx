@@ -1,8 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Edit2, Check, X } from 'lucide-react';
+import { ChevronDown, Edit2, Check, X, Plus } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { CardSkeleton } from './card-skeleton';
+import { ACTION_BUTTONS } from '@/lib/constants/action-buttons';
 import type {
   MapCard,
   CardStatus,
@@ -30,6 +37,12 @@ interface ImplementationCardProps {
   onAction: (cardId: string, action: string) => void;
   onUpdateDescription: (cardId: string, description: string) => void;
   onUpdateQuickAnswer?: (cardId: string, quickAnswer: string) => void;
+  onUpdateRequirement?: (cardId: string, requirementId: string, text: string) => void | Promise<void>;
+  onAddRequirement?: (cardId: string, text: string) => void | Promise<void>;
+  onLinkContextArtifact?: (cardId: string, artifactId: string) => void | Promise<void>;
+  onAddPlannedFile?: (cardId: string, logicalFilePath: string) => void | Promise<void>;
+  availableArtifacts?: ContextArtifact[];
+  availableFilePaths?: string[];
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
   onSelectDoc?: (doc: ContextArtifact) => void;
@@ -101,6 +114,12 @@ export function ImplementationCard({
   onAction,
   onUpdateDescription,
   onUpdateQuickAnswer = () => {},
+  onUpdateRequirement,
+  onAddRequirement,
+  onLinkContextArtifact,
+  onAddPlannedFile,
+  availableArtifacts = [],
+  availableFilePaths = [],
   onApprovePlannedFile,
   onBuildCard,
   onSelectDoc,
@@ -119,18 +138,18 @@ export function ImplementationCard({
   const [editedDescription, setEditedDescription] = useState(card.description || '');
   const [isEditingQuickAnswer, setIsEditingQuickAnswer] = useState(false);
   const [editedQuickAnswer, setEditedQuickAnswer] = useState(quickAnswerProp || '');
+  const [editingRequirementId, setEditingRequirementId] = useState<string | null>(null);
+  const [editedRequirementText, setEditedRequirementText] = useState('');
+  const [isAddingRequirement, setIsAddingRequirement] = useState(false);
+  const [newRequirementText, setNewRequirementText] = useState('');
 
   const status = (CARD_STATUS.includes(card.status as CardStatusType) ? card.status : 'todo') as CardStatusType;
   const config = statusConfig[status];
   const sortedArtifacts = [...contextArtifacts].sort((a, b) => a.name.localeCompare(b.name));
   const quickAnswer = quickAnswerProp ?? editedQuickAnswer;
 
-  const getActionButtonText = () => {
-    if (status === 'active') return 'Monitor';
-    if (status === 'review') return 'Test';
-    if (status === 'questions') return 'Reply';
-    return 'Build';
-  };
+  const getActionButtonText = () =>
+    ACTION_BUTTONS.CARD_ACTION[status as keyof typeof ACTION_BUTTONS.CARD_ACTION] ?? ACTION_BUTTONS.CARD_ACTION.todo;
 
   const handleSaveDescription = () => {
     onUpdateDescription(card.id, editedDescription);
@@ -150,6 +169,46 @@ export function ImplementationCard({
   const handleCancelQuickAnswer = () => {
     setEditedQuickAnswer(quickAnswer || '');
     setIsEditingQuickAnswer(false);
+  };
+
+  const handleStartEditRequirement = (req: CardRequirement) => {
+    setEditingRequirementId(req.id);
+    setEditedRequirementText(req.text);
+  };
+
+  const handleSaveRequirement = async () => {
+    if (!editingRequirementId || !onUpdateRequirement) return;
+    const trimmed = editedRequirementText.trim();
+    if (trimmed) {
+      await onUpdateRequirement(card.id, editingRequirementId, trimmed);
+    }
+    setEditingRequirementId(null);
+    setEditedRequirementText('');
+  };
+
+  const handleCancelEditRequirement = () => {
+    setEditingRequirementId(null);
+    setEditedRequirementText('');
+  };
+
+  const handleStartAddRequirement = () => {
+    setIsAddingRequirement(true);
+    setNewRequirementText('');
+  };
+
+  const handleSaveNewRequirement = async () => {
+    if (!onAddRequirement) return;
+    const trimmed = newRequirementText.trim();
+    if (trimmed) {
+      await onAddRequirement(card.id, trimmed);
+    }
+    setIsAddingRequirement(false);
+    setNewRequirementText('');
+  };
+
+  const handleCancelAddRequirement = () => {
+    setIsAddingRequirement(false);
+    setNewRequirementText('');
   };
 
   return (
@@ -224,7 +283,7 @@ export function ImplementationCard({
               onClick={(e) => { e.stopPropagation(); onExpand(card.id); }}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold bg-foreground text-background rounded hover:bg-foreground/90 transition-colors"
             >
-              <ChevronDown className="h-4 w-4" /> View Details & Edit
+              <ChevronDown className="h-4 w-4" /> {ACTION_BUTTONS.VIEW_DETAILS_EDIT}
             </button>
           )}
           <button
@@ -244,23 +303,84 @@ export function ImplementationCard({
               <CardSkeleton />
             ) : (
             <>
-            {requirements.length > 0 && (
-              <div>
-                <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Requirements</h5>
+            <div>
+              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Requirements</h5>
+              {requirements.length > 0 || isAddingRequirement ? (
                 <ul className="space-y-1">
                   {requirements.map((req) => (
-                    <li key={req.id} className="text-xs text-gray-600 flex items-center gap-2 flex-wrap">
-                      <span>• {req.text}</span>
-                      <KnowledgeBadge status={req.status} />
+                    <li key={req.id} className="group/req text-xs text-gray-600 flex items-center gap-2 flex-wrap">
+                      {editingRequirementId === req.id ? (
+                        <div className="flex-1 min-w-0 space-y-2" onClick={(e) => e.stopPropagation()}>
+                          <textarea
+                            value={editedRequirementText}
+                            onChange={(e) => setEditedRequirementText(e.target.value)}
+                            className="w-full text-xs p-2 bg-white border border-gray-300 rounded text-gray-900"
+                            placeholder="Requirement text..."
+                            rows={2}
+                          />
+                          <div className="flex gap-2">
+                            <button type="button" onClick={handleSaveRequirement} className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-green-600 text-white rounded hover:bg-green-700">
+                              <Check className="h-3 w-3" /> Save
+                            </button>
+                            <button type="button" onClick={handleCancelEditRequirement} className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                              <X className="h-3 w-3" /> Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="flex-1">• {req.text}</span>
+                          <KnowledgeBadge status={req.status} />
+                          {onUpdateRequirement && (
+                            <button type="button" onClick={(e) => { e.stopPropagation(); handleStartEditRequirement(req); }} className="opacity-0 group-hover/req:opacity-100 hover:opacity-100 p-1 hover:bg-black/5 rounded transition-opacity shrink-0" title="Edit">
+                              <Edit2 className="h-3 w-3 text-gray-400" />
+                            </button>
+                          )}
+                        </>
+                      )}
                     </li>
                   ))}
+                  {isAddingRequirement && (
+                    <li className="text-xs" onClick={(e) => e.stopPropagation()}>
+                      <div className="space-y-2">
+                        <textarea
+                          value={newRequirementText}
+                          onChange={(e) => setNewRequirementText(e.target.value)}
+                          className="w-full text-xs p-2 bg-white border border-gray-300 rounded text-gray-900"
+                          placeholder="Add a requirement..."
+                          rows={2}
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button type="button" onClick={handleSaveNewRequirement} className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-green-600 text-white rounded hover:bg-green-700">
+                            <Check className="h-3 w-3" /> Add
+                          </button>
+                          <button type="button" onClick={handleCancelAddRequirement} className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                            <X className="h-3 w-3" /> Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  )}
                 </ul>
-              </div>
-            )}
+              ) : null}
+              {requirements.length === 0 && !isAddingRequirement && (
+                <p className="text-xs text-muted-foreground italic">None — added by agent when creating card or add below</p>
+              )}
+              {onAddRequirement && !isAddingRequirement && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleStartAddRequirement(); }}
+                  className="mt-2 flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/40 hover:border-foreground/50 rounded px-2 py-1.5 transition-colors"
+                >
+                  <Plus className="h-3 w-3" /> Add
+                </button>
+              )}
+            </div>
 
-            {sortedArtifacts.length > 0 && (
-              <div>
-                <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Context</h5>
+            <div>
+              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Context Documents</h5>
+              {sortedArtifacts.length > 0 ? (
                 <div className="space-y-1">
                   {sortedArtifacts.map((doc) => (
                     <button
@@ -273,23 +393,56 @@ export function ImplementationCard({
                     </button>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {plannedFiles.length > 0 && (
-              <div>
-                <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Planned Files</h5>
-                {plannedFiles.some((pf) => pf.status === 'approved') && onBuildCard && (
-                  <div className="mb-2">
+              ) : (
+                <p className="text-xs text-muted-foreground italic">None — add via chat or documents panel</p>
+              )}
+              {onLinkContextArtifact && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); onBuildCard(card.id); }}
-                      className="w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-2 flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/40 hover:border-foreground/50 rounded px-2 py-1.5 transition-colors"
                     >
-                      Build
+                      <Plus className="h-3 w-3" /> Add
                     </button>
-                  </div>
-                )}
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="max-h-48 overflow-y-auto">
+                    {availableArtifacts
+                      .filter((a) => !sortedArtifacts.some((d) => d.id === a.id))
+                      .map((art) => (
+                        <DropdownMenuItem
+                          key={art.id}
+                          onClick={(e) => { e.stopPropagation(); onLinkContextArtifact(card.id, art.id); }}
+                          className="text-xs"
+                        >
+                          {art.name}
+                        </DropdownMenuItem>
+                      ))}
+                    {availableArtifacts.filter((a) => !sortedArtifacts.some((d) => d.id === a.id)).length === 0 && (
+                      <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                        {availableArtifacts.length === 0 ? 'No docs — add via documents panel first' : 'All docs already linked'}
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+
+            <div>
+              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Code Files to Create/Edit</h5>
+              {plannedFiles.length > 0 && plannedFiles.some((pf) => pf.status === 'approved') && onBuildCard && (
+                <div className="mb-2">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onBuildCard(card.id); }}
+                    className="w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                  >
+                    Build
+                  </button>
+                </div>
+              )}
+              {plannedFiles.length > 0 ? (
                 <div className="space-y-1">
                   {plannedFiles.map((pf) => (
                     <div key={pf.id} className="flex items-center justify-between gap-2 text-xs px-2 py-1 bg-white border border-gray-300 rounded">
@@ -318,12 +471,47 @@ export function ImplementationCard({
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-xs text-muted-foreground italic">None — added by agent or files panel</p>
+              )}
+              {onAddPlannedFile && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-2 flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/40 hover:border-foreground/50 rounded px-2 py-1.5 transition-colors"
+                    >
+                      <Plus className="h-3 w-3" /> Add
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="max-h-48 overflow-y-auto">
+                    {availableFilePaths
+                      .filter((p) => !plannedFiles.some((pf) => pf.logical_file_name === p))
+                      .map((path) => (
+                        <DropdownMenuItem
+                          key={path}
+                          onClick={(e) => { e.stopPropagation(); onAddPlannedFile(card.id, path); }}
+                          className="text-xs font-mono"
+                        >
+                          {path}
+                        </DropdownMenuItem>
+                      ))}
+                    {availableFilePaths.filter((p) => !plannedFiles.some((pf) => pf.logical_file_name === p)).length === 0 && (
+                      <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                        {availableFilePaths.length === 0 ? 'No files — add via agent first' : 'All files already added'}
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
 
-            {facts.length > 0 && (
-              <div>
-                <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Known Facts</h5>
+            {(card.build_state != null || card.last_built_at != null) && (
+            <>
+            <div>
+              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Known Facts</h5>
+              {facts.length > 0 ? (
                 <ul className="space-y-1">
                   {facts.map((fact) => (
                     <li key={fact.id} className="text-xs text-gray-600 flex items-center gap-2 flex-wrap">
@@ -333,12 +521,14 @@ export function ImplementationCard({
                     </li>
                   ))}
                 </ul>
-              </div>
-            )}
+              ) : (
+                <p className="text-xs text-muted-foreground italic">None — populated by execution agent</p>
+              )}
+            </div>
 
-            {assumptions.length > 0 && (
-              <div>
-                <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Assumptions</h5>
+            <div>
+              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Assumptions</h5>
+              {assumptions.length > 0 ? (
                 <ul className="space-y-1">
                   {assumptions.map((a) => (
                     <li key={a.id} className="text-xs text-gray-600 flex items-center gap-2 flex-wrap">
@@ -347,12 +537,14 @@ export function ImplementationCard({
                     </li>
                   ))}
                 </ul>
-              </div>
-            )}
+              ) : (
+                <p className="text-xs text-muted-foreground italic">None — populated by execution agent</p>
+              )}
+            </div>
 
-            {questions.length > 0 && (
-              <div>
-                <h5 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700 mb-2">Questions</h5>
+            <div>
+              <h5 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700 mb-2">Questions</h5>
+              {questions.length > 0 ? (
                 <ul className="space-y-1 mb-3">
                   {questions.map((q) => (
                     <li key={q.id} className="text-xs text-gray-600 flex items-center gap-2 flex-wrap">
@@ -361,39 +553,44 @@ export function ImplementationCard({
                     </li>
                   ))}
                 </ul>
-                <div className="border-t border-yellow-200 pt-2">
-                  {isEditingQuickAnswer ? (
-                    <div className="space-y-2">
-                      <textarea
-                        value={editedQuickAnswer}
-                        onChange={(e) => setEditedQuickAnswer(e.target.value)}
-                        className="w-full text-xs p-2 bg-white border border-gray-300 rounded text-gray-900"
-                        placeholder="Provide an answer or clarification..."
-                        rows={2}
-                      />
-                      <div className="flex gap-2">
-                        <button type="button" onClick={handleSaveQuickAnswer} className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-green-600 text-white rounded hover:bg-green-700">
-                          <Check className="h-3 w-3" /> Save
-                        </button>
-                        <button type="button" onClick={handleCancelQuickAnswer} className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
-                          <X className="h-3 w-3" /> Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="group/answer flex items-start gap-2">
-                      <p className="text-xs text-gray-600 flex-1 leading-relaxed">{quickAnswer || 'Awaiting response...'}</p>
-                      <button type="button" onClick={() => setIsEditingQuickAnswer(true)} className="opacity-0 group-hover/answer:opacity-100 transition-opacity p-1 hover:bg-black/5 rounded">
-                        <Edit2 className="h-3 w-3 text-gray-400" />
+              ) : (
+                <p className="text-xs text-muted-foreground italic mb-3">None — populated by execution agent</p>
+              )}
+              <div className="border-t border-yellow-200 pt-2">
+                {isEditingQuickAnswer ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={editedQuickAnswer}
+                      onChange={(e) => setEditedQuickAnswer(e.target.value)}
+                      className="w-full text-xs p-2 bg-white border border-gray-300 rounded text-gray-900"
+                      placeholder="Provide an answer or clarification..."
+                      rows={2}
+                    />
+                    <div className="flex gap-2">
+                      <button type="button" onClick={handleSaveQuickAnswer} className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-green-600 text-white rounded hover:bg-green-700">
+                        <Check className="h-3 w-3" /> Save
+                      </button>
+                      <button type="button" onClick={handleCancelQuickAnswer} className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                        <X className="h-3 w-3" /> Cancel
                       </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="group/answer flex items-start gap-2">
+                    <p className="text-xs text-gray-600 flex-1 leading-relaxed">{quickAnswer || 'Awaiting response...'}</p>
+                    <button type="button" onClick={() => setIsEditingQuickAnswer(true)} className="opacity-0 group-hover/answer:opacity-100 transition-opacity p-1 hover:bg-black/5 rounded">
+                      <Edit2 className="h-3 w-3 text-gray-400" />
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
 
             </>
             )}
+            </>
+            )}
+
             <button
               type="button"
               onClick={() => onExpand(card.id)}

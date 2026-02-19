@@ -5,11 +5,10 @@ import { Header } from '@/components/dossier/header';
 import { LeftSidebar } from '@/components/dossier/left-sidebar';
 import { WorkflowBlock } from '@/components/dossier/workflow-block';
 import { RightPanel } from '@/components/dossier/right-panel';
-import { ProjectSelector } from '@/components/dossier/project-selector';
-import { MessageSquare, Sparkles } from 'lucide-react';
-import type { ProjectContext, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
+import { Sparkles } from 'lucide-react';
+import type { ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 import type { CodeFileForPanel } from '@/components/dossier/implementation-card';
-import { useMapSnapshot, useCardKnowledge, useCardPlannedFiles, useSubmitAction, useTriggerBuild } from '@/lib/hooks';
+import { useMapSnapshot, useCardKnowledge, useCardPlannedFiles, useCardContextArtifacts, useArtifacts, useProjectFiles, useSubmitAction, useTriggerBuild } from '@/lib/hooks';
 import { useProjects } from '@/lib/hooks/use-projects';
 import { MapErrorBoundary } from '@/components/dossier/map-error-boundary';
 import { ChatErrorBoundary } from '@/components/dossier/chat-error-boundary';
@@ -67,15 +66,21 @@ export default function DossierPage() {
   const { triggerBuild } = useTriggerBuild(appMode === 'active' ? projectId : undefined);
 
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
-  const { data: cardKnowledge, loading: cardKnowledgeLoading } = useCardKnowledge(
+  const { data: cardKnowledge, loading: cardKnowledgeLoading, refetch: refetchCardKnowledge } = useCardKnowledge(
     appMode === 'active' ? projectId : undefined,
     expandedCardId ?? undefined
   );
-  const { data: cardPlannedFiles, loading: cardPlannedFilesLoading } = useCardPlannedFiles(
+  const { data: cardPlannedFiles, loading: cardPlannedFilesLoading, refetch: refetchCardPlannedFiles } = useCardPlannedFiles(
     appMode === 'active' ? projectId : undefined,
     expandedCardId ?? undefined
   );
-  const cardKnowledgeLoadingState = cardKnowledgeLoading || cardPlannedFilesLoading;
+  const { data: cardContextArtifacts, loading: cardContextArtifactsLoading, refetch: refetchCardContextArtifacts } = useCardContextArtifacts(
+    appMode === 'active' ? projectId : undefined,
+    expandedCardId ?? undefined
+  );
+  const { data: projectArtifacts } = useArtifacts(appMode === 'active' ? projectId : undefined);
+  const { data: projectFilesTree } = useProjectFiles(appMode === 'active' ? projectId : undefined);
+  const cardKnowledgeLoadingState = cardKnowledgeLoading || cardPlannedFilesLoading || cardContextArtifactsLoading;
 
   const getCardKnowledgeLoading = useCallback(
     (cardId: string): boolean =>
@@ -87,26 +92,30 @@ export default function DossierPage() {
     (cardId: string): CardKnowledgeForDisplay | undefined => {
       if (cardId !== expandedCardId) return undefined;
       const card = snapshot?.workflows
-        .flatMap((wf) => wf.activities.flatMap((a) => [...a.steps.flatMap((s) => s.cards), ...a.cards]))
+        .flatMap((wf) => wf.activities.flatMap((a) => a.cards))
         .find((c) => c.id === cardId);
       const out: CardKnowledgeForDisplay = {};
-      if (cardKnowledge?.requirements?.length) out.requirements = cardKnowledge.requirements;
-      if (cardPlannedFiles?.length) out.plannedFiles = cardPlannedFiles;
+      out.requirements = cardKnowledge?.requirements ?? [];
+      out.contextArtifacts = cardContextArtifacts ?? [];
+      out.plannedFiles = cardPlannedFiles ?? [];
       if (cardKnowledge?.facts?.length) out.facts = cardKnowledge.facts;
       if (cardKnowledge?.assumptions?.length) out.assumptions = cardKnowledge.assumptions;
       if (cardKnowledge?.questions?.length) out.questions = cardKnowledge.questions;
       if (card?.quick_answer != null) out.quickAnswer = card.quick_answer;
-      return Object.keys(out).length ? out : undefined;
+      return out;
     },
-    [expandedCardId, cardKnowledge, cardPlannedFiles, snapshot]
+    [expandedCardId, cardKnowledge, cardContextArtifacts, cardPlannedFiles, snapshot]
   );
 
-  const projectContext: ProjectContext = {
-    userRequest: snapshot?.project?.name ?? 'Describe your idea in the Agent chat to get started',
-    generatedAt: snapshot?.project?.name ? 'Just now' : '—',
-    activeAgents: 3,
-    lastUpdate: 'Just now',
-  };
+  function flattenFilePaths(nodes: { path?: string; type?: string; children?: unknown[] }[] | null, acc: string[] = []): string[] {
+    if (!nodes) return acc;
+    for (const n of nodes) {
+      if (n.type === 'file' && n.path) acc.push(n.path);
+      if (n.children?.length) flattenFilePaths(n.children as { path?: string; type?: string; children?: unknown[] }[], acc);
+    }
+    return acc;
+  }
+  const availableFilePaths = projectFilesTree ? flattenFilePaths(projectFilesTree) : [];
 
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
@@ -182,28 +191,16 @@ export default function DossierPage() {
     [triggerBuild, refetch]
   );
 
-  const handleBuildAll = useCallback(
-    async (workflowId: string) => {
-      const result = await triggerBuild({ scope: 'workflow', workflow_id: workflowId });
-      if (result.runId) {
-        setRightPanelTab('runs');
-        setRightPanelOpen(true);
-        refetch();
-      }
-    },
-    [triggerBuild, refetch]
-  );
-
   const [populatingWorkflowId, setPopulatingWorkflowId] = useState<string | null>(null);
   const handlePopulateWorkflow = useCallback(
     async (workflowId: string, workflowTitle: string, workflowDescription: string | null) => {
       if (!projectId) return;
       setPopulatingWorkflowId(workflowId);
       try {
-        const message =
-          snapshot?.project?.description
-            ? `Add activities and cards for ${workflowTitle}. Project: ${snapshot.project.description}`
-            : `Add activities and cards for ${workflowTitle}`;
+        const parts: string[] = [`Add activities and cards for ${workflowTitle}`];
+        if (workflowDescription) parts.push(`Workflow: ${workflowDescription}`);
+        if (snapshot?.project?.description) parts.push(`Project: ${snapshot.project.description}`);
+        const message = parts.join('. ');
         const res = await fetch(`/api/projects/${projectId}/chat/stream`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -299,6 +296,84 @@ export default function DossierPage() {
     [submitAction, refetch]
   );
 
+  const handleUpdateRequirement = useCallback(
+    async (cardId: string, requirementId: string, text: string) => {
+      if (!projectId) return;
+      const res = await fetch(
+        `/api/projects/${projectId}/cards/${cardId}/requirements/${requirementId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        }
+      );
+      if (res.ok) {
+        refetchCardKnowledge();
+      }
+    },
+    [projectId, refetchCardKnowledge]
+  );
+
+  const handleAddRequirement = useCallback(
+    async (cardId: string, text: string) => {
+      if (!projectId) return;
+      const res = await fetch(
+        `/api/projects/${projectId}/cards/${cardId}/requirements`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, source: 'user' }),
+        }
+      );
+      if (res.ok) {
+        refetchCardKnowledge();
+      }
+    },
+    [projectId, refetchCardKnowledge]
+  );
+
+  const handleLinkContextArtifact = useCallback(
+    async (cardId: string, artifactId: string) => {
+      const result = await submitAction({
+        actions: [
+          {
+            action_type: 'linkContextArtifact',
+            target_ref: { card_id: cardId },
+            payload: { context_artifact_id: artifactId },
+          },
+        ],
+      });
+      if (result && result.applied > 0) {
+        refetch();
+        refetchCardContextArtifacts();
+      }
+    },
+    [submitAction, refetch, refetchCardContextArtifacts]
+  );
+
+  const handleAddPlannedFile = useCallback(
+    async (cardId: string, logicalFilePath: string) => {
+      if (!projectId) return;
+      const res = await fetch(
+        `/api/projects/${projectId}/cards/${cardId}/planned-files`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            logical_file_name: logicalFilePath,
+            artifact_kind: 'util',
+            action: 'edit',
+            intent_summary: 'Added by user',
+          }),
+        }
+      );
+      if (res.ok) {
+        refetchCardPlannedFiles();
+      }
+    },
+    [projectId, refetchCardPlannedFiles]
+  );
+
   const handleApprovePlannedFile = useCallback(
     async (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => {
       const result = await submitAction({
@@ -320,7 +395,16 @@ export default function DossierPage() {
   }, [refetch]);
 
   const handleProjectUpdate = useCallback(
-    async (updates: { name?: string; description?: string | null; repo_url?: string | null; default_branch?: string }) => {
+    async (updates: {
+      name?: string;
+      description?: string | null;
+      customer_personas?: string | null;
+      tech_stack?: string | null;
+      deployment?: string | null;
+      design_inspiration?: string | null;
+      repo_url?: string | null;
+      default_branch?: string;
+    }) => {
       if (!projectId) return false;
       try {
         const res = await fetch(`/api/projects/${projectId}`, {
@@ -343,10 +427,9 @@ export default function DossierPage() {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         agentStatus={agentStatus}
-        onBuildAll={handleBuildAll}
-        firstWorkflowId={snapshot?.workflows?.[0]?.id ?? null}
         selectedProjectId={projectId}
         onSelectProjectId={handleSelectProjectId}
+        onSaveCurrentProject={refetch}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -398,31 +481,6 @@ export default function DossierPage() {
             </div>
           ) : (
             <>
-              <div className="shrink-0 bg-secondary/80 backdrop-blur border-b border-border px-6 py-4">
-                <div className="flex items-start justify-between gap-6">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-1">
-                      <MessageSquare className="h-3 w-3" />
-                      Your Request
-                    </div>
-                    <p className="text-sm text-foreground font-medium leading-relaxed">
-                      &quot;{projectContext.userRequest}&quot;
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-4 shrink-0">
-                    <ProjectSelector
-                      selectedProjectId={projectId}
-                      onSelectProjectId={handleSelectProjectId}
-                    />
-                    {/* Placeholder indicators hidden for now: agents working, last update */}
-                  </div>
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-                  This implementation map was generated from your request. Each card represents a task agents are working on.
-                  <span className="text-foreground"> Click any card</span> to see details, provide answers, or guide the work.
-                </p>
-              </div>
-
               <div className="flex-1 overflow-y-auto">
                 {mapLoading && <MapSkeleton />}
                 {!mapLoading && mapError && (
@@ -447,11 +505,17 @@ export default function DossierPage() {
                     onCardAction={handleCardAction}
                     onUpdateCardDescription={handleUpdateCardDescription}
                     onUpdateQuickAnswer={handleUpdateQuickAnswer}
+                    onUpdateRequirement={handleUpdateRequirement}
+                    onAddRequirement={handleAddRequirement}
+                    onLinkContextArtifact={handleLinkContextArtifact}
+                    onAddPlannedFile={handleAddPlannedFile}
+                    availableArtifacts={projectArtifacts ?? []}
+                    availableFilePaths={availableFilePaths}
                     onApprovePlannedFile={handleApprovePlannedFile}
                     onBuildCard={handleBuildCard}
-                    onBuildAll={handleBuildAll}
                     onPopulateWorkflow={handlePopulateWorkflow}
                     populatingWorkflowId={populatingWorkflowId}
+                    onProjectUpdate={handleProjectUpdate}
                     onSelectDoc={(doc) => {
                       setSelectedDoc(doc);
                       setRightPanelTab('docs');

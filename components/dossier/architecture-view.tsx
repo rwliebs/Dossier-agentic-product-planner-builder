@@ -16,10 +16,7 @@ function snapshotToEpics(snapshot: MapSnapshot): EpicLike[] {
       id: act.id,
       epicId: wf.id,
       title: act.title,
-      cards: [
-        ...act.steps.flatMap((s) => s.cards),
-        ...act.cards,
-      ].sort((a, b) => a.priority - b.priority),
+      cards: [...act.cards].sort((a, b) => a.priority - b.priority),
     })),
   }));
 }

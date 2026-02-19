@@ -21,6 +21,9 @@ export type { UseCardKnowledgeResult, CardKnowledge } from "./use-card-knowledge
 export { useCardPlannedFiles } from "./use-card-planned-files";
 export type { UseCardPlannedFilesResult } from "./use-card-planned-files";
 
+export { useCardContextArtifacts } from "./use-card-context-artifacts";
+export type { UseCardContextArtifactsResult } from "./use-card-context-artifacts";
+
 export { useArtifacts } from "./use-artifacts";
 export type { UseArtifactsResult } from "./use-artifacts";
 

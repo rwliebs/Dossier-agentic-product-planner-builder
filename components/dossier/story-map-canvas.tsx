@@ -15,6 +15,12 @@ export interface StoryMapCanvasProps {
   onCardAction: (cardId: string, action: string) => void;
   onUpdateCardDescription?: (cardId: string, description: string) => void;
   onUpdateQuickAnswer?: (cardId: string, quickAnswer: string) => void;
+  onUpdateRequirement?: (cardId: string, requirementId: string, text: string) => void | Promise<void>;
+  onAddRequirement?: (cardId: string, text: string) => void | Promise<void>;
+  onLinkContextArtifact?: (cardId: string, artifactId: string) => void | Promise<void>;
+  onAddPlannedFile?: (cardId: string, logicalFilePath: string) => void | Promise<void>;
+  availableArtifacts?: ContextArtifact[];
+  availableFilePaths?: string[];
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
   onSelectDoc?: (doc: ContextArtifact) => void;
@@ -35,6 +41,12 @@ export function StoryMapCanvas({
   onCardAction,
   onUpdateCardDescription,
   onUpdateQuickAnswer,
+  onUpdateRequirement,
+  onAddRequirement,
+  onLinkContextArtifact,
+  onAddPlannedFile,
+  availableArtifacts = [],
+  availableFilePaths = [],
   onApprovePlannedFile,
   onBuildCard,
   onSelectDoc,
@@ -98,7 +110,37 @@ export function StoryMapCanvas({
         <div className="p-6 min-w-max">
           {workflows.map((wf) => {
             const sortedActivities = [...wf.activities].sort((a, b) => a.position - b.position);
-            if (sortedActivities.length === 0) return null;
+            if (sortedActivities.length === 0) {
+              return (
+                <div key={wf.id} className="mb-0">
+                  <div className="flex items-center gap-3 border-b border-border px-0 py-3 mb-4">
+                    <span className="text-xs font-mono text-muted-foreground uppercase tracking-widest">
+                      {wf.title}
+                    </span>
+                    <span className="text-foreground text-xs">→</span>
+                    {onPopulateWorkflow && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1.5 text-[11px] font-mono uppercase tracking-wider ml-2"
+                        onClick={() => onPopulateWorkflow(wf.id, wf.title, wf.description ?? null)}
+                        disabled={populatingWorkflowId != null}
+                      >
+                        <Sparkles className="h-3 w-3" />
+                        {populatingWorkflowId === wf.id ? ACTION_BUTTONS.POPULATING : ACTION_BUTTONS.POPULATE}
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex gap-6 mb-6">
+                    <div className="w-48 flex flex-col">
+                      <div className="border border-dashed border-border rounded px-3 py-4 text-center">
+                        <p className="text-[11px] text-muted-foreground/60 font-mono">—</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
             return (
               <div key={wf.id} className="mb-0">
                 <div className="flex items-center gap-3 border-b border-border px-0 py-3 mb-4">
@@ -117,6 +159,12 @@ export function StoryMapCanvas({
                         onCardAction={onCardAction}
                         onUpdateCardDescription={onUpdateCardDescription}
                         onUpdateQuickAnswer={onUpdateQuickAnswer}
+                        onUpdateRequirement={onUpdateRequirement}
+                        onAddRequirement={onAddRequirement}
+                        onLinkContextArtifact={onLinkContextArtifact}
+                        onAddPlannedFile={onAddPlannedFile}
+                        availableArtifacts={availableArtifacts}
+                        availableFilePaths={availableFilePaths}
                         onApprovePlannedFile={onApprovePlannedFile}
                         onBuildCard={onBuildCard}
                         onSelectDoc={onSelectDoc}

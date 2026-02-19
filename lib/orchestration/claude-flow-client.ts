@@ -1,16 +1,14 @@
 /**
- * Agentic-flow execution plane client.
- * Real client uses subprocess adapter (agentic-flow CLI) when available;
- * falls back to mock when agentic-flow is not importable or ANTHROPIC_API_KEY is unset.
+ * Claude-flow execution plane client.
+ * Real client uses subprocess adapter (claude-flow CLI) when available;
+ * falls back to mock when claude-flow is not importable or ANTHROPIC_API_KEY is unset.
  *
  * @see REMAINING_WORK_PLAN.md §5 O10
- * @see https://github.com/ruvnet/agentic-flow
+ * @see docs/O10_CLAUDE_FLOW_GAP.md — programmatic API gap and subprocess bridge
  */
 
-import { spawn, execSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import * as fs from "node:fs";
-import * as path from "node:path";
 import { buildTaskFromPayload } from "./build-task";
 
 export interface PlannedFileDetail {
@@ -73,14 +71,11 @@ export interface CancelResult {
   error?: string;
 }
 
-export interface AgenticFlowClient {
+export interface ClaudeFlowClient {
   dispatch(payload: DispatchPayload): Promise<DispatchResult>;
   status(executionId: string): Promise<StatusResult>;
   cancel(executionId: string): Promise<CancelResult>;
 }
-
-/** Backward-compatible type alias */
-export type ClaudeFlowClient = AgenticFlowClient;
 
 /** Process registry for subprocess adapter: execution_id -> { pid, startedAt } */
 const processRegistry = new Map<
@@ -88,16 +83,13 @@ const processRegistry = new Map<
   { pid: number; startedAt: string }
 >();
 
-/** Default agent for build tasks (coder handles implementation) */
-const DEFAULT_AGENT = "coder";
-
 /**
- * Real client — subprocess adapter that spawns agentic-flow CLI.
+ * Real client — subprocess adapter that spawns claude-flow CLI.
  * Uses buildTaskFromPayload to translate DispatchPayload into task description.
  *
- * CLI: npx agentic-flow --agent coder --task "<taskDescription>"
+ * @see docs/O10_CLAUDE_FLOW_GAP.md
  */
-export function createRealAgenticFlowClient(): AgenticFlowClient {
+export function createRealClaudeFlowClient(): ClaudeFlowClient {
   return {
     async dispatch(payload: DispatchPayload): Promise<DispatchResult> {
       const { taskDescription } = buildTaskFromPayload(payload);
@@ -105,18 +97,19 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
       const cwd = payload.worktree_path ?? process.cwd();
       const env = {
         ...process.env,
-        AGENTIC_FLOW_NON_INTERACTIVE: "true",
+        CLAUDE_FLOW_NON_INTERACTIVE: "true",
       };
 
       try {
         const child = spawn(
           "npx",
           [
-            "agentic-flow",
-            "--agent",
-            DEFAULT_AGENT,
-            "--task",
+            "claude-flow",
+            "swarm",
             taskDescription,
+            "--no-interactive",
+            "--output-format",
+            "json",
           ],
           {
             cwd,
@@ -132,7 +125,7 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
           startedAt: new Date().toISOString(),
         });
 
-        child.on("exit", () => {
+        child.on("exit", (code) => {
           processRegistry.delete(executionId);
         });
 
@@ -208,11 +201,11 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
   };
 }
 
-/** Whether the real client is available (agentic-flow importable + ANTHROPIC_API_KEY set) */
+/** Whether the real client is available (claude-flow importable + ANTHROPIC_API_KEY set) */
 let realClientAvailable: boolean | null = null;
 
 /**
- * @internal For testing only — resets availability so createAgenticFlowClient re-evaluates.
+ * @internal For testing only — resets availability so createClaudeFlowClient re-evaluates.
  */
 export function __setRealClientAvailableForTesting(
   available: boolean | null
@@ -221,48 +214,42 @@ export function __setRealClientAvailableForTesting(
 }
 
 /**
- * Check if agentic-flow package is installed (avoids bundler pulling in the package).
- */
-function isAgenticFlowInstalled(): boolean {
-  try {
-    const { existsSync } = require("node:fs");
-    const { join } = require("node:path");
-    const pkgPath = join(process.cwd(), "node_modules", "agentic-flow", "package.json");
-    return existsSync(pkgPath);
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Returns the execution client.
- * If agentic-flow is installed and ANTHROPIC_API_KEY is set, returns the real (subprocess) client.
+ * If claude-flow is importable and ANTHROPIC_API_KEY is set, returns the real (subprocess) client.
  * Otherwise falls back to mock and logs a warning.
  */
-export function createAgenticFlowClient(): AgenticFlowClient {
+export function createClaudeFlowClient(): ClaudeFlowClient {
   if (realClientAvailable === null) {
     const hasKey = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
-    realClientAvailable = hasKey && isAgenticFlowInstalled();
+    if (!hasKey) {
+      realClientAvailable = false;
+    } else {
+      try {
+        // Dynamic require to avoid static bundler resolution of optional claude-flow
+        const mod = "claude" + "-flow";
+        require.resolve(mod);
+        realClientAvailable = true;
+      } catch {
+        realClientAvailable = false;
+      }
+    }
   }
 
   if (realClientAvailable) {
-    return createRealAgenticFlowClient();
+    return createRealClaudeFlowClient();
   }
 
   if (typeof console !== "undefined" && console.warn) {
-    console.warn("agentic-flow not available — using mock client");
+    console.warn("claude-flow not available — using mock client");
   }
-  return createMockAgenticFlowClient();
+  return createMockClaudeFlowClient();
 }
-
-/** Backward-compatible factory alias */
-export const createClaudeFlowClient = createAgenticFlowClient;
 
 /**
  * Mock client — simulates dispatch and immediate completion.
  * Simulates webhook callback with sample knowledge items to exercise the full feedback loop.
  */
-export function createMockAgenticFlowClient(): AgenticFlowClient {
+export function createMockClaudeFlowClient(): ClaudeFlowClient {
   const executions = new Map<
     string,
     { payload: DispatchPayload; createdAt: string }
@@ -283,29 +270,6 @@ export function createMockAgenticFlowClient(): AgenticFlowClient {
       } else {
         setImmediate(async () => {
           try {
-            const clonePath = payload.worktree_path;
-            if (clonePath) {
-              try {
-                const samplePath = path.join(clonePath, "src", "mock-generated.ts");
-                fs.mkdirSync(path.dirname(samplePath), { recursive: true });
-                fs.writeFileSync(
-                  samplePath,
-                  `// Mock-generated file from Dossier build (dry-run)\n` +
-                    `// Card: ${payload.card_title ?? "Untitled"}\n` +
-                    `// Generated at: ${new Date().toISOString()}\n\n` +
-                    `export function mockGenerated(): string {\n  return "mock";\n}\n`,
-                  "utf-8"
-                );
-                execSync("git add .", { cwd: clonePath, stdio: "pipe" });
-                execSync(
-                  `git commit -m "chore: mock-generated file from Dossier build"`,
-                  { cwd: clonePath, stdio: "pipe" }
-                );
-              } catch (fileErr) {
-                console.warn("Mock file write/commit failed:", fileErr);
-              }
-            }
-
             const { getDb } = await import("@/lib/db");
             const { processWebhook } = await import("./process-webhook");
             const db = getDb();
@@ -369,6 +333,3 @@ export function createMockAgenticFlowClient(): AgenticFlowClient {
     },
   };
 }
-
-/** Backward-compatible mock factory alias */
-export const createMockClaudeFlowClient = createMockAgenticFlowClient;

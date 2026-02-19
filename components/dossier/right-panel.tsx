@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -15,10 +15,17 @@ import {
   X,
   Copy,
   ExternalLink,
+  Plus,
+  Minus,
+  Pencil,
 } from "lucide-react";
 import type { ContextArtifact } from "@/lib/types/ui";
 import type { CodeFileForPanel } from "./implementation-card";
-import { useProjectFiles, type FileNode } from "@/lib/hooks/use-project-files";
+import {
+  useProjectFiles,
+  type FileNode,
+  type ProjectFilesSource,
+} from "@/lib/hooks/use-project-files";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface RightPanelProps {
@@ -38,20 +45,41 @@ interface RightPanelProps {
   onSelectDoc?: (doc: ContextArtifact | null) => void;
 }
 
+function StatusIndicator({ status }: { status?: FileNode["status"] }) {
+  if (!status || status === "unchanged") return null;
+  if (status === "added")
+    return <Plus className="h-3 w-3 text-green-600 flex-shrink-0" />;
+  if (status === "modified")
+    return <Pencil className="h-3 w-3 text-amber-600 flex-shrink-0" />;
+  if (status === "deleted")
+    return <Minus className="h-3 w-3 text-red-600 flex-shrink-0" />;
+  return null;
+}
+
 function FileTreeNode({
   node,
   depth = 0,
+  onFileClick,
 }: {
   node: FileNode;
   depth?: number;
+  onFileClick?: (path: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(depth < 2);
+
+  const handleClick = () => {
+    if (node.type === "folder") {
+      setIsOpen(!isOpen);
+    } else if (onFileClick) {
+      onFileClick(node.path);
+    }
+  };
 
   return (
     <div>
       <button
         type="button"
-        onClick={() => node.type === "folder" && setIsOpen(!isOpen)}
+        onClick={handleClick}
         className="w-full flex items-center gap-1.5 py-1 px-2 hover:bg-accent/50 text-left group"
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
@@ -74,12 +102,18 @@ function FileTreeNode({
             <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
           </>
         )}
+        <StatusIndicator status={node.status} />
         <span className="text-xs text-foreground truncate">{node.name}</span>
       </button>
       {node.type === "folder" && isOpen && node.children && (
         <div>
           {node.children.map((child) => (
-            <FileTreeNode key={child.path} node={child} depth={depth + 1} />
+            <FileTreeNode
+              key={child.path}
+              node={child}
+              depth={depth + 1}
+              onFileClick={onFileClick}
+            />
           ))}
         </div>
       )}
@@ -99,8 +133,35 @@ export function RightPanel({
   docsList = [],
   onSelectDoc,
 }: RightPanelProps) {
-  const { data: projectFiles, loading: filesLoading } = useProjectFiles(projectId);
+  const [filesSource, setFilesSource] = useState<ProjectFilesSource>("planned");
+  const [selectedRepoFilePath, setSelectedRepoFilePath] = useState<string | null>(null);
+  const [selectedRepoFileContent, setSelectedRepoFileContent] = useState<string | null>(null);
+  const [repoFileLoading, setRepoFileLoading] = useState(false);
+
+  const {
+    data: projectFiles,
+    loading: filesLoading,
+    error: filesError,
+    fetchFileContent,
+  } = useProjectFiles(projectId, filesSource);
+
   const fileTree = projectFiles && projectFiles.length > 0 ? projectFiles : [];
+
+  const handleRepoFileClick = useCallback(
+    async (path: string) => {
+      if (!fetchFileContent) return;
+      setSelectedRepoFilePath(path);
+      setRepoFileLoading(true);
+      setSelectedRepoFileContent(null);
+      try {
+        const content = await fetchFileContent(path);
+        setSelectedRepoFileContent(content ?? "");
+      } finally {
+        setRepoFileLoading(false);
+      }
+    },
+    [fetchFileContent]
+  );
 
   if (!isOpen) return null;
 
@@ -148,35 +209,100 @@ export function RightPanel({
       {/* Panel Content */}
       <div className="flex-1 overflow-hidden">
         {activeTab === "files" && (
-          <ScrollArea className="h-full">
-            <div className="py-2">
-              <div className="px-3 pb-2 mb-2 border-b border-border">
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <GitBranch className="h-3 w-3" />
-                  <span>main</span>
-                  {filesLoading && projectId && (
-                    <>
-                      <span className="text-foreground/40">•</span>
-                      <Skeleton className="h-3 w-16 rounded" />
-                    </>
-                  )}
-                </div>
+          <div className="h-full flex flex-col overflow-hidden">
+            <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <GitBranch className="h-3 w-3" />
+                <span>{filesSource === "repo" ? "feature" : "main"}</span>
+                {filesLoading && projectId && (
+                  <>
+                    <span className="text-foreground/40">•</span>
+                    <Skeleton className="h-3 w-16 rounded" />
+                  </>
+                )}
               </div>
-              {filesLoading && projectId ? (
-                <div className="space-y-1 px-3 py-2">
-                  <Skeleton className="h-6 w-32 rounded" />
-                  <Skeleton className="h-6 w-40 rounded ml-3" />
-                  <Skeleton className="h-6 w-36 rounded ml-3" />
-                  <Skeleton className="h-6 w-28 rounded ml-6" />
-                  <Skeleton className="h-6 w-24 rounded" />
+              {projectId && (
+                <div className="flex rounded-md border border-border overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilesSource("planned");
+                      setSelectedRepoFilePath(null);
+                      setSelectedRepoFileContent(null);
+                    }}
+                    className={`px-2 py-1 text-[10px] uppercase tracking-wider ${
+                      filesSource === "planned"
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:bg-accent/50"
+                    }`}
+                  >
+                    Planned
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilesSource("repo");
+                      setSelectedRepoFilePath(null);
+                      setSelectedRepoFileContent(null);
+                    }}
+                    className={`px-2 py-1 text-[10px] uppercase tracking-wider ${
+                      filesSource === "repo"
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:bg-accent/50"
+                    }`}
+                  >
+                    Repository
+                  </button>
                 </div>
-              ) : (
-                fileTree.map((node) => (
-                  <FileTreeNode key={node.path} node={node} />
-                ))
               )}
             </div>
-          </ScrollArea>
+            {filesError && (
+              <div className="px-3 py-2 text-xs text-destructive">
+                {filesError}
+              </div>
+            )}
+            <div className="flex-1 flex overflow-hidden min-h-0">
+              <ScrollArea className="flex-1 min-w-0">
+                <div className="py-2">
+                  {filesLoading && projectId ? (
+                    <div className="space-y-1 px-3 py-2">
+                      <Skeleton className="h-6 w-32 rounded" />
+                      <Skeleton className="h-6 w-40 rounded ml-3" />
+                      <Skeleton className="h-6 w-36 rounded ml-3" />
+                      <Skeleton className="h-6 w-28 rounded ml-6" />
+                      <Skeleton className="h-6 w-24 rounded" />
+                    </div>
+                  ) : (
+                    fileTree.map((node) => (
+                      <FileTreeNode
+                        key={node.path}
+                        node={node}
+                        onFileClick={
+                          filesSource === "repo" ? handleRepoFileClick : undefined
+                        }
+                      />
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+              {filesSource === "repo" && selectedRepoFilePath && (
+                <div className="w-1/2 border-l border-border flex flex-col min-w-0">
+                  <div className="px-2 py-1.5 border-b border-border text-[10px] font-mono text-muted-foreground truncate">
+                    {selectedRepoFilePath}
+                  </div>
+                  <ScrollArea className="flex-1 p-2">
+                    {repoFileLoading ? (
+                      <Skeleton className="h-4 w-full rounded" />
+                    ) : (
+                      <pre className="text-xs font-mono whitespace-pre-wrap break-words text-foreground">
+                        {selectedRepoFileContent ?? "(empty)"}
+                      </pre>
+                    )}
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {activeTab === "terminal" && (

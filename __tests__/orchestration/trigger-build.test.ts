@@ -48,6 +48,14 @@ vi.mock("@/lib/supabase/queries", () => ({
   getArtifactById: vi.fn(),
 }));
 
+vi.mock("@/lib/orchestration/repo-manager", () => ({
+  ensureClone: vi.fn().mockReturnValue({
+    success: true,
+    clonePath: "/tmp/dossier/repos/test-project",
+  }),
+  createFeatureBranch: vi.fn().mockReturnValue({ success: true }),
+}));
+
 describe("Trigger build - single-build lock (O10.6)", () => {
   beforeEach(() => {
     vi.mocked(orchestrationQueries.listOrchestrationRunsByProject).mockResolvedValue([]);
@@ -109,6 +117,30 @@ describe("Trigger build - single-build lock (O10.6)", () => {
     );
   });
 
+  it("rejects when no repository is connected", async () => {
+    vi.mocked(orchestrationQueries.listOrchestrationRunsByProject).mockResolvedValue([]);
+    vi.mocked(queries.getProject).mockResolvedValue({
+      id: projectId,
+      repo_url: null,
+      default_branch: "main",
+    } as never);
+
+    const mockDb = createMockDbAdapter();
+    const result = await triggerBuild(mockDb, {
+      project_id: projectId,
+      scope: "card",
+      card_id: cardId,
+      trigger_type: "card",
+      initiated_by: "user",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("No repository connected");
+    expect(result.validationErrors).toContain(
+      "Connect a GitHub repository in the project settings before triggering a build."
+    );
+  });
+
   it("rejects when card(s) lack finalized_at", async () => {
     vi.mocked(orchestrationQueries.listOrchestrationRunsByProject).mockResolvedValue([]);
     vi.mocked(queries.getCardById).mockResolvedValue({
@@ -167,6 +199,7 @@ describe("Trigger build - single-build lock (O10.6)", () => {
     expect(mockInsertAssignment).toHaveBeenCalledWith(
       expect.objectContaining({
         allowed_paths: ["src", "app", "lib", "components"],
+        worktree_path: "/tmp/dossier/repos/test-project",
       })
     );
   });

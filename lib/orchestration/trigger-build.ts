@@ -8,6 +8,7 @@ import { createRun } from "./create-run";
 import { createAssignment } from "./create-assignment";
 import { dispatchAssignment } from "./dispatch";
 import { logEvent } from "./event-logger";
+import { ensureClone, createFeatureBranch } from "./repo-manager";
 import {
   getCardById,
   getCardIdsByWorkflow,
@@ -59,10 +60,19 @@ export async function triggerBuild(
     return { success: false, error: "Project not found" };
   }
 
-  const repoUrl =
-    (project as { repo_url?: string }).repo_url ?? "https://github.com/placeholder/repo";
+  const repoUrl = (project as { repo_url?: string }).repo_url;
   const baseBranch =
     (project as { default_branch?: string }).default_branch ?? "main";
+
+  if (!repoUrl || repoUrl.includes("placeholder")) {
+    return {
+      success: false,
+      error: "No repository connected",
+      validationErrors: [
+        "Connect a GitHub repository in the project settings before triggering a build.",
+      ],
+    };
+  }
 
   const cardIds =
     input.scope === "card" && input.card_id
@@ -99,6 +109,20 @@ export async function triggerBuild(
     };
   }
 
+  // Clone repo for single-card builds (MVP); multi-card requires worktrees (deferred)
+  let clonePath: string | null = null;
+  if (cardIds.length === 1) {
+    const cloneResult = ensureClone(input.project_id, repoUrl);
+    if (!cloneResult.success) {
+      return {
+        success: false,
+        error: cloneResult.error,
+        validationErrors: [cloneResult.error ?? "Repo clone failed"],
+      };
+    }
+    clonePath = cloneResult.clonePath ?? null;
+  }
+
   // Code file creation (planned files) is optional — all finalized cards are buildable
   const runResult = await createRun(db, {
     project_id: input.project_id,
@@ -115,6 +139,7 @@ export async function triggerBuild(
       workflow_id: input.workflow_id ?? null,
       triggered_at: new Date().toISOString(),
     },
+    worktree_root: clonePath,
   });
 
   if (!runResult.success) {
@@ -156,13 +181,30 @@ export async function triggerBuild(
     const cardIdShort = cardId.slice(0, 8);
     const featureBranch = `feat/run-${runIdShort}-${cardIdShort}`;
 
+    let worktreePath: string | null = null;
+    if (clonePath) {
+      const branchResult = createFeatureBranch(
+        clonePath,
+        featureBranch,
+        baseBranch
+      );
+      if (!branchResult.success) {
+        return {
+          success: false,
+          error: branchResult.error,
+          validationErrors: [branchResult.error ?? "Create branch failed"],
+        };
+      }
+      worktreePath = clonePath;
+    }
+
     const assignResult = await createAssignment(db, {
       run_id: runId,
       card_id: cardId,
       agent_role: "coder",
       agent_profile: "default",
       feature_branch: featureBranch,
-      worktree_path: null,
+      worktree_path: worktreePath,
       allowed_paths: allowedPaths,
       forbidden_paths: null,
       assignment_input_snapshot: {

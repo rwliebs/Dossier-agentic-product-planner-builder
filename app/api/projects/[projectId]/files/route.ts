@@ -1,16 +1,24 @@
 import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
-import { getProject, getPlannedFilesByProject } from "@/lib/supabase/queries";
+import {
+  getProject,
+  getPlannedFilesByProject,
+} from "@/lib/supabase/queries";
+import {
+  listOrchestrationRunsByProject,
+  getCardAssignmentsByRun,
+} from "@/lib/supabase/queries/orchestration";
 import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
+import {
+  getRepoFileTreeWithStatus,
+  getFileContent,
+  getFileDiff,
+  type FileNode,
+} from "@/lib/orchestration/repo-reader";
+
+export type { FileNode };
 
 type RouteParams = { params: Promise<{ projectId: string }> };
-
-export interface FileNode {
-  name: string;
-  type: "file" | "folder";
-  path: string;
-  children?: FileNode[];
-}
 
 function buildTree(rows: { logical_file_name: string }[]): FileNode[] {
   const byPath = new Map<string, FileNode>();
@@ -49,12 +57,98 @@ function buildTree(rows: { logical_file_name: string }[]): FileNode[] {
   return roots;
 }
 
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { projectId } = await params;
     const db = getDb();
     const project = await getProject(db, projectId);
     if (!project) return notFoundError("Project not found");
+
+    const { searchParams } = new URL(request.url);
+    const source = searchParams.get("source") ?? "planned";
+
+    if (source === "repo") {
+      const runs = await listOrchestrationRunsByProject(db, projectId, {
+        limit: 5,
+      });
+      const run = runs.find(
+        (r) => (r as { worktree_root?: string }).worktree_root
+      );
+      if (!run) {
+        return json(
+          { error: "No build with repository available. Trigger a build first." },
+          { status: 404 }
+        );
+      }
+      const runRow = run as {
+        worktree_root: string;
+        base_branch: string;
+        id: string;
+      };
+      const assignments = await getCardAssignmentsByRun(db, runRow.id);
+      const assignment = assignments.find(
+        (a) => (a as { worktree_path?: string }).worktree_path
+      ) as { feature_branch: string } | undefined;
+      if (!assignment) {
+        return json(
+          { error: "No assignment with worktree. Trigger a build first." },
+          { status: 404 }
+        );
+      }
+
+      const filePath = searchParams.get("path");
+      const wantContent = searchParams.get("content") === "1";
+      const wantDiff = searchParams.get("diff") === "1";
+
+      if (wantContent && filePath) {
+        const contentResult = getFileContent(
+          runRow.worktree_root,
+          assignment.feature_branch,
+          filePath
+        );
+        if (!contentResult.success) {
+          return json(
+            { error: contentResult.error ?? "Failed to read file" },
+            { status: 404 }
+          );
+        }
+        return new Response(contentResult.content ?? "", {
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
+      }
+
+      if (wantDiff && filePath) {
+        const diffResult = getFileDiff(
+          runRow.worktree_root,
+          runRow.base_branch,
+          assignment.feature_branch,
+          filePath
+        );
+        if (!diffResult.success) {
+          return json(
+            { error: diffResult.error ?? "Failed to get diff" },
+            { status: 404 }
+          );
+        }
+        return new Response(diffResult.diff ?? "", {
+          headers: { "Content-Type": "text/x-diff; charset=utf-8" },
+        });
+      }
+
+      const result = getRepoFileTreeWithStatus(
+        runRow.worktree_root,
+        assignment.feature_branch,
+        runRow.base_branch
+      );
+      if (!result.success) {
+        return json(
+          { error: result.error ?? "Failed to read repository files" },
+          { status: 500 }
+        );
+      }
+      return json(result.tree ?? []);
+    }
+
     const rows = await getPlannedFilesByProject(db, projectId);
     const tree = buildTree(rows as { logical_file_name: string }[]);
     return json(tree);

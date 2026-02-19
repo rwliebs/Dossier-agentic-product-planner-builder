@@ -4,8 +4,8 @@ Step 4 API layer for the Dossier planning system. Aligns with [dual-llm-integrat
 
 ## Setup
 
-1. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-2. Apply migrations: run the SQL in `supabase/migrations/` against your Supabase project (via Dashboard SQL editor or `supabase db push` if using Supabase CLI).
+1. Copy `.env.example` to `.env.local` and set `ANTHROPIC_API_KEY` and `GITHUB_TOKEN`.
+2. Database: SQLite (default) stores data in `~/.dossier/dossier.db`. Migrations run automatically on first use.
 
 ## Base URL
 
@@ -271,9 +271,52 @@ Delete planned file.
 
 ---
 
+## Project Files (Planned + Repository)
+
+### GET /api/projects/[projectId]/files
+
+File tree for the project. Two modes via `source` query param.
+
+**Query params:**
+
+| Param | Values | Description |
+|-------|--------|-------------|
+| `source` | `planned` (default) | Planned files from `card_planned_file` (intent, not produced code) |
+| `source` | `repo` | Actual files from cloned repo (after build); includes diff status |
+| `content` | `1` | With `source=repo` and `path`: return file content as `text/plain` |
+| `diff` | `1` | With `source=repo` and `path`: return unified diff vs base branch as `text/x-diff` |
+| `path` | `src/foo.ts` | Required when `content=1` or `diff=1`; file path (with or without leading slash) |
+
+**Default (`source=planned`):** Returns hierarchical file tree built from `card_planned_file.logical_file_name`.
+
+**`source=repo`:** Returns file tree from the latest build's cloned repo (feature branch). Requires at least one completed or running build with `worktree_root` set. Nodes include optional `status`: `added`, `modified`, `deleted`.
+
+**`source=repo&content=1&path=...`:** Returns raw file content. `404` if file not found.
+
+**`source=repo&diff=1&path=...`:** Returns `git diff base...feature -- path`. `404` if file unchanged or not found.
+
+**Response (tree):** `200` — Array of `FileNode`:
+```json
+[
+  {
+    "name": "src",
+    "type": "folder",
+    "path": "/src",
+    "status": "modified",
+    "children": [
+      { "name": "index.ts", "type": "file", "path": "/src/index.ts", "status": "added" }
+    ]
+  }
+]
+```
+
+**Response (content/diff):** `200` — `text/plain` or `text/x-diff` body. `404` — Error JSON if no build or file not found.
+
+---
+
 ## Dual LLM Strategy Alignment
 
 - **Planning Context Engine (Step 8):** `POST /api/projects/[id]/actions` receives `PlanningAction[]`. Engine must submit through this endpoint; no direct writes.
-- **Build Orchestrator (Step 9):** `GET /api/projects/[id]/map` provides `run_input_snapshot` structure. `GET .../planned-files` returns approved files for assignment.
+- **Build Orchestrator (Step 9):** `GET /api/projects/[id]/map` provides `run_input_snapshot` structure. `GET .../planned-files` returns approved files for assignment. `GET .../files?source=repo` returns produced files from the cloned repo after build (with diff status).
 - **Action-centric mutations:** All map changes go through the actions endpoint.
 - **No-auth-first POC:** Auth/RLS deferred; endpoints use anon key.

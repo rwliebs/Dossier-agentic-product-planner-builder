@@ -30,6 +30,7 @@ ttl_expires_on: null
 | Artifacts | `/api/projects/[id]/artifacts` | Context artifacts |
 | Card knowledge | `/api/projects/[id]/cards/[cardId]/{requirements,facts,assumptions,questions}` | Knowledge items |
 | Planned files | `/api/projects/[id]/cards/[cardId]/planned-files` | Card planned files |
+| Files | `/api/projects/[id]/files` | File tree (planned or repo); `?source=repo` for produced code |
 
 ## Related
 - [data-contracts-reference.md](data-contracts-reference.md)

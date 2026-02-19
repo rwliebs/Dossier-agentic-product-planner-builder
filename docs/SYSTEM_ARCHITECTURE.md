@@ -90,10 +90,14 @@ GET /api/projects/[id]/map → DbAdapter queries → build map tree
   → Project + Workflow[] + Activity[] + Step[] + Card[]
 ```
 
-### Build Path (future)
+### Build Path
 ```
-User trigger → OrchestrationRun → CardAssignment[] → agentic-flow
-  → RuVector memory → agents → RunCheck[] → ApprovalRequest → PR
+User trigger → ensureClone (repo to ~/.dossier/repos/<projectId>/)
+  → createRun → createAssignment (worktree_path = clone)
+  → dispatch to agentic-flow (cwd = clone)
+  → agents write files, commit to feature branch
+  → GET /api/projects/[id]/files?source=repo → repo file tree + diff status
+  → RunCheck[] → ApprovalRequest → PR
 ```
 
 ---
@@ -112,6 +116,7 @@ User trigger → OrchestrationRun → CardAssignment[] → agentic-flow
 | GET | `/api/projects/[id]/artifacts` | List context artifacts |
 | GET | `/api/projects/[id]/cards/[cardId]/requirements` | Card requirements |
 | GET | `/api/projects/[id]/cards/[cardId]/planned-files` | Card planned files |
+| GET | `/api/projects/[id]/files` | File tree (planned or repo); `?source=repo` for produced code |
 | GET | `/api/projects/[id]/cards/[cardId]/finalize` | Card finalization package |
 | POST | `/api/projects/[id]/cards/[cardId]/finalize` | Confirm card finalization |
 

@@ -37,9 +37,13 @@ ttl_expires_on: null
 ### Run Lifecycle
 ```
 User trigger (card | workflow)
-  → createRun (validate policy, capture snapshots)
-  → createAssignment per card (feature_branch, allowed_paths, forbidden_paths)
-  → dispatch to agentic-flow (in-process or MCP)
+  → ensureClone (repo to ~/.dossier/repos/<projectId>/) — single-card only for MVP
+  → createRun (validate policy, capture snapshots; worktree_root = clone path)
+  → createFeatureBranch per card
+  → createAssignment per card (feature_branch, worktree_path, allowed_paths, forbidden_paths)
+  → dispatch to agentic-flow (cwd = worktree_path)
+  → agents write files, commit to feature branch
+  → GET /api/projects/[id]/files?source=repo surfaces produced files with diff status
   → execute checks (dependency, security, policy, lint, unit, integration, e2e)
   → approval gates: request approval only if checks pass
   → createPullRequestCandidate (draft)
@@ -53,9 +57,11 @@ User trigger (card | workflow)
 ### Key Files
 | File | Purpose |
 |------|---------|
+| `lib/orchestration/repo-manager.ts` | ensureClone, createFeatureBranch; clone to ~/.dossier/repos/ |
+| `lib/orchestration/repo-reader.ts` | getRepoFileTree, getChangedFiles, getFileContent, getFileDiff |
 | `lib/orchestration/create-run.ts` | createRun; policy validation; snapshot capture |
 | `lib/orchestration/create-assignment.ts` | CardAssignment per card |
-| `lib/orchestration/trigger-build.ts` | Entry point for build trigger |
+| `lib/orchestration/trigger-build.ts` | Entry point; clones repo, creates branch, populates worktree_path |
 | `lib/orchestration/dispatch.ts` | Dispatch to agentic-flow |
 | `lib/orchestration/execute-checks.ts` | Run required checks |
 | `lib/orchestration/approval-gates.ts` | Check pass before approval request |

@@ -104,8 +104,9 @@ ttl_expires_on: null
 - No run requests approval without required checks completed
 - PR creation and merge remain user-gated
 - Assignment snapshots immutable; card boundaries enforced
+- User can review produced files in Files tab (Repository mode) with diff indicators
 
-**Data flow**: `OrchestrationRun → CardAssignment[] → agentic-flow → RunCheck[] → ApprovalRequest → PullRequestCandidate`
+**Data flow**: `ensureClone → OrchestrationRun → CardAssignment[] → agentic-flow (cwd=clone) → GET /files?source=repo → RunCheck[] → ApprovalRequest → PullRequestCandidate`
 
 ---
 

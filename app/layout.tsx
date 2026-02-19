@@ -2,6 +2,7 @@ import React from "react"
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono, Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { Toaster } from 'sonner'
 import { ErrorBoundary } from '@/components/error-boundary'
 import './globals.css'
 
@@ -43,6 +44,7 @@ export default function RootLayout({
         <ErrorBoundary title="Something went wrong">
           {children}
         </ErrorBoundary>
+        <Toaster richColors position="top-right" />
         <Analytics />
       </body>
     </html>

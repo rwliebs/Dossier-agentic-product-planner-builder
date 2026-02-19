@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { WorkflowBlock } from "@/components/dossier/workflow-block";
+import { ACTION_BUTTONS } from "@/lib/constants/action-buttons";
 import type { MapSnapshot } from "@/lib/types/ui";
 
 const minimalSnapshot: MapSnapshot = {
@@ -76,7 +77,7 @@ describe("WorkflowBlock", () => {
       />
     );
 
-    expect(screen.getByRole("button", { name: /build all/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: new RegExp(ACTION_BUTTONS.BUILD_ALL, "i") })).toBeInTheDocument();
   });
 
   it("renders activity column with card title", () => {
@@ -119,5 +120,29 @@ describe("WorkflowBlock", () => {
     const hasGuidance =
       /workflow|populate|activities|agent|preview|add/i.test(bodyText);
     expect(hasGuidance).toBe(true);
+  });
+
+  it("shows Populate button on each workflow when onPopulateWorkflow is provided", () => {
+    const onPopulateWorkflow = vi.fn();
+    render(
+      <WorkflowBlock
+        snapshot={workflowsOnlySnapshot}
+        viewMode="functionality"
+        expandedCardId={null}
+        onExpandCard={() => {}}
+        onCardAction={() => {}}
+        onPopulateWorkflow={onPopulateWorkflow}
+      />
+    );
+
+    const populateButtons = screen.getAllByRole("button", { name: new RegExp(ACTION_BUTTONS.POPULATE, "i") });
+    expect(populateButtons.length).toBe(workflowsOnlySnapshot.workflows.length);
+
+    populateButtons[0].click();
+    expect(onPopulateWorkflow).toHaveBeenCalledWith(
+      "wf-a",
+      "User Management",
+      null
+    );
   });
 });

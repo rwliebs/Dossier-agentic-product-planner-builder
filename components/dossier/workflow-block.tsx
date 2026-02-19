@@ -5,6 +5,7 @@ import { Zap } from 'lucide-react';
 import { StoryMapCanvas, type StoryMapCanvasProps } from './story-map-canvas';
 import { ArchitectureView } from './architecture-view';
 import { Button } from '@/components/ui/button';
+import { ACTION_BUTTONS } from '@/lib/constants/action-buttons';
 import type { MapSnapshot, MapCard, ContextArtifact, CardKnowledgeForDisplay, CodeFile } from '@/lib/types/ui';
 import type { CodeFileForPanel } from './implementation-card';
 
@@ -32,6 +33,8 @@ interface WorkflowBlockProps {
   onUpdateFileDescription?: (fileId: string, description: string) => void;
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
   getCardKnowledgeLoading?: (cardId: string) => boolean;
+  onPopulateWorkflow?: (workflowId: string, workflowTitle: string, workflowDescription: string | null) => void;
+  populatingWorkflowId?: string | null;
 }
 
 export function WorkflowBlock({
@@ -50,6 +53,8 @@ export function WorkflowBlock({
   onUpdateFileDescription,
   getCardKnowledge,
   getCardKnowledgeLoading,
+  onPopulateWorkflow,
+  populatingWorkflowId,
 }: WorkflowBlockProps) {
   const allCards = useMemo(() => allCardsFromSnapshot(snapshot), [snapshot]);
   const statusCounts = useMemo(
@@ -89,7 +94,7 @@ export function WorkflowBlock({
               onClick={() => onBuildAll(snapshot.workflows[0].id)}
             >
               <Zap className="h-3 w-3" />
-              <span className="text-xs uppercase tracking-widest font-mono">Build All</span>
+              <span className="text-xs uppercase tracking-widest font-mono">{ACTION_BUTTONS.BUILD_ALL}</span>
             </Button>
           )}
         </div>
@@ -110,6 +115,8 @@ export function WorkflowBlock({
             onSelectFile={onFileClick}
             getCardKnowledge={getCardKnowledge}
             getCardKnowledgeLoading={getCardKnowledgeLoading}
+            onPopulateWorkflow={onPopulateWorkflow}
+            populatingWorkflowId={populatingWorkflowId}
           />
         ) : (
           <ArchitectureView

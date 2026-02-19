@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Layers } from 'lucide-react';
+import { Layers, Sparkles } from 'lucide-react';
 import { ActivityColumn, type ActivityColumnProps } from './activity-column';
+import { Button } from '@/components/ui/button';
+import { ACTION_BUTTONS } from '@/lib/constants/action-buttons';
 import type { MapWorkflow, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 import type { CodeFileForPanel } from './implementation-card';
 
@@ -20,6 +22,10 @@ export interface StoryMapCanvasProps {
   codeFiles?: CodeFileForPanel[];
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
   getCardKnowledgeLoading?: (cardId: string) => boolean;
+  /** When workflows are scaffolded (no activities), call to populate a single workflow. */
+  onPopulateWorkflow?: (workflowId: string, workflowTitle: string, workflowDescription: string | null) => void;
+  /** ID of workflow currently being populated (shows loading state). */
+  populatingWorkflowId?: string | null;
 }
 
 export function StoryMapCanvas({
@@ -36,6 +42,8 @@ export function StoryMapCanvas({
   codeFiles,
   getCardKnowledge,
   getCardKnowledgeLoading,
+  onPopulateWorkflow,
+  populatingWorkflowId,
 }: StoryMapCanvasProps) {
   const [uncontrolledExpandedCardId, setUncontrolledExpandedCardId] = useState<string | null>(null);
   const expandedCardId = controlledExpandedCardId ?? uncontrolledExpandedCardId;
@@ -55,6 +63,18 @@ export function StoryMapCanvas({
                   {wf.title}
                 </span>
                 <span className="text-foreground text-xs">→</span>
+                {onPopulateWorkflow && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 text-[11px] font-mono uppercase tracking-wider ml-2"
+                    onClick={() => onPopulateWorkflow(wf.id, wf.title, wf.description ?? null)}
+                    disabled={populatingWorkflowId != null}
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    {populatingWorkflowId === wf.id ? ACTION_BUTTONS.POPULATING : ACTION_BUTTONS.POPULATE}
+                  </Button>
+                )}
               </div>
               <div className="flex gap-6 mb-6">
                 <div className="w-48 flex flex-col">
@@ -70,10 +90,7 @@ export function StoryMapCanvas({
               <Layers className="h-5 w-5 text-muted-foreground" />
             </div>
             <p className="text-sm text-muted-foreground">
-              Workflows are scaffolded — use the Agent chat to populate them with activities and cards.
-            </p>
-            <p className="text-[11px] text-muted-foreground/60 font-mono uppercase tracking-wider">
-              Accept the pending preview in the chat panel to continue
+              Workflows are scaffolded — click Populate on any workflow to add activities and cards.
             </p>
           </div>
         </div>

@@ -104,6 +104,21 @@ describe("parseActionsFromStream", () => {
     expect((actions[1] as { action_type?: string }).action_type).toBe("createCard");
   });
 
+  it("parses actions with 'action' field (LLM alternate format)", async () => {
+    const pid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    const wfId = "22cb49ef-34aa-4cb3-ab3e-81063a2cba0d";
+    const actId = "a1f8c3d2-4e5f-6a7b-8c9d-0e1f2a3b4c5d";
+    const json = `{"type":"actions","message":"Done.","actions":[{"action":"createActivity","target_ref":{"workflow_id":"${wfId}"},"payload":{"id":"${actId}","title":"Register","position":0}},{"action":"createCard","target_ref":{"workflow_activity_id":"${actId}"},"payload":{"title":"Sign up","status":"todo","priority":1,"position":0}}]}`;
+    const stream = await streamFromStrings([json]);
+    const actions: unknown[] = [];
+    for await (const result of parseActionsFromStream(stream)) {
+      if (result.type === "action") actions.push(result.action);
+    }
+    expect(actions.length).toBe(2);
+    expect((actions[0] as { action_type?: string }).action_type).toBe("createActivity");
+    expect((actions[1] as { action_type?: string }).action_type).toBe("createCard");
+  });
+
   it("yields done at end", async () => {
     const results: string[] = [];
     const stream = await streamFromStrings(['{"type":"clarification","message":"Tell me more","actions":[]}\n']);

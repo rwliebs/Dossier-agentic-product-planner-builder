@@ -178,6 +178,10 @@ export async function POST(
           if (result.type !== "action") continue;
 
           const action = result.action;
+          // In populate mode, only apply createActivity and createCard; skip other action types
+          if (mode === "populate" && action.action_type !== "createActivity" && action.action_type !== "createCard") {
+            continue;
+          }
           const targetRef = action.target_ref as Record<string, unknown>;
           const projectIdValue = state.project.id;
 

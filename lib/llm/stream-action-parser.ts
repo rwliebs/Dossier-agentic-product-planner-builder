@@ -20,7 +20,7 @@ function normalizeAction(obj: Record<string, unknown>): PlanningAction {
       : typeof targetRef.project_id === "string"
         ? targetRef.project_id
         : "";
-  const rawActionType = obj.action_type as string;
+  const rawActionType = (obj.action_type ?? obj.action) as string;
   const action_type = planningActionTypeSchema.safeParse(rawActionType).success
     ? (rawActionType as PlanningAction["action_type"])
     : "updateCard";
@@ -117,7 +117,11 @@ function tryParseObject(
           const normalized = normalizeAction(item as Record<string, unknown>);
           planningActionSchema.parse(normalized);
           actions.push(normalized);
-        } catch {
+        } catch (err) {
+          if (process.env.PLANNING_DEBUG === "1") {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.warn("[stream-action-parser] Skipped invalid action:", msg, JSON.stringify(item).slice(0, 200));
+          }
           // Skip invalid action
         }
       }

@@ -185,4 +185,91 @@ describe("chat/stream with mock", () => {
     const workflowIds = (phaseComplete?.data as { workflow_ids?: string[] })?.workflow_ids ?? [];
     expect(workflowIds.length).toBe(2);
   });
+
+  it("populate with mock_response produces createActivity and createCard actions", async () => {
+    let pid: string;
+    let workflowId: string;
+    try {
+      pid = await createTestProject();
+      const db = getDb();
+      workflowId = crypto.randomUUID();
+      await db.insertWorkflow({
+        id: workflowId,
+        project_id: pid,
+        title: "User Management",
+        description: "User registration and auth",
+        position: 0,
+      });
+    } catch {
+      return;
+    }
+
+    const actId1 = crypto.randomUUID();
+    const actId2 = crypto.randomUUID();
+    const cardId1 = crypto.randomUUID();
+    const mockPopulate = JSON.stringify({
+      type: "actions",
+      message: "Created activities and cards.",
+      actions: [
+        {
+          id: actId1,
+          action_type: "createActivity",
+          target_ref: { workflow_id: workflowId },
+          payload: { id: actId1, title: "Register", color: "blue", position: 0 },
+        },
+        {
+          id: actId2,
+          action_type: "createActivity",
+          target_ref: { workflow_id: workflowId },
+          payload: { id: actId2, title: "Login", color: "green", position: 1 },
+        },
+        {
+          id: cardId1,
+          action_type: "createCard",
+          target_ref: { workflow_activity_id: actId1 },
+          payload: { title: "Sign up form", status: "todo", priority: 1, position: 0 },
+        },
+      ],
+    });
+
+    const req = new NextRequest(
+      `http://localhost/api/projects/${pid}/chat/stream`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Add activities and cards",
+          mode: "populate",
+          workflow_id: workflowId,
+          mock_response: mockPopulate,
+        }),
+      },
+    );
+
+    const res = await POST(req, { params: Promise.resolve({ projectId: pid }) });
+    expect(res.status).toBe(200);
+
+    const events = await consumeSSE(res);
+    const actions = events
+      .filter((e) => e.event === "action")
+      .map((e) => (e.data as { action?: unknown }).action)
+      .filter(Boolean);
+
+    const createActivity = actions.filter(
+      (a: { action_type?: string }) => a?.action_type === "createActivity",
+    );
+    const createCard = actions.filter(
+      (a: { action_type?: string }) => a?.action_type === "createCard",
+    );
+    const errors = events.filter((e) => e.event === "error");
+
+    if (createCard.length === 0 && errors.length > 0) {
+      throw new Error(
+        `createCard failed. Errors: ${errors.map((e) => JSON.stringify((e.data as { reason?: string }).reason)).join("; ")}`,
+      );
+    }
+
+    expect(createActivity.length).toBe(2);
+    expect(createCard.length).toBe(1);
+  });
 });

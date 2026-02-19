@@ -194,6 +194,79 @@ export default function DossierPage() {
     [triggerBuild, refetch]
   );
 
+  const [populatingWorkflowId, setPopulatingWorkflowId] = useState<string | null>(null);
+  const handlePopulateWorkflow = useCallback(
+    async (workflowId: string, workflowTitle: string, workflowDescription: string | null) => {
+      if (!projectId) return;
+      setPopulatingWorkflowId(workflowId);
+      try {
+        const message =
+          snapshot?.project?.description
+            ? `Add activities and cards for ${workflowTitle}. Project: ${snapshot.project.description}`
+            : `Add activities and cards for ${workflowTitle}`;
+        const res = await fetch(`/api/projects/${projectId}/chat/stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message, mode: 'populate', workflow_id: workflowId }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const msg = (err as { error?: string; message?: string }).error ?? (err as { message?: string }).message ?? `Populate failed (${res.status})`;
+          const { toast } = await import('sonner');
+          toast.error(msg);
+          setPopulatingWorkflowId(null);
+          return;
+        }
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let streamError: string | null = null;
+        let actionCount = 0;
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const blocks = buffer.split(/\n\n+/);
+            buffer = blocks.pop() ?? '';
+            for (const block of blocks) {
+              let eventType = '';
+              let dataStr = '';
+              for (const line of block.split('\n')) {
+                if (line.startsWith('event: ')) eventType = line.slice(7).trim();
+                if (line.startsWith('data: ')) dataStr = line.slice(6);
+              }
+              if (eventType === 'error' && dataStr) {
+                try {
+                  const data = JSON.parse(dataStr) as { reason?: string };
+                  streamError = data.reason ?? 'Populate failed';
+                } catch {
+                  streamError = 'Populate failed';
+                }
+              }
+              if (eventType === 'action') actionCount++;
+            }
+          }
+        }
+        if (streamError) {
+          const { toast } = await import('sonner');
+          toast.error(streamError);
+        } else if (actionCount === 0) {
+          const { toast } = await import('sonner');
+          toast.warning('No activities or cards were generated. Try again or add more context in the Agent chat.');
+        }
+        refetch();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Populate failed';
+        const { toast } = await import('sonner');
+        toast.error(msg);
+      } finally {
+        setPopulatingWorkflowId(null);
+      }
+    },
+    [projectId, snapshot?.project?.description, refetch]
+  );
+
   const handleUpdateCardDescription = useCallback(
     async (cardId: string, description: string) => {
       const result = await submitAction({
@@ -377,6 +450,8 @@ export default function DossierPage() {
                     onApprovePlannedFile={handleApprovePlannedFile}
                     onBuildCard={handleBuildCard}
                     onBuildAll={handleBuildAll}
+                    onPopulateWorkflow={handlePopulateWorkflow}
+                    populatingWorkflowId={populatingWorkflowId}
                     onSelectDoc={(doc) => {
                       setSelectedDoc(doc);
                       setRightPanelTab('docs');

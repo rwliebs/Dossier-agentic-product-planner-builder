@@ -80,7 +80,7 @@ export const cardSchema = z.object({
 
 export const planningActionSchema = z.object({
   id: z.string().uuid(),
-  project_id: z.string().uuid(),
+  project_id: z.union([z.string().uuid(), z.literal("")]).optional(),
   action_type: planningActionTypeSchema,
   target_ref: z.record(z.unknown()),
   payload: z.record(z.unknown()),

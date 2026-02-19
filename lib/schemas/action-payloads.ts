@@ -48,7 +48,7 @@ export const createActivityPayloadSchema = z.object({
     .enum(["yellow", "blue", "purple", "green", "orange", "pink"])
     .nullable()
     .optional(),
-  position: z.number().int().nonnegative(),
+  position: z.number().int().nonnegative().optional().default(0),
 });
 
 export const createActivityTargetRefSchema = z.object({
@@ -63,8 +63,8 @@ export const createCardPayloadSchema = z.object({
   title: z.string().min(1),
   description: z.string().nullable().optional(),
   status: cardStatusSchema,
-  priority: z.number().int().nonnegative(),
-  position: z.number().int().nonnegative(),
+  priority: z.number().int().nonnegative().default(0),
+  position: z.number().int().nonnegative().optional().default(0),
 });
 
 export const createCardTargetRefSchema = z.object({

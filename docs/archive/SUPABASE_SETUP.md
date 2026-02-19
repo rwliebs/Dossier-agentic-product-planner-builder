@@ -1,5 +1,7 @@
 # Supabase Setup Guide
 
+> **Deprecated** — Architecture pivoted to self-deploy SQLite. See [development-reference](../development-reference.md) and [configuration-reference](../reference/configuration-reference.md).
+
 This document describes how to configure Supabase as the persistence layer for Dossier (Slice A core planning entities).
 
 ## Project Structure

@@ -43,8 +43,12 @@ docs/
 │   ├── investigation-ruvector-retrieval-harvest-tests.md
 │   └── o10-claude-flow-gap.md
 │
-└── adr/                      # Architecture Decision Records
-    └── 0001-*.md, 0002-*.md, ...
+├── adr/                      # Architecture Decision Records
+│   └── 0001-*.md, 0002-*.md, ...
+└── archive/                  # Historical / deprecated
+    ├── README.md
+    ├── STEP_2_*.md
+    └── SUPABASE_SETUP.md
 ```
 
 ## Quick Links

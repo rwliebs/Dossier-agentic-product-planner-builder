@@ -5,7 +5,7 @@ docs_index:
   version: 1
   documents:
     - id: doc.system-architecture
-      path: docs/SYSTEM_ARCHITECTURE.md
+      path: SYSTEM_ARCHITECTURE.md
       tokens_estimate: 1200
       tags: [architecture, system, overview]
       anchors:
@@ -19,7 +19,7 @@ docs_index:
       last_verified: "2026-02-18"
 
     - id: doc.data-contracts
-      path: docs/domains/data-contracts-reference.md
+      path: domains/data-contracts-reference.md
       tokens_estimate: 1800
       tags: [schemas, types, api, contracts]
       anchors:
@@ -33,7 +33,7 @@ docs_index:
       last_verified: "2026-02-18"
 
     - id: doc.user-workflows
-      path: docs/product/user-workflows-reference.md
+      path: product/user-workflows-reference.md
       tokens_estimate: 900
       tags: [ux, workflows, user-journey]
       anchors:
@@ -47,7 +47,7 @@ docs_index:
       last_verified: "2026-02-18"
 
     - id: doc.api-reference
-      path: docs/domains/api-reference.md
+      path: domains/api-reference.md
       tokens_estimate: 400
       tags: [api, endpoints]
       anchors:
@@ -57,7 +57,7 @@ docs_index:
       last_verified: "2026-02-18"
 
     - id: doc.planning
-      path: docs/domains/planning-reference.md
+      path: domains/planning-reference.md
       tokens_estimate: 700
       tags: [planning, llm, chat]
       anchors:
@@ -69,7 +69,7 @@ docs_index:
       last_verified: "2026-02-18"
 
     - id: doc.mutation
-      path: docs/domains/mutation-reference.md
+      path: domains/mutation-reference.md
       tokens_estimate: 650
       tags: [mutation, actions, pipeline]
       anchors:
@@ -81,7 +81,7 @@ docs_index:
       last_verified: "2026-02-18"
 
     - id: doc.map
-      path: docs/domains/map-reference.md
+      path: domains/map-reference.md
       tokens_estimate: 550
       tags: [map, snapshot, story-map]
       anchors:
@@ -93,7 +93,7 @@ docs_index:
       last_verified: "2026-02-18"
 
     - id: doc.orchestration
-      path: docs/domains/orchestration-reference.md
+      path: domains/orchestration-reference.md
       tokens_estimate: 750
       tags: [orchestration, build, runs]
       anchors:
@@ -105,7 +105,7 @@ docs_index:
       last_verified: "2026-02-18"
 
     - id: doc.testing
-      path: docs/testing-reference.md
+      path: testing-reference.md
       tokens_estimate: 800
       tags: [testing, vitest, quality]
       anchors:
@@ -115,7 +115,7 @@ docs_index:
       last_verified: "2026-02-18"
 
     - id: doc.development
-      path: docs/development-reference.md
+      path: development-reference.md
       tokens_estimate: 700
       tags: [development, setup, workflow]
       anchors:
@@ -125,7 +125,7 @@ docs_index:
       last_verified: "2026-02-18"
 
     - id: doc.database-schema
-      path: docs/reference/database-schema.md
+      path: reference/database-schema.md
       tokens_estimate: 900
       tags: [database, schema]
       anchors:
@@ -135,7 +135,7 @@ docs_index:
       last_verified: "2026-02-18"
 
     - id: doc.configuration
-      path: docs/reference/configuration-reference.md
+      path: reference/configuration-reference.md
       tokens_estimate: 600
       tags: [configuration, env]
       anchors:
@@ -145,7 +145,7 @@ docs_index:
       last_verified: "2026-02-18"
 
     - id: doc.memory
-      path: docs/domains/memory-reference.md
+      path: domains/memory-reference.md
       tokens_estimate: 600
       tags: [memory, ruvector, embeddings]
       anchors:

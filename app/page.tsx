@@ -201,10 +201,8 @@ export default function DossierPage() {
     if (action === 'monitor' || action === 'test') {
       setRightPanelTab('terminal');
       setRightPanelOpen(true);
-    } else if (action === 'build') {
-      handleBuildCard(cardId);
     }
-  }, [handleBuildCard]);
+  }, []);
 
   const [populatingWorkflowId, setPopulatingWorkflowId] = useState<string | null>(null);
   const handlePopulateWorkflow = useCallback(

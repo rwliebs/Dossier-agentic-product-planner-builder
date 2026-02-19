@@ -18,10 +18,10 @@
  * @see docs/adr/0008-agentic-flow-execution-plane.md
  */
 
-import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { readConfigFile } from "@/lib/config/data-dir";
 import { buildTaskFromPayload } from "./build-task";
 
 export interface PlannedFileDetail {
@@ -184,12 +184,12 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
       const { taskDescription } = buildTaskFromPayload(payload);
       const executionId = randomUUID();
 
-      const anthropicKey = process.env.ANTHROPIC_API_KEY ?? "";
+      const anthropicKey = resolveAnthropicKey();
       if (!anthropicKey) {
         return {
           success: false,
           error:
-            "ANTHROPIC_API_KEY is not set — agentic-flow requires it for the Anthropic provider",
+            "ANTHROPIC_API_KEY not set (checked process.env and ~/.dossier/config)",
         };
       }
 
@@ -326,18 +326,6 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
   };
 }
 
-/** Whether the real client is available (SDK importable + ANTHROPIC_API_KEY set) */
-let realClientAvailable: boolean | null = null;
-
-/**
- * @internal For testing only — resets availability so createAgenticFlowClient re-evaluates.
- */
-export function __setRealClientAvailableForTesting(
-  available: boolean | null
-): void {
-  realClientAvailable = available;
-}
-
 /**
  * Check if agentic-flow (alpha) and @anthropic-ai/claude-agent-sdk are installed.
  * Both are required: agentic-flow for agent definitions/routing, SDK for tool execution.
@@ -378,156 +366,57 @@ function isAgenticFlowInstalled(): { hasPackage: boolean; hasSdk: boolean } {
 }
 
 /**
+ * Resolves ANTHROPIC_API_KEY from process.env or ~/.dossier/config.
+ * If found in config but not in env, injects it into process.env so
+ * agentic-flow's internals (which read process.env directly) see it.
+ */
+function resolveAnthropicKey(): string | null {
+  const fromEnv = process.env.ANTHROPIC_API_KEY?.trim();
+  if (fromEnv) return fromEnv;
+
+  const config = readConfigFile();
+  const fromConfig = config.ANTHROPIC_API_KEY?.trim();
+  if (fromConfig) {
+    process.env.ANTHROPIC_API_KEY = fromConfig;
+    return fromConfig;
+  }
+
+  return null;
+}
+
+/**
  * Returns the execution client.
- * If agentic-flow and @anthropic-ai/claude-agent-sdk are installed and ANTHROPIC_API_KEY
- * is set, returns the real client that imports agentic-flow's claudeAgent() with
- * Write/Edit/Bash tools.
- * Otherwise falls back to mock and logs a warning with the specific reason.
+ * Resolves ANTHROPIC_API_KEY from process.env or ~/.dossier/config.
+ * Throws if agentic-flow, the Claude Agent SDK, or the key are missing —
+ * there is no mock fallback.
  */
 export function createAgenticFlowClient(): AgenticFlowClient {
-  if (realClientAvailable === null) {
-    const hasKey = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
-    const { hasPackage, hasSdk } = isAgenticFlowInstalled();
-    realClientAvailable = hasKey && hasPackage && hasSdk;
+  const hasKey = Boolean(resolveAnthropicKey());
+  const { hasPackage, hasSdk } = isAgenticFlowInstalled();
 
-    if (!realClientAvailable && typeof console !== "undefined" && console.warn) {
-      const reasons: string[] = [];
-      if (!hasKey) reasons.push("ANTHROPIC_API_KEY not set");
-      if (!hasPackage)
-        reasons.push(
-          "agentic-flow package not installed (run: pnpm add agentic-flow@alpha)"
-        );
-      if (!hasSdk)
-        reasons.push(
-          "@anthropic-ai/claude-agent-sdk not installed (run: pnpm add @anthropic-ai/claude-agent-sdk)"
-        );
-      console.warn(
-        `agentic-flow not available — using mock client. Reason: ${reasons.join("; ")}`
-      );
-    }
+  const reasons: string[] = [];
+  if (!hasKey)
+    reasons.push(
+      "ANTHROPIC_API_KEY not set (checked process.env and ~/.dossier/config)"
+    );
+  if (!hasPackage)
+    reasons.push(
+      "agentic-flow package not installed (run: pnpm add agentic-flow@alpha)"
+    );
+  if (!hasSdk)
+    reasons.push(
+      "@anthropic-ai/claude-agent-sdk not installed (run: pnpm add @anthropic-ai/claude-agent-sdk)"
+    );
+
+  if (reasons.length > 0) {
+    throw new Error(
+      `agentic-flow not available: ${reasons.join("; ")}`
+    );
   }
 
-  if (realClientAvailable) {
-    return createRealAgenticFlowClient();
-  }
-
-  return createMockAgenticFlowClient();
+  return createRealAgenticFlowClient();
 }
 
 /** Backward-compatible factory alias */
 export const createClaudeFlowClient = createAgenticFlowClient;
 
-/**
- * Mock client — simulates dispatch and immediate completion.
- * Simulates webhook callback with sample knowledge items to exercise the full feedback loop.
- */
-export function createMockAgenticFlowClient(): AgenticFlowClient {
-  const executions = new Map<
-    string,
-    { payload: DispatchPayload; createdAt: string }
-  >();
-
-  return {
-    async dispatch(payload: DispatchPayload): Promise<DispatchResult> {
-      const executionId = `mock-exec-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-      executions.set(executionId, {
-        payload,
-        createdAt: new Date().toISOString(),
-      });
-
-      // Simulate webhook callback after a short delay (exercises full feedback loop in dev)
-      // Skip in test environment — tests use mocked DB, real DB may not have the card
-      if (typeof process !== "undefined" && process.env?.VITEST) {
-        // no-op in tests
-      } else {
-        setImmediate(async () => {
-          try {
-            const clonePath = payload.worktree_path;
-            if (clonePath) {
-              try {
-                const samplePath = path.join(clonePath, "src", "mock-generated.ts");
-                fs.mkdirSync(path.dirname(samplePath), { recursive: true });
-                fs.writeFileSync(
-                  samplePath,
-                  `// Mock-generated file from Dossier build (dry-run)\n` +
-                    `// Card: ${payload.card_title ?? "Untitled"}\n` +
-                    `// Generated at: ${new Date().toISOString()}\n\n` +
-                    `export function mockGenerated(): string {\n  return "mock";\n}\n`,
-                  "utf-8"
-                );
-                execSync("git add .", { cwd: clonePath, stdio: "pipe" });
-                execSync(
-                  `git commit -m "chore: mock-generated file from Dossier build"`,
-                  { cwd: clonePath, stdio: "pipe" }
-                );
-              } catch (fileErr) {
-                console.warn("Mock file write/commit failed:", fileErr);
-              }
-            }
-
-            const { getDb } = await import("@/lib/db");
-            const { processWebhook } = await import("./process-webhook");
-            const db = getDb();
-            await processWebhook(db, {
-              event_type: "execution_completed",
-              assignment_id: payload.assignment_id,
-              execution_id: executionId,
-              ended_at: new Date().toISOString(),
-              summary: "[Mock] Execution completed (dry-run)",
-              knowledge: {
-                facts: [
-                  { text: "Mock: Codebase uses TypeScript", evidence_source: "tsconfig.json" },
-                ],
-                assumptions: [
-                  { text: "Mock: Assumed existing API patterns apply" },
-                ],
-                questions: [
-                  { text: "Mock: Should we add error boundaries for this component?" },
-                ],
-              },
-            });
-          } catch (err) {
-            console.warn("Mock webhook simulation failed:", err);
-          }
-        });
-      }
-
-      return {
-        success: true,
-        execution_id: executionId,
-      };
-    },
-
-    async status(executionId: string): Promise<StatusResult> {
-      const exec = executions.get(executionId);
-      if (!exec) {
-        return {
-          success: false,
-          error: `Execution not found: ${executionId}`,
-        };
-      }
-      return {
-        success: true,
-        status: {
-          execution_id: executionId,
-          status: "completed",
-          started_at: exec.createdAt,
-          ended_at: new Date().toISOString(),
-          summary: "[Mock] Execution completed (dry-run)",
-          commits: [],
-        },
-      };
-    },
-
-    async cancel(executionId: string): Promise<CancelResult> {
-      if (!executions.has(executionId)) {
-        return { success: false, error: `Execution not found: ${executionId}` };
-      }
-      executions.delete(executionId);
-      return { success: true };
-    },
-  };
-}
-
-/** Backward-compatible mock factory alias */
-export const createMockClaudeFlowClient = createMockAgenticFlowClient;

@@ -1,32 +1,23 @@
 /**
- * O10: Tests for local agentic-flow client factory and real client.
- * - Factory returns mock when agentic-flow is not available
- * - Factory returns real client when agentic-flow IS available (via test override)
- * - buildTaskFromPayload is called during real dispatch
- * - No real Anthropic API key required
+ * O10: Tests for agentic-flow client factory and real client.
+ * - Factory throws when agentic-flow dependencies are missing
+ * - Factory resolves ANTHROPIC_API_KEY from process.env or ~/.dossier/config
+ * - Real client calls buildTaskFromPayload during dispatch
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   createAgenticFlowClient,
   createRealAgenticFlowClient,
-  __setRealClientAvailableForTesting,
 } from "@/lib/orchestration/agentic-flow-client";
 import * as buildTask from "@/lib/orchestration/build-task";
 import type { DispatchPayload } from "@/lib/orchestration/agentic-flow-client";
 
-vi.mock("node:child_process", async (importOriginal) => {
-  const mod =
-    await importOriginal<typeof import("node:child_process")>();
-  const mockSpawn = vi.fn(() => ({
-    pid: 99999,
-    unref: vi.fn(),
-    on: vi.fn(),
-  }));
+vi.mock("@/lib/config/data-dir", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/config/data-dir")>();
   return {
-    ...mod,
-    default: { ...mod, spawn: mockSpawn },
-    spawn: mockSpawn,
+    ...original,
+    readConfigFile: vi.fn(() => ({})),
   };
 });
 
@@ -40,31 +31,15 @@ const basePayload: DispatchPayload = {
 };
 
 describe("createAgenticFlowClient factory (O10)", () => {
-  beforeEach(() => {
-    __setRealClientAvailableForTesting(null);
-  });
-
-  it("returns mock when agentic-flow is not available", async () => {
-    __setRealClientAvailableForTesting(false);
-    const client = createAgenticFlowClient();
-    const result = await client.dispatch(basePayload);
-
-    expect(result.success).toBe(true);
-    expect(result.execution_id).toBeDefined();
-    expect(result.execution_id).toMatch(/^mock-exec-/);
-  });
-
-  it("returns real client when agentic-flow is available", async () => {
-    __setRealClientAvailableForTesting(true);
-    const client = createAgenticFlowClient();
-    const result = await client.dispatch(basePayload);
-
-    expect(result.success).toBe(true);
-    expect(result.execution_id).toBeDefined();
-    expect(result.execution_id).not.toMatch(/^mock-exec-/);
-    expect(result.execution_id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    );
+  it("throws when ANTHROPIC_API_KEY is missing from both env and config", () => {
+    const orig = process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    try {
+      expect(() => createAgenticFlowClient()).toThrow("agentic-flow not available");
+      expect(() => createAgenticFlowClient()).toThrow("ANTHROPIC_API_KEY not set");
+    } finally {
+      if (orig !== undefined) process.env.ANTHROPIC_API_KEY = orig;
+    }
   });
 });
 

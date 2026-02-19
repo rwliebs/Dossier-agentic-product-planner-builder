@@ -17,6 +17,8 @@ import {
   getCardsByProject,
   getArtifactsByProject,
   getCardContextLinksByProject,
+  getRequirementsByProject,
+  getPlannedFilesByProject,
 } from "./queries";
 
 /**
@@ -34,19 +36,25 @@ export async function fetchMapSnapshot(
     id: projectRow.id,
     name: projectRow.name,
     description: projectRow.description ?? null,
+    customer_personas: (projectRow as Record<string, unknown>).customer_personas as string | null | undefined ?? null,
+    tech_stack: (projectRow as Record<string, unknown>).tech_stack as string | null | undefined ?? null,
+    deployment: (projectRow as Record<string, unknown>).deployment as string | null | undefined ?? null,
+    design_inspiration: (projectRow as Record<string, unknown>).design_inspiration as string | null | undefined ?? null,
     repo_url: projectRow.repo_url ?? null,
     default_branch: projectRow.default_branch ?? "main",
   };
 
   const state = createEmptyPlanningState(project);
 
-  const [workflows, activities, cards, artifacts, cardContextLinks] =
+  const [workflows, activities, cards, artifacts, cardContextLinks, requirements, plannedFiles] =
     await Promise.all([
       getWorkflowsByProject(db, projectId),
       getActivitiesByProject(db, projectId),
       getCardsByProject(db, projectId),
       getArtifactsByProject(db, projectId),
       getCardContextLinksByProject(db, projectId),
+      getRequirementsByProject(db, projectId),
+      getPlannedFilesByProject(db, projectId),
     ]);
 
   for (const w of workflows ?? []) {
@@ -110,6 +118,22 @@ export async function fetchMapSnapshot(
       state.cardContextLinks.set(cardId, new Set());
     }
     state.cardContextLinks.get(cardId)!.add(link.context_artifact_id);
+  }
+
+  for (const req of requirements ?? []) {
+    const cardId = (req as { card_id: string }).card_id;
+    if (!state.cardRequirements.has(cardId)) {
+      state.cardRequirements.set(cardId, []);
+    }
+    state.cardRequirements.get(cardId)!.push(req as import("@/lib/schemas/slice-b").CardRequirement);
+  }
+
+  for (const pf of plannedFiles ?? []) {
+    const cardId = (pf as { card_id: string }).card_id;
+    if (!state.cardPlannedFiles.has(cardId)) {
+      state.cardPlannedFiles.set(cardId, []);
+    }
+    state.cardPlannedFiles.get(cardId)!.push(pf as import("@/lib/schemas/slice-b").CardPlannedFile);
   }
 
   return state;

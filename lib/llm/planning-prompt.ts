@@ -395,17 +395,15 @@ export function serializeMapStateForFinalize(state: PlanningState): string {
 }
 
 /**
- * Build the system prompt for FINALIZE mode.
- * Produces project-wide context documents and per-card e2e tests as createContextArtifact actions.
+ * Build the system prompt for FINALIZE mode (project-wide docs only).
+ * Produces 5 project-level context documents as createContextArtifact actions.
+ * Per-card tests are generated separately via buildFinalizeTestsSystemPrompt.
  */
 export function buildFinalizeSystemPrompt(): string {
-  return `You are a finalization assistant that produces build-ready context documents and e2e tests for a software project.
+  return `You are a finalization assistant that produces build-ready context documents for a software project.
 
 ## Your Task
-Given a fully planned story map (workflows, activities, cards with requirements and planned files), generate createContextArtifact actions that produce:
-
-### Part 1: Project-Wide Context Documents
-Create these 5 project-level documents. Each is a createContextArtifact action with content in markdown.
+Given a fully planned story map (workflows, activities, cards with requirements and planned files), generate createContextArtifact actions for 5 project-level documents. Each is a createContextArtifact action with content in markdown.
 
 1. **Architectural Summary** (type: "doc", name: "architectural-summary")
    - Tech stack decisions and rationale
@@ -439,14 +437,35 @@ Create these 5 project-level documents. Each is a createContextArtifact action w
    - Interaction patterns (forms, navigation, feedback)
    - Derived from: project design_inspiration, card planned files of kind component/hook
 
-### Part 2: Per-Card E2E Tests
-For each card that has requirements, create a createContextArtifact with:
-- type: "test"
-- name: test file path (e.g. "__tests__/e2e/<card-slug>.test.ts")
-- card_id: the card's id (links the test to its card)
-- content: actual runnable Playwright test code
+## createContextArtifact Action Schema
+- action_type: "createContextArtifact"
+- target_ref: { "project_id": "<project_id>" }
+- payload: { "name": "<artifact name>", "type": "<doc|spec|design>", "title": "<human title>", "content": "<full content>", "card_id": null }
 
-#### Test Guidelines
+All documents are project-level: card_id must be null.
+
+## Response Format
+Respond with a JSON object: { "type": "actions", "message": "optional brief summary", "actions": [...] }
+
+## Critical Constraints
+1. Generate ALL 5 project-wide documents — do not skip any
+2. Document content must be specific to THIS project — not generic boilerplate
+3. Use IDs from the provided map state — never invent IDs that don't exist
+4. Generate new UUIDs for each createContextArtifact action id
+5. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+}
+
+/**
+ * Build the system prompt for per-card e2e test generation (finalize sub-step).
+ * Generates a createContextArtifact with type "test" for a single card.
+ */
+export function buildFinalizeTestsSystemPrompt(): string {
+  return `You are a test generation assistant that produces e2e acceptance tests for a single software feature card.
+
+## Your Task
+Given a card with its requirements, planned files, and project context, generate ONE createContextArtifact action containing a Playwright e2e test file for this card.
+
+## Test Guidelines
 - **Outcome-based**: each test validates that a requirement is realized as user-visible behavior
 - **One test case per requirement**: clear 1:1 mapping from requirement text to test
 - **Framework**: Playwright with vitest (import { test, expect } from '@playwright/test')
@@ -455,8 +474,7 @@ For each card that has requirements, create a createContextArtifact with:
 - **Selectors**: use data-testid attributes and semantic roles, not CSS classes
 - **No implementation assumptions**: test observable outcomes (page content, navigation, API responses), not internal state
 
-#### Test Template
-Each test file should follow this structure:
+## Test Template
 \`\`\`
 import { test, expect } from '@playwright/test';
 
@@ -473,26 +491,24 @@ test.describe('<Card Title>', () => {
 ## createContextArtifact Action Schema
 - action_type: "createContextArtifact"
 - target_ref: { "project_id": "<project_id>" }
-- payload: { "name": "<artifact name>", "type": "<doc|spec|design|test>", "title": "<human title>", "content": "<full content>", "card_id": "<card_id or null>" }
-
-For project-wide documents: card_id should be null.
-For per-card tests: card_id should be the card's id.
+- payload: { "name": "<test file path>", "type": "test", "title": "<Card Title> E2E Tests", "content": "<full test code>", "card_id": "<card_id>" }
 
 ## Response Format
 Respond with a JSON object: { "type": "actions", "message": "optional brief summary", "actions": [...] }
 
+The actions array should contain exactly ONE createContextArtifact action for this card.
+
 ## Critical Constraints
-1. Generate ALL 5 project-wide documents — do not skip any
-2. Generate tests ONLY for cards that have at least one requirement
-3. Each test file must be syntactically valid TypeScript/Playwright
-4. Document content must be specific to THIS project — not generic boilerplate
-5. Use IDs from the provided map state — never invent IDs that don't exist
-6. Generate new UUIDs for each createContextArtifact action id
-7. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+1. Each test file must be syntactically valid TypeScript/Playwright
+2. Test content must be specific to THIS card's requirements — not generic boilerplate
+3. Use the card_id from the provided card data
+4. Generate a new UUID for the createContextArtifact action id
+5. Name format: "__tests__/e2e/<card-slug>.test.ts"
+6. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
 }
 
 /**
- * Build the user message for finalize mode.
+ * Build the user message for finalize mode (project-wide docs only).
  */
 export function buildFinalizeUserMessage(
   mapSnapshot: PlanningState,
@@ -500,7 +516,39 @@ export function buildFinalizeUserMessage(
   const stateJson = serializeMapStateForFinalize(mapSnapshot);
   const projectId = mapSnapshot.project.id;
 
-  return `## Project Map State (with requirements and planned files)\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Your Task\nGenerate createContextArtifact actions for:\n1. All 5 project-wide context documents\n2. E2e test files for each card that has requirements\n\nUse project_id "${projectId}" in all target_ref and project_id fields.\n\nOutput ONLY the JSON object.`;
+  return `## Project Map State (with requirements and planned files)\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Your Task\nGenerate createContextArtifact actions for all 5 project-wide context documents.\n\nUse project_id "${projectId}" in all target_ref and project_id fields.\n\nOutput ONLY the JSON object.`;
+}
+
+/**
+ * Build the user message for per-card test generation (finalize sub-step).
+ * Provides the card's requirements, planned files, and enough project context
+ * for the LLM to write meaningful tests without receiving the entire map.
+ */
+export function buildFinalizeTestsUserMessage(
+  card: {
+    id: string;
+    title: string;
+    description: string | null;
+    requirements: Array<{ text: string; status: string }>;
+    planned_files: Array<{
+      logical_file_name: string;
+      artifact_kind: string;
+      action: string;
+      intent_summary: string;
+    }>;
+  },
+  projectSummary: {
+    id: string;
+    name: string | null;
+    description: string | null;
+    tech_stack: string | null;
+    deployment: string | null;
+  },
+): string {
+  const cardJson = JSON.stringify(card, null, 2);
+  const projectJson = JSON.stringify(projectSummary, null, 2);
+
+  return `## Project Context\n\`\`\`json\n${projectJson}\n\`\`\`\n\n## Card to Test\n\`\`\`json\n${cardJson}\n\`\`\`\n\n## Your Task\nGenerate one createContextArtifact action containing a Playwright e2e test file for this card.\nWrite one test case per requirement. Use project_id "${projectSummary.id}" in all target_ref fields.\n\nOutput ONLY the JSON object.`;
 }
 
 export interface ConversationMessage {

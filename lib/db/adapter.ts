@@ -74,6 +74,7 @@ export interface DbAdapter {
 
   // --- Card knowledge items ---
   getCardRequirements(cardId: string): Promise<DbRow[]>;
+  getRequirementsByProject(projectId: string): Promise<DbRow[]>;
   getCardFacts(cardId: string): Promise<DbRow[]>;
   getCardAssumptions(cardId: string): Promise<DbRow[]>;
   getCardQuestions(cardId: string): Promise<DbRow[]>;

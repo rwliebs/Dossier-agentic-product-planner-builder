@@ -268,11 +268,13 @@ export default function DossierPage() {
   );
 
   const [finalizingProject, setFinalizingProject] = useState(false);
+  const [finalizeProgress, setFinalizeProgress] = useState('');
 
   const handleFinalizeProject = useCallback(
     async () => {
       if (!projectId) return;
       setFinalizingProject(true);
+      setFinalizeProgress('Starting finalization…');
       try {
         const res = await fetch(`/api/projects/${projectId}/chat/stream`, {
           method: 'POST',
@@ -305,6 +307,15 @@ export default function DossierPage() {
                 if (line.startsWith('event: ')) eventType = line.slice(7).trim();
                 if (line.startsWith('data: ')) dataStr = line.slice(6);
               }
+              if (eventType === 'finalize_progress' && dataStr) {
+                try {
+                  const d = JSON.parse(dataStr) as { label?: string; step_index?: number; total_steps?: number };
+                  const stepLabel = d.total_steps
+                    ? `(${(d.step_index ?? 0) + 1}/${d.total_steps}) ${d.label ?? ''}`
+                    : d.label ?? '';
+                  setFinalizeProgress(stepLabel);
+                } catch { /* ignore */ }
+              }
               if (eventType === 'error' && dataStr) {
                 try {
                   const d = JSON.parse(dataStr);
@@ -334,6 +345,7 @@ export default function DossierPage() {
         toast.error(msg);
       } finally {
         setFinalizingProject(false);
+        setFinalizeProgress('');
       }
     },
     [projectId, refetch]
@@ -620,6 +632,7 @@ export default function DossierPage() {
                     populatingWorkflowId={populatingWorkflowId}
                     onFinalizeProject={handleFinalizeProject}
                     finalizingProject={finalizingProject}
+                    finalizeProgress={finalizeProgress}
                     onProjectUpdate={handleProjectUpdate}
                     onSelectDoc={(doc) => {
                       setSelectedDoc(doc);

@@ -49,13 +49,13 @@ After per-card finalize: card is build-ready.
 
 User clicks "Finalize Project" in the UI after planning phases 1-3 are complete. The system validates that the map has sufficient structure (workflows, activities, cards with requirements) before allowing finalization.
 
-### LLM Mode: `finalize`
+### LLM Mode: `finalize` (Multi-Step)
 
-A new planning mode that receives the full map state and generates `createContextArtifact` actions.
+Finalize mode runs multiple sequential LLM calls within a single SSE stream to prevent timeouts on large projects. Each sub-step has its own focused prompt and produces a subset of the total output.
 
-### Project-Wide Context Documents
+#### Sub-step 1: Project-Wide Context Documents (1 LLM call)
 
-The finalize LLM produces five categories of project-level `ContextArtifact` records:
+The first LLM call produces five categories of project-level `ContextArtifact` records:
 
 | Document | Artifact Type | Content |
 |----------|--------------|---------|
@@ -67,13 +67,15 @@ The finalize LLM produces five categories of project-level `ContextArtifact` rec
 
 Each document is derived from the current map state: project metadata (tech_stack, deployment, design_inspiration, customer_personas), workflow/activity/card titles and descriptions, requirements, and planned files.
 
-### Per-Card E2E Tests
+#### Sub-steps 2–N: Per-Card E2E Tests (1 LLM call per card)
 
-For each card that has requirements, the finalize LLM generates a `ContextArtifact` with:
+For each card that has requirements, a separate LLM call generates a `ContextArtifact` with:
 
 - `type: 'test'`
 - `name`: test file path (e.g., `__tests__/e2e/user-authentication.test.ts`)
 - `content`: actual runnable test code
+
+Each per-card call receives only the card's requirements, planned files, and a lightweight project summary — not the full map state. This keeps input tokens low and response times fast.
 
 Test guidelines the LLM must follow:
 
@@ -82,6 +84,17 @@ Test guidelines the LLM must follow:
 - **Framework**: Playwright for e2e (consistent with existing test suite).
 - **Self-contained**: each test file can run independently.
 - **Descriptive names**: test names read as acceptance criteria (e.g., "user can reset password via email link").
+
+#### Progress Events
+
+Between sub-steps, the SSE stream emits `finalize_progress` events:
+
+```
+event: finalize_progress
+data: { "step": "docs"|"card_tests", "step_index": 0, "total_steps": N, "status": "generating"|"complete"|"error", "label": "human-readable description" }
+```
+
+The frontend displays these to give the user real-time visibility into finalization progress. If a per-card test call fails, the error is reported but finalization continues with the remaining cards.
 
 ### New Action Type: `createContextArtifact`
 
@@ -185,7 +198,7 @@ A card with `finalized_at IS NOT NULL` is build-ready. Build trigger validation 
 ### Risk: Finalize LLM call is expensive (large map state input)
 
 - **Mitigation**: finalize mode receives a summarized map state (titles, descriptions, requirement texts) rather than the full JSON with positions and IDs.
-- **Mitigation**: context document generation and test generation can be split into multiple LLM calls if token limits are exceeded.
+- **Mitigation** (implemented): context document generation and test generation are split into multiple LLM calls. Sub-step 1 generates all 5 project docs in one call. Sub-steps 2–N each generate tests for one card, receiving only that card's data plus a lightweight project summary. This prevents timeouts and keeps each call's token usage manageable.
 
 ### Risk: createContextArtifact action creates duplicate artifacts on re-finalization
 

@@ -108,6 +108,10 @@ export async function getCardRequirements(db: DbAdapter, cardId: string) {
   return db.getCardRequirements(cardId);
 }
 
+export async function getRequirementsByProject(db: DbAdapter, projectId: string) {
+  return db.getRequirementsByProject(projectId);
+}
+
 export async function getCardFacts(db: DbAdapter, cardId: string) {
   return db.getCardFacts(cardId);
 }

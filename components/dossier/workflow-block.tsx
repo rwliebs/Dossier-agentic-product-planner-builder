@@ -76,6 +76,7 @@ interface WorkflowBlockProps {
   populatingWorkflowId?: string | null;
   onFinalizeProject?: () => void;
   finalizingProject?: boolean;
+  finalizeProgress?: string;
   /** Called when user edits project context (description, personas, tech stack, deployment, design inspiration) */
   onProjectUpdate?: (updates: {
     description?: string | null;
@@ -112,6 +113,7 @@ export function WorkflowBlock({
   populatingWorkflowId,
   onFinalizeProject,
   finalizingProject,
+  finalizeProgress,
   onProjectUpdate,
 }: WorkflowBlockProps) {
   const allCards = useMemo(() => allCardsFromSnapshot(snapshot), [snapshot]);
@@ -186,16 +188,23 @@ export function WorkflowBlock({
                 {statusCounts.production > 0 && <div className="text-green-600"><span className="font-bold">{statusCounts.production}</span> live</div>}
                 {statusCounts.todo > 0 && <div className="text-muted-foreground"><span className="text-foreground font-bold">{statusCounts.todo}</span> pending</div>}
                 {onFinalizeProject && allCards.length > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 gap-1.5 text-[11px] font-mono uppercase tracking-wider ml-2 bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100"
-                    onClick={onFinalizeProject}
-                    disabled={finalizingProject}
-                  >
-                    <Sparkles className="h-3 w-3" />
-                    {finalizingProject ? ACTION_BUTTONS.FINALIZING_PROJECT : ACTION_BUTTONS.FINALIZE_PROJECT}
-                  </Button>
+                  <div className="flex items-center gap-2 ml-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1.5 text-[11px] font-mono uppercase tracking-wider bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100"
+                      onClick={onFinalizeProject}
+                      disabled={finalizingProject}
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      {finalizingProject ? ACTION_BUTTONS.FINALIZING_PROJECT : ACTION_BUTTONS.FINALIZE_PROJECT}
+                    </Button>
+                    {finalizingProject && finalizeProgress && (
+                      <span className="text-[10px] font-mono text-indigo-500 truncate max-w-[280px]">
+                        {finalizeProgress}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

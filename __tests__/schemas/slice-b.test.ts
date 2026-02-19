@@ -195,6 +195,21 @@ describe("Slice B schema contracts", () => {
       });
     });
 
+    it("rejects artifact_kind 'test' — tests live as ContextArtifact type:test per product invariant", () => {
+      expect(() =>
+        cardPlannedFileSchema.parse({
+          id: "99999999-9999-4999-8999-999999999999",
+          card_id: ids.card,
+          logical_file_name: "__tests__/e2e/feature.test.ts",
+          artifact_kind: "test",
+          action: "create",
+          intent_summary: "E2E test",
+          status: "proposed",
+          position: 0,
+        })
+      ).toThrow();
+    });
+
     it("validates planned file status enum", () => {
       const statuses = ["proposed", "user_edited", "approved"];
       statuses.forEach((status) => {

@@ -379,6 +379,15 @@ export function createSqliteAdapter(dbPath: string | ":memory:"): DbAdapter {
         .all(cardId) as DbRow[];
       return rows.map((r) => parseRow("card_requirement", r));
     },
+    async getRequirementsByProject(projectId: string) {
+      const cardIds = await adapter.getCardIdsByProject(projectId);
+      if (cardIds.length === 0) return [];
+      const placeholders = cardIds.map(() => "?").join(",");
+      const rows = db
+        .prepare(`SELECT * FROM card_requirement WHERE card_id IN (${placeholders}) ORDER BY position ASC`)
+        .all(...cardIds) as DbRow[];
+      return rows.map((r) => parseRow("card_requirement", r));
+    },
     async getCardFacts(cardId: string) {
       const rows = db
         .prepare("SELECT * FROM card_known_fact WHERE card_id = ? ORDER BY position ASC")

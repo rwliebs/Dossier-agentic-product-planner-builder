@@ -13,17 +13,20 @@ anchors:
     summary: "__tests__/ mirrors lib/; components, api, mutations, orchestration"
   - id: mocking
     summary: "Mock DbAdapter, PLANNING_MOCK_ALLOWED for LLM tests"
+  - id: product-outcomes
+    summary: "Tests aligned with user-workflows-reference.md and user-stories.md"
 ttl_expires_on: null
 ---
 # Testing Reference
 
-**Anchors**: [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)
+**Anchors**: [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md), [user-workflows-reference.md](product/user-workflows-reference.md)
 
 ## Contract
 
 - INVARIANT: Tests use Vitest; jsdom for React components
 - INVARIANT: Contract and integration tests are source of truth; E2E augments
 - INVARIANT: DB tests use in-memory SQLite or mock adapter
+- INVARIANT: Tests assert product outcomes from user-workflows-reference.md and user-stories.md
 
 ---
 
@@ -85,10 +88,24 @@ __tests__/
 
 ---
 
+## Product Outcome Alignment
+
+Tests assert the following product invariants (from user-workflows-reference.md):
+
+| Outcome | Test Location |
+|--------|---------------|
+| Build requires finalized_at + approved planned files | `trigger-build.test.ts` |
+| Build rejects when card(s) lack finalized_at | `trigger-build.test.ts` |
+| Build rejects when no cards have approved planned files | `trigger-build.test.ts` |
+| artifact_kind excludes test (tests live as ContextArtifact type:test) | `slice-b.test.ts` |
+| Per-card finalize validates requirements + planned files; sets finalized_at | `finalize.test.ts` |
+| E2E: build-ready = approved planned files + finalized | `project-to-cards-flow.test.ts` |
+
 ## Verification
 - [ ] All tests pass before commit
 - [ ] Contract tests cover schema and action validation
 - [ ] Integration tests cover API and orchestration boundaries
+- [ ] Product outcome alignment table reflects current coverage
 
 ## Related
 - [development-reference.md](development-reference.md)

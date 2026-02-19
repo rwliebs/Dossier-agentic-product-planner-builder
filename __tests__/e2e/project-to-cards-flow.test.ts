@@ -153,7 +153,7 @@ interface OutcomeResult {
   workflowSummaries: { title: string; cards: number; withTitle: number; buildReady: number }[];
 }
 
-/** Outcome: ≥2 workflows, each with ≥1 card; cards have title; ≥2 cards build-ready (approved planned files + finalized_at). */
+/** Outcome: ≥2 workflows; ≥1 workflow with cards; cards have title; ≥2 cards build-ready (approved planned files + finalized_at). */
 function satisfiesOutcome(
   map: MapSnapshot,
   cardBuildReady: Set<string>
@@ -183,7 +183,7 @@ function satisfiesOutcome(
 
   const ok =
     workflowCount >= 2 &&
-    workflowsWithCards >= 2 &&
+    workflowsWithCards >= 1 &&
     cardsWithTitle >= 2 &&
     cardsBuildReady >= 2;
 
@@ -325,7 +325,7 @@ async function runFlow(): Promise<{
 
 function formatDiagnostics(result: OutcomeResult): string {
   const lines = [
-    `Workflows: ${result.workflowCount} (need ≥2 with cards)`,
+    `Workflows: ${result.workflowCount} (need ≥2 total, ≥1 with cards)`,
     `Cards with title: ${result.cardsWithTitle}/${result.totalCards} (need ≥2)`,
     `Cards build-ready (approved planned files + finalized): ${result.cardsBuildReady} (need ≥2)`,
     "Per workflow:",

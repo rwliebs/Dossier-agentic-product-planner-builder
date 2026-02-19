@@ -222,6 +222,10 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
       executionRegistry.set(executionId, entry);
 
       const runExecution = async () => {
+        let eventType: string;
+        let summary: string;
+        let errorMsg: string | undefined;
+
         try {
           const result = await agenticFlow.claudeAgent(
             agent,
@@ -234,15 +238,43 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
           entry.status = "completed";
           entry.endedAt = new Date().toISOString();
           entry.summary = result.output.substring(0, 500);
+          eventType = "execution_completed";
+          summary = entry.summary;
         } catch (err) {
           if (abortController.signal.aborted) {
             entry.status = "cancelled";
+            eventType = "execution_failed";
+            summary = "Execution cancelled";
           } else {
             entry.status = "failed";
             entry.error =
               err instanceof Error ? err.message : String(err);
+            eventType = "execution_failed";
+            summary = entry.error;
+            errorMsg = entry.error;
           }
           entry.endedAt = new Date().toISOString();
+        }
+
+        try {
+          const { getDb } = await import("@/lib/db");
+          const { processWebhook } = await import("./process-webhook");
+          const db = getDb();
+          await processWebhook(db, {
+            event_type: eventType,
+            assignment_id: payload.assignment_id,
+            execution_id: executionId,
+            ended_at: entry.endedAt!,
+            summary,
+            error: errorMsg,
+            knowledge: {
+              facts: [],
+              assumptions: [],
+              questions: [],
+            },
+          });
+        } catch (webhookErr) {
+          console.warn("Post-execution webhook processing failed:", webhookErr);
         }
       };
 

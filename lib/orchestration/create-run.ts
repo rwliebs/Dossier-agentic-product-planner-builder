@@ -7,10 +7,6 @@ import type { DbAdapter } from "@/lib/db/adapter";
 import { createOrchestrationRunInputSchema } from "@/lib/schemas/slice-c";
 import { getSystemPolicyProfileByProject } from "@/lib/supabase/queries/orchestration";
 import {
-  getCardIdsByWorkflow,
-  getCardPlannedFiles,
-} from "@/lib/supabase/queries";
-import {
   validateRunInputAgainstPolicy,
   validateScopeAgainstPolicy,
 } from "./run-validation";
@@ -44,17 +40,27 @@ export async function createRun(
   input: CreateRunInput
 ): Promise<CreateRunResult> {
   try {
-    // Fetch active system policy profile
-    const policy = await getSystemPolicyProfileByProject(
+    // Fetch active system policy profile, auto-provisioning if missing
+    let policy = await getSystemPolicyProfileByProject(
       db,
       input.project_id
     );
 
     if (!policy) {
-      return {
-        success: false,
-        error: "No system policy profile found for project",
+      const defaultPolicy = {
+        id: crypto.randomUUID(),
+        project_id: input.project_id,
+        required_checks: ["lint"],
+        protected_paths: [],
+        forbidden_paths: [],
+        dependency_policy: {},
+        security_policy: {},
+        architecture_policy: {},
+        approval_policy: {},
+        updated_at: new Date().toISOString(),
       };
+      await db.insertSystemPolicyProfile(defaultPolicy);
+      policy = defaultPolicy;
     }
 
     // Build immutable snapshots
@@ -93,28 +99,7 @@ export async function createRun(
       };
     }
 
-    // Validate approved planned files: build requires ≥1 approved planned file per targeted card
-    const targetedCardIds =
-      input.scope === "card" && input.card_id
-        ? [input.card_id]
-        : input.scope === "workflow" && input.workflow_id
-          ? await getCardIdsByWorkflow(db, input.workflow_id)
-          : [];
-
-    for (const cardId of targetedCardIds) {
-      const plannedFiles = await getCardPlannedFiles(db, cardId);
-      const hasApproved = plannedFiles.some(
-        (f) => (f as { status?: string }).status === "approved"
-      );
-      if (!hasApproved) {
-        return {
-          success: false,
-          validationErrors: [
-            `Card ${cardId} has no approved planned files. Build requires at least one approved planned file per targeted card.`,
-          ],
-        };
-      }
-    }
+    // Planned files are optional — finalized cards are buildable with or without them
 
     // Parse and validate run payload (create schema omits id - DB generates)
     const runPayload = createOrchestrationRunInputSchema.parse({

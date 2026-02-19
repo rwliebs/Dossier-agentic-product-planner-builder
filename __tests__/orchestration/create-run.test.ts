@@ -35,10 +35,14 @@ describe("createRun", () => {
     vi.mocked(orchestrationQueries.getSystemPolicyProfileByProject).mockResolvedValue(policy as never);
   });
 
-  it("returns error when no policy exists", async () => {
+  it("auto-provisions default policy when none exists", async () => {
     vi.mocked(orchestrationQueries.getSystemPolicyProfileByProject).mockResolvedValue(null);
 
-    const mockDb = createMockDbAdapter();
+    const mockInsertPolicy = vi.fn().mockResolvedValue(undefined);
+    const mockDb = createMockDbAdapter({
+      insertSystemPolicyProfile: mockInsertPolicy,
+      insertOrchestrationRun: vi.fn().mockResolvedValue({ id: "run-auto" }),
+    });
     const result = await createRun(mockDb, {
       project_id: projectId,
       scope: "card",
@@ -47,11 +51,17 @@ describe("createRun", () => {
       initiated_by: "user-123",
       repo_url: "https://github.com/acme/app",
       base_branch: "main",
-      run_input_snapshot: { card_id: "card-123" },
+      run_input_snapshot: { card_id: cardId },
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("No system policy profile");
+    expect(mockInsertPolicy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: projectId,
+        required_checks: ["lint"],
+      })
+    );
+    expect(result.success).toBe(true);
+    expect(result.runId).toBe("run-auto");
   });
 
   it("returns validation errors when run_input_snapshot lacks scope target", async () => {
@@ -73,11 +83,15 @@ describe("createRun", () => {
     expect(result.validationErrors).toBeDefined();
   });
 
-  it("returns validation error when card has no approved planned files", async () => {
+  it("succeeds when card has no approved planned files (planned files optional)", async () => {
     vi.mocked(queries.getCardPlannedFiles).mockResolvedValue([]);
 
+    const mockDb = createMockDbAdapter({
+      insertOrchestrationRun: vi.fn().mockResolvedValue({ id: "run-no-pf" }),
+    });
+
     const result = await createRun(
-      createMockDbAdapter(),
+      mockDb,
       {
         project_id: projectId,
         scope: "card",
@@ -90,8 +104,8 @@ describe("createRun", () => {
       }
     );
 
-    expect(result.success).toBe(false);
-    expect(result.validationErrors?.some((s) => s.includes("no approved planned files"))).toBe(true);
+    expect(result.success).toBe(true);
+    expect(result.runId).toBe("run-no-pf");
   });
 
   it("succeeds when card has at least one approved planned file", async () => {

@@ -623,21 +623,40 @@ export function createSqliteAdapter(dbPath: string | ":memory:"): DbAdapter {
       const row = db.prepare("SELECT * FROM system_policy_profile WHERE project_id = ?").get(projectId) as DbRow | undefined;
       return row ? parseRow("system_policy_profile", row) : null;
     },
+    async insertSystemPolicyProfile(row: DbRow) {
+      const r = stringifyRow("system_policy_profile", row);
+      db.prepare(
+        `INSERT INTO system_policy_profile (id, project_id, required_checks, protected_paths, forbidden_paths, dependency_policy, security_policy, architecture_policy, approval_policy, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        r.id ?? crypto.randomUUID(),
+        r.project_id,
+        typeof r.required_checks === "string" ? r.required_checks : JSON.stringify(r.required_checks ?? []),
+        typeof r.protected_paths === "string" ? r.protected_paths : JSON.stringify(r.protected_paths ?? []),
+        typeof r.forbidden_paths === "string" ? r.forbidden_paths : JSON.stringify(r.forbidden_paths ?? []),
+        typeof r.dependency_policy === "string" ? r.dependency_policy : JSON.stringify(r.dependency_policy ?? {}),
+        typeof r.security_policy === "string" ? r.security_policy : JSON.stringify(r.security_policy ?? {}),
+        typeof r.architecture_policy === "string" ? r.architecture_policy : JSON.stringify(r.architecture_policy ?? {}),
+        typeof r.approval_policy === "string" ? r.approval_policy : JSON.stringify(r.approval_policy ?? {}),
+        (r.updated_at as string) ?? new Date().toISOString()
+      );
+    },
     async getOrchestrationRun(runId: string) {
       const row = db.prepare("SELECT * FROM orchestration_run WHERE id = ?").get(runId) as DbRow | undefined;
       return row ? parseRow("orchestration_run", row) : null;
     },
     async listOrchestrationRunsByProject(projectId: string, options?: { scope?: "workflow" | "card"; status?: string; limit?: number }) {
-      let sql = "SELECT * FROM orchestration_run WHERE project_id = ? ORDER BY created_at DESC";
+      let where = "WHERE project_id = ?";
       const params: unknown[] = [projectId];
       if (options?.scope) {
-        sql += " AND scope = ?";
+        where += " AND scope = ?";
         params.push(options.scope);
       }
       if (options?.status) {
-        sql += " AND status = ?";
+        where += " AND status = ?";
         params.push(options.status);
       }
+      let sql = `SELECT * FROM orchestration_run ${where} ORDER BY created_at DESC`;
       if (options?.limit) {
         sql += " LIMIT ?";
         params.push(options.limit);

@@ -114,6 +114,7 @@ export interface DbAdapter {
 
   // --- Orchestration: system policy ---
   getSystemPolicyProfileByProject(projectId: string): Promise<DbRow | null>;
+  insertSystemPolicyProfile(row: DbRow): Promise<void>;
 
   // --- Orchestration: runs ---
   getOrchestrationRun(runId: string): Promise<DbRow | null>;

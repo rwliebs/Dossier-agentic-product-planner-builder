@@ -44,6 +44,18 @@ export async function POST(request: NextRequest) {
       default_branch: default_branch ?? "main",
     });
 
+    await db.insertSystemPolicyProfile({
+      id: crypto.randomUUID(),
+      project_id: id,
+      required_checks: ["lint"],
+      protected_paths: [],
+      forbidden_paths: [],
+      dependency_policy: {},
+      security_policy: {},
+      architecture_policy: {},
+      approval_policy: {},
+    });
+
     const created = await db.getProject(id);
     return json(created ?? { id, name, repo_url: repo_url ?? null, default_branch: default_branch ?? "main" }, 201);
   } catch (err) {

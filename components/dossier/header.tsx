@@ -1,8 +1,5 @@
 'use client';
 
-import { Eye, Database } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { ACTION_BUTTONS } from '@/lib/constants/action-buttons';
 import { SettingsMenu } from '@/components/dossier/settings-menu';
 
 interface DossierHeaderProps {
@@ -14,12 +11,7 @@ interface DossierHeaderProps {
   onSaveCurrentProject?: () => void | Promise<void>;
 }
 
-export function Header({ viewMode, onViewModeChange, agentStatus, selectedProjectId, onSelectProjectId, onSaveCurrentProject }: DossierHeaderProps) {
-  const statusColors = {
-    idle: 'text-muted-foreground',
-    building: 'text-green-400 animate-pulse',
-    reviewing: 'text-yellow-400',
-  };
+export function Header({ selectedProjectId, onSelectProjectId, onSaveCurrentProject }: DossierHeaderProps) {
 
   return (
     <header className="border-b border-grid-line bg-background px-6 py-4">
@@ -34,39 +26,6 @@ export function Header({ viewMode, onViewModeChange, agentStatus, selectedProjec
         </div>
 
         <div className="flex items-center gap-6">
-          {/* Agent Status */}
-          <div className="flex items-center gap-2">
-            <div className={`h-2 w-2 rounded-full ${statusColors[agentStatus]} ${agentStatus === 'building' ? 'animate-pulse' : ''}`} />
-            <span className="text-xs uppercase tracking-widest font-mono text-foreground">
-              {agentStatus === 'idle' && 'Ready'}
-              {agentStatus === 'building' && 'Building'}
-              {agentStatus === 'reviewing' && 'Reviewing'}
-            </span>
-          </div>
-
-          {/* View Mode Toggle */}
-          <div className="flex items-center gap-2 border border-grid-line rounded px-2 py-1">
-            <Button
-              variant={viewMode === 'functionality' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => onViewModeChange('functionality')}
-              className="h-6 px-2 text-xs uppercase tracking-widest font-mono"
-            >
-              <Eye className="h-3 w-3 mr-1" />
-              {ACTION_BUTTONS.VIEW_MODE.functionality}
-            </Button>
-            <div className="w-px h-4 bg-grid-line" />
-            <Button
-              variant={viewMode === 'architecture' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => onViewModeChange('architecture')}
-              className="h-6 px-2 text-xs uppercase tracking-widest font-mono"
-            >
-              <Database className="h-3 w-3 mr-1" />
-              {ACTION_BUTTONS.VIEW_MODE.architecture}
-            </Button>
-          </div>
-
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
             <SettingsMenu

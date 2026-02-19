@@ -251,9 +251,6 @@ export function ImplementationCard({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-[10px] font-mono uppercase tracking-wider font-bold px-2 py-1 rounded ${config.badge}`}>
-            {statusLabels[status]}
-          </span>
           {card.build_state && (
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted text-muted-foreground">
               build: {card.build_state}
@@ -448,7 +445,7 @@ export function ImplementationCard({
 
             <div>
               <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Code Files to Create/Edit</h5>
-              {plannedFiles.length > 0 && plannedFiles.some((pf) => pf.status === 'approved') && onBuildCard && (
+              {(card as Record<string, unknown>).finalized_at && onBuildCard && (
                 <div className="mb-2">
                   {(() => {
                     const buildState = (card as { build_state?: string }).build_state;

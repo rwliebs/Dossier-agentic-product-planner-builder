@@ -13,10 +13,9 @@ import {
   buildScaffoldUserMessage,
   buildPopulateWorkflowPrompt,
   buildPopulateWorkflowUserMessage,
-  buildFinalizeSystemPrompt,
-  buildFinalizeUserMessage,
-  buildFinalizeTestsSystemPrompt,
-  buildFinalizeTestsUserMessage,
+  buildFinalizeDocSystemPrompt,
+  buildFinalizeDocUserMessage,
+  FINALIZE_DOC_SPECS,
 } from "@/lib/llm/planning-prompt";
 import { PLANNING_LLM } from "@/lib/feature-flags";
 import { chatStreamRequestSchema } from "@/lib/validation/request-schema";
@@ -147,37 +146,9 @@ async function runLlmSubStep(opts: {
 }
 
 /**
- * Collect cards that have at least one non-rejected requirement from the map state.
- */
-function getCardsWithRequirements(state: PlanningState) {
-  const cards = Array.from(state.cards.values());
-  return cards
-    .map((card) => {
-      const reqs = (state.cardRequirements.get(card.id) || [])
-        .filter((r) => r.status !== "rejected")
-        .map((r) => ({ text: r.text, status: r.status }));
-      if (reqs.length === 0) return null;
-      const plannedFiles = (state.cardPlannedFiles.get(card.id) || [])
-        .map((f) => ({
-          logical_file_name: f.logical_file_name,
-          artifact_kind: f.artifact_kind,
-          action: f.action,
-          intent_summary: f.intent_summary,
-        }));
-      return {
-        id: card.id,
-        title: card.title,
-        description: card.description,
-        requirements: reqs,
-        planned_files: plannedFiles,
-      };
-    })
-    .filter((c): c is NonNullable<typeof c> => c !== null);
-}
-
-/**
- * Run multi-step finalization: project docs (1 call) then per-card tests (1 call each).
- * Emits finalize_progress events between sub-steps for frontend progress tracking.
+ * Run multi-step finalization: 1 LLM call per project document (5 docs = 5 calls).
+ * Each sub-step generates a single artifact, keeping token usage low
+ * and preventing timeouts on large projects.
  */
 async function runFinalizeMultiStep(opts: {
   db: DbAdapter;
@@ -188,94 +159,52 @@ async function runFinalizeMultiStep(opts: {
 }): Promise<number> {
   const { db, projectId, emit, mockResponse } = opts;
   let currentState = opts.state;
-
-  const testableCards = getCardsWithRequirements(currentState);
-  const totalSteps = 1 + testableCards.length;
+  const totalSteps = FINALIZE_DOC_SPECS.length;
   let totalActions = 0;
 
-  emit("finalize_progress", {
-    step: "docs",
-    step_index: 0,
-    total_steps: totalSteps,
-    status: "generating",
-    label: "Generating project context documents",
-  });
-
-  const docsResult = await runLlmSubStep({
-    db,
-    projectId,
-    systemPrompt: buildFinalizeSystemPrompt(),
-    userMessage: buildFinalizeUserMessage(currentState),
-    state: currentState,
-    emit,
-    actionFilter: (a) => a.action_type === "createContextArtifact",
-    mockResponse,
-  });
-
-  totalActions += docsResult.actionCount;
-  currentState = docsResult.updatedState;
-
-  emit("finalize_progress", {
-    step: "docs",
-    step_index: 0,
-    total_steps: totalSteps,
-    status: "complete",
-    label: `Created ${docsResult.actionCount} project documents`,
-  });
-
-  const projectSummary = {
-    id: currentState.project.id,
-    name: currentState.project.name,
-    description: currentState.project.description,
-    tech_stack: currentState.project.tech_stack,
-    deployment: currentState.project.deployment,
-  };
-
-  for (let i = 0; i < testableCards.length; i++) {
-    const card = testableCards[i];
+  for (let i = 0; i < FINALIZE_DOC_SPECS.length; i++) {
+    const spec = FINALIZE_DOC_SPECS[i];
 
     emit("finalize_progress", {
-      step: "card_tests",
-      step_index: i + 1,
+      step: "doc",
+      step_index: i,
       total_steps: totalSteps,
       status: "generating",
-      label: `Generating tests for "${card.title}"`,
-      card_id: card.id,
+      label: `Generating ${spec.label}`,
     });
 
     try {
-      const testResult = await runLlmSubStep({
+      const result = await runLlmSubStep({
         db,
         projectId,
-        systemPrompt: buildFinalizeTestsSystemPrompt(),
-        userMessage: buildFinalizeTestsUserMessage(card, projectSummary),
+        systemPrompt: buildFinalizeDocSystemPrompt(spec),
+        userMessage: buildFinalizeDocUserMessage(currentState, spec),
         state: currentState,
         emit,
         actionFilter: (a) => a.action_type === "createContextArtifact",
+        mockResponse,
       });
 
-      totalActions += testResult.actionCount;
-      currentState = testResult.updatedState;
+      totalActions += result.actionCount;
+      currentState = result.updatedState;
 
       emit("finalize_progress", {
-        step: "card_tests",
-        step_index: i + 1,
+        step: "doc",
+        step_index: i,
         total_steps: totalSteps,
         status: "complete",
-        label: `Tests created for "${card.title}"`,
-        card_id: card.id,
+        label: `Created ${spec.label}`,
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Test generation failed";
-      console.error(`[finalize] Card test generation failed for ${card.id}:`, msg);
-      emit("error", { reason: `Test generation failed for "${card.title}": ${msg}` });
+      const msg = err instanceof Error ? err.message : "Doc generation failed";
+      console.error(`[finalize] Doc generation failed for ${spec.name}:`, msg);
+      emit("error", { reason: `Failed to generate ${spec.label}: ${msg}` });
       emit("finalize_progress", {
-        step: "card_tests",
-        step_index: i + 1,
+        step: "doc",
+        step_index: i,
         total_steps: totalSteps,
         status: "error",
-        label: `Failed to generate tests for "${card.title}"`,
-        card_id: card.id,
+        label: `Failed: ${spec.label}`,
       });
     }
   }

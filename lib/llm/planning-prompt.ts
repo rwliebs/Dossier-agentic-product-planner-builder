@@ -395,64 +395,99 @@ export function serializeMapStateForFinalize(state: PlanningState): string {
 }
 
 /**
- * Build the system prompt for FINALIZE mode (project-wide docs only).
- * Produces 5 project-level context documents as createContextArtifact actions.
- * Per-card tests are generated separately via buildFinalizeTestsSystemPrompt.
+ * Specification for each project-wide finalization document.
+ * Used to generate one focused LLM call per document.
  */
-export function buildFinalizeSystemPrompt(): string {
-  return `You are a finalization assistant that produces build-ready context documents for a software project.
+export interface FinalizeDocSpec {
+  name: string;
+  type: "doc" | "spec" | "design";
+  title: string;
+  label: string;
+  contentGuidelines: string;
+}
+
+export const FINALIZE_DOC_SPECS: FinalizeDocSpec[] = [
+  {
+    name: "architectural-summary",
+    type: "doc",
+    title: "Architectural Summary",
+    label: "Architectural Summary",
+    contentGuidelines: `- Tech stack decisions and rationale
+- Service topology (frontend, backend, database, external services)
+- Key architectural patterns (state management, routing, data fetching)
+- Deployment model
+- Derived from: project tech_stack, deployment, design_inspiration, and the planned file intents across cards`,
+  },
+  {
+    name: "data-contracts",
+    type: "spec",
+    title: "Data Contracts",
+    label: "Data Contracts",
+    contentGuidelines: `- Entity schemas with fields and types
+- API endpoint contracts (method, path, request/response shapes)
+- Shared interfaces and data flow between components
+- Derived from: card planned files (especially schema, endpoint, service kinds), card descriptions, requirements`,
+  },
+  {
+    name: "domain-summaries",
+    type: "doc",
+    title: "Domain Summaries",
+    label: "Domain Summaries",
+    contentGuidelines: `- Bounded contexts identified from workflows
+- Domain models and entity relationships
+- Key terminology glossary
+- Derived from: workflow titles/descriptions, activity titles, card titles/descriptions`,
+  },
+  {
+    name: "user-workflow-summaries",
+    type: "doc",
+    title: "User Workflow Summaries",
+    label: "User Workflow Summaries",
+    contentGuidelines: `- Per workflow: user outcome, activity progression, how activities connect
+- Cross-workflow dependencies and shared entities
+- User journey narratives
+- Derived from: workflow/activity/card structure and descriptions`,
+  },
+  {
+    name: "design-system",
+    type: "design",
+    title: "Design System",
+    label: "Design System",
+    contentGuidelines: `- Component palette (which UI components are needed)
+- Color tokens and typography conventions
+- Layout patterns and spacing
+- Interaction patterns (forms, navigation, feedback)
+- Derived from: project design_inspiration, card planned files of kind component/hook`,
+  },
+];
+
+/**
+ * Build the system prompt to generate ONE specific project-wide document.
+ */
+export function buildFinalizeDocSystemPrompt(spec: FinalizeDocSpec): string {
+  return `You are a finalization assistant that produces a single build-ready context document for a software project.
 
 ## Your Task
-Given a fully planned story map (workflows, activities, cards with requirements and planned files), generate createContextArtifact actions for 5 project-level documents. Each is a createContextArtifact action with content in markdown.
+Generate ONE createContextArtifact action for the "${spec.title}" document.
 
-1. **Architectural Summary** (type: "doc", name: "architectural-summary")
-   - Tech stack decisions and rationale
-   - Service topology (frontend, backend, database, external services)
-   - Key architectural patterns (state management, routing, data fetching)
-   - Deployment model
-   - Derived from: project tech_stack, deployment, design_inspiration, and the planned file intents across cards
-
-2. **Data Contracts** (type: "spec", name: "data-contracts")
-   - Entity schemas with fields and types
-   - API endpoint contracts (method, path, request/response shapes)
-   - Shared interfaces and data flow between components
-   - Derived from: card planned files (especially schema, endpoint, service kinds), card descriptions, requirements
-
-3. **Domain Summaries** (type: "doc", name: "domain-summaries")
-   - Bounded contexts identified from workflows
-   - Domain models and entity relationships
-   - Key terminology glossary
-   - Derived from: workflow titles/descriptions, activity titles, card titles/descriptions
-
-4. **User Workflow Summaries** (type: "doc", name: "user-workflow-summaries")
-   - Per workflow: user outcome, activity progression, how activities connect
-   - Cross-workflow dependencies and shared entities
-   - User journey narratives
-   - Derived from: workflow/activity/card structure and descriptions
-
-5. **Design System** (type: "design", name: "design-system")
-   - Component palette (which UI components are needed)
-   - Color tokens and typography conventions
-   - Layout patterns and spacing
-   - Interaction patterns (forms, navigation, feedback)
-   - Derived from: project design_inspiration, card planned files of kind component/hook
+The document content must be in markdown and cover:
+${spec.contentGuidelines}
 
 ## createContextArtifact Action Schema
 - action_type: "createContextArtifact"
 - target_ref: { "project_id": "<project_id>" }
-- payload: { "name": "<artifact name>", "type": "<doc|spec|design>", "title": "<human title>", "content": "<full content>", "card_id": null }
-
-All documents are project-level: card_id must be null.
+- payload: { "name": "${spec.name}", "type": "${spec.type}", "title": "${spec.title}", "content": "<full markdown content>", "card_id": null }
 
 ## Response Format
 Respond with a JSON object: { "type": "actions", "message": "optional brief summary", "actions": [...] }
 
+The actions array must contain exactly ONE createContextArtifact action.
+
 ## Critical Constraints
-1. Generate ALL 5 project-wide documents — do not skip any
-2. Document content must be specific to THIS project — not generic boilerplate
-3. Use IDs from the provided map state — never invent IDs that don't exist
-4. Generate new UUIDs for each createContextArtifact action id
-5. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+1. Content must be specific to THIS project — not generic boilerplate
+2. Use IDs from the provided map state — never invent IDs that don't exist
+3. Generate a new UUID for the createContextArtifact action id
+4. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
 }
 
 /**
@@ -508,15 +543,16 @@ The actions array should contain exactly ONE createContextArtifact action for th
 }
 
 /**
- * Build the user message for finalize mode (project-wide docs only).
+ * Build the user message for generating a single finalization document.
  */
-export function buildFinalizeUserMessage(
+export function buildFinalizeDocUserMessage(
   mapSnapshot: PlanningState,
+  spec: FinalizeDocSpec,
 ): string {
   const stateJson = serializeMapStateForFinalize(mapSnapshot);
   const projectId = mapSnapshot.project.id;
 
-  return `## Project Map State (with requirements and planned files)\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Your Task\nGenerate createContextArtifact actions for all 5 project-wide context documents.\n\nUse project_id "${projectId}" in all target_ref and project_id fields.\n\nOutput ONLY the JSON object.`;
+  return `## Project Map State (with requirements and planned files)\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Your Task\nGenerate one createContextArtifact action for the "${spec.title}" document (name: "${spec.name}", type: "${spec.type}").\n\nUse project_id "${projectId}" in all target_ref and project_id fields.\n\nOutput ONLY the JSON object.`;
 }
 
 /**

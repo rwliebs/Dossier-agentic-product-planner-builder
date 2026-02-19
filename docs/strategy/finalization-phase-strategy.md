@@ -53,9 +53,9 @@ User clicks "Finalize Project" in the UI after planning phases 1-3 are complete.
 
 Finalize mode runs multiple sequential LLM calls within a single SSE stream to prevent timeouts on large projects. Each sub-step has its own focused prompt and produces a subset of the total output.
 
-#### Sub-step 1: Project-Wide Context Documents (1 LLM call)
+#### Sub-steps 1–5: Project-Wide Context Documents (1 LLM call each)
 
-The first LLM call produces five categories of project-level `ContextArtifact` records:
+Each project document gets its own LLM call with a focused prompt. The five categories of project-level `ContextArtifact` records:
 
 | Document | Artifact Type | Content |
 |----------|--------------|---------|
@@ -67,7 +67,7 @@ The first LLM call produces five categories of project-level `ContextArtifact` r
 
 Each document is derived from the current map state: project metadata (tech_stack, deployment, design_inspiration, customer_personas), workflow/activity/card titles and descriptions, requirements, and planned files.
 
-#### Sub-steps 2–N: Per-Card E2E Tests (1 LLM call per card)
+#### Sub-steps 6–N: Per-Card E2E Tests (1 LLM call per card)
 
 For each card that has requirements, a separate LLM call generates a `ContextArtifact` with:
 
@@ -198,7 +198,7 @@ A card with `finalized_at IS NOT NULL` is build-ready. Build trigger validation 
 ### Risk: Finalize LLM call is expensive (large map state input)
 
 - **Mitigation**: finalize mode receives a summarized map state (titles, descriptions, requirement texts) rather than the full JSON with positions and IDs.
-- **Mitigation** (implemented): context document generation and test generation are split into multiple LLM calls. Sub-step 1 generates all 5 project docs in one call. Sub-steps 2–N each generate tests for one card, receiving only that card's data plus a lightweight project summary. This prevents timeouts and keeps each call's token usage manageable.
+- **Mitigation** (implemented): finalization is fully decomposed into individual LLM calls. Each of the 5 project documents gets its own focused call. Each card's e2e tests get a separate call receiving only that card's data plus a lightweight project summary. The streaming client uses idle-based timeouts (resets on each received chunk) so actively streaming responses are never killed. This prevents timeouts and keeps each call's token usage manageable.
 
 ### Risk: createContextArtifact action creates duplicate artifacts on re-finalization
 

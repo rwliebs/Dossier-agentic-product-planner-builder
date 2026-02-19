@@ -288,6 +288,21 @@ export function ImplementationCard({
               <ChevronDown className="h-4 w-4" /> {ACTION_BUTTONS.VIEW_DETAILS_EDIT}
             </button>
           )}
+          {onFinalizeCard && !(card as Record<string, unknown>).finalized_at && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onFinalizeCard(card.id); }}
+              className="w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+            >
+              {ACTION_BUTTONS.FINALIZE_CARD}
+            </button>
+          )}
+          {(card as Record<string, unknown>).finalized_at && (
+            <div className="flex items-center gap-2 px-2 py-1.5 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 font-mono">
+              <Check className="h-3 w-3" />
+              Finalized
+            </div>
+          )}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onAction(card.id, status === 'active' ? 'monitor' : status === 'review' ? 'test' : 'build'); }}
@@ -527,24 +542,6 @@ export function ImplementationCard({
                 </DropdownMenu>
               )}
             </div>
-
-            {onFinalizeCard && requirements.length > 0 && plannedFiles.length > 0 && !(card as Record<string, unknown>).finalized_at && (
-              <div>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onFinalizeCard(card.id); }}
-                  className="w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-                >
-                  {ACTION_BUTTONS.FINALIZE_CARD}
-                </button>
-              </div>
-            )}
-            {(card as Record<string, unknown>).finalized_at && (
-              <div className="flex items-center gap-2 px-2 py-1.5 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 font-mono">
-                <Check className="h-3 w-3" />
-                Finalized
-              </div>
-            )}
 
             {(card.build_state != null || card.last_built_at != null) && (
             <>

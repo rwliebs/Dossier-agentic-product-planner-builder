@@ -140,6 +140,10 @@ export async function claudePlanningRequest(
 /**
  * Call Claude API with streaming. Returns a ReadableStream that yields text deltas
  * as they arrive. Used for incremental parsing and live updates.
+ *
+ * Timeout behaviour: idle-based. The timer resets each time a text chunk arrives,
+ * so long-running generations that are actively streaming won't be killed.
+ * Only stalls (no data for timeoutMs) trigger an abort.
  */
 export async function claudeStreamingRequest(
   input: ClaudeStreamingRequestInput,
@@ -163,7 +167,13 @@ export async function claudeStreamingRequest(
 
   const client = new Anthropic({ apiKey });
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  let idleTimer: ReturnType<typeof setTimeout>;
+  const resetIdleTimer = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => controller.abort(), timeoutMs);
+  };
+  resetIdleTimer();
 
   const stream = client.messages.stream(
     {
@@ -178,6 +188,7 @@ export async function claudeStreamingRequest(
   return new ReadableStream<string>({
     start(streamController) {
       stream.on("text", (delta: string) => {
+        resetIdleTimer();
         try {
           streamController.enqueue(delta);
         } catch {
@@ -185,18 +196,18 @@ export async function claudeStreamingRequest(
         }
       });
       stream.on("end", () => {
-        clearTimeout(timeoutId);
+        clearTimeout(idleTimer);
         streamController.close();
       });
       stream.on("error", (err) => {
-        clearTimeout(timeoutId);
+        clearTimeout(idleTimer);
         streamController.error(err);
       });
-      stream.on("abort", (err) => {
-        clearTimeout(timeoutId);
+      stream.on("abort", () => {
+        clearTimeout(idleTimer);
         streamController.error(
           new Error(
-            `Planning LLM request timed out after ${timeoutMs}ms. Try again.`,
+            `Planning LLM stream idle for ${timeoutMs}ms with no data. Try again.`,
           ),
         );
       });

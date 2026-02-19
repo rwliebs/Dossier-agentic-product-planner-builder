@@ -137,13 +137,13 @@ ttl_expires_on: null
 | 1 | User | Clicks **Finalize Project** (Implementation Map header) after planning phases 1-3 |
 | 2 | Planning LLM (finalize mode) | Produces project-wide context docs (architectural summary, data contracts, domain summaries, workflow summaries, design system) + per-card e2e tests |
 | 3 | System | Saves as ContextArtifact records; tests linked to cards; toast shows count created |
-| 4 | User | Clicks **Finalize** on individual card (shown when card has requirements + planned files, not yet finalized) |
+| 4 | User | Clicks **Finalize** on individual card (always visible when not finalized; API validates requirements + planned files) |
 | 5 | System | Validates requirements + planned files; sets card.finalized_at; card is build-ready |
 | 6 | UI | Shows "Finalized" badge on card; Build button becomes available |
 
 **UI elements**:
 - **Finalize Project** — Button in Implementation Map header (next to status counts). Triggers streaming LLM call; shows "Finalizing Project" while running.
-- **Finalize** — Per-card button (indigo). Visible when card has ≥1 requirement, ≥1 planned file, and no finalized_at. Hidden after finalization.
+- **Finalize** — Per-card button (indigo). Visible when card is not yet finalized. User can always click; API validates requirements and planned files and returns a clear error if missing.
 - **Finalized** — Badge on card after confirmation (indigo background, check icon).
 
 **Success outcomes**:

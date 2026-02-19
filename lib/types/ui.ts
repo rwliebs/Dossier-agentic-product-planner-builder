@@ -37,6 +37,7 @@ export interface MapCard {
   status: string;
   priority: number;
   quick_answer?: string | null;
+  finalized_at?: string | null;
   build_state?: string | null;
   last_built_at?: string | null;
   last_build_ref?: string | null;

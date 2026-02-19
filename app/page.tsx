@@ -333,10 +333,10 @@ export default function DossierPage() {
           toast.error(streamError);
         } else if (actionCount === 0) {
           const { toast } = await import('sonner');
-          toast.warning('No context documents or tests were generated.');
+          toast.warning('No context documents were generated.');
         } else {
           const { toast } = await import('sonner');
-          toast.success(`Finalized: ${actionCount} context documents & tests created`);
+          toast.success(`Finalized: ${actionCount} context documents created`);
         }
         refetch();
       } catch (err) {
@@ -353,7 +353,11 @@ export default function DossierPage() {
 
   const handleFinalizeCard = useCallback(
     async (cardId: string) => {
-      if (!projectId) return;
+      if (!projectId) {
+        const { toast } = await import('sonner');
+        toast.error('No project selected');
+        return;
+      }
       try {
         const res = await fetch(`/api/projects/${projectId}/cards/${cardId}/finalize`, {
           method: 'POST',

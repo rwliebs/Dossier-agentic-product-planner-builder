@@ -2,12 +2,13 @@
  * E2E test: Create project → prompt idea → completed cards for at least two workflows.
  *
  * Outcome-based: run the full flow, then assert on the final state.
- * Covers: scaffold, populate, card content, planned files creation & approval.
+ * Covers: scaffold, populate, card content, planned files creation & approval,
+ * requirements, per-card finalization (Workflow E).
  *
- * Required outcomes:
+ * Required outcomes (per user-workflows-reference.md):
  * - Map has ≥2 workflows, each with ≥1 card
  * - Cards have non-empty title
- * - ≥2 cards have approved planned files (build-ready)
+ * - ≥2 cards build-ready: approved planned files AND finalized_at
  *
  * Note: LLM populate can be variable; if 0 cards, run with PLANNING_DEBUG=1 to inspect.
  * Requires: dev server (npm run dev), ANTHROPIC_API_KEY, PLANNING_LLM enabled.
@@ -148,14 +149,14 @@ interface OutcomeResult {
   workflowsWithCards: number;
   cardsWithTitle: number;
   totalCards: number;
-  cardsWithApprovedPlannedFiles: number;
-  workflowSummaries: { title: string; cards: number; withTitle: number; withApproved: number }[];
+  cardsBuildReady: number;
+  workflowSummaries: { title: string; cards: number; withTitle: number; buildReady: number }[];
 }
 
-/** Outcome: ≥2 workflows, each with ≥1 card; cards have title; ≥2 cards have approved planned files. */
+/** Outcome: ≥2 workflows, each with ≥1 card; cards have title; ≥2 cards build-ready (approved planned files + finalized_at). */
 function satisfiesOutcome(
   map: MapSnapshot,
-  cardApprovedCount: Map<string, number>
+  cardBuildReady: Set<string>
 ): OutcomeResult {
   const workflowCount = map.workflows.length;
   const workflowsWithCards = map.workflows.filter(
@@ -166,9 +167,7 @@ function satisfiesOutcome(
   const cardsWithTitle = allCards.filter(
     (c) => c.title != null && String(c.title).trim().length > 0
   ).length;
-  const cardsWithApprovedPlannedFiles = allCards.filter(
-    (c) => (cardApprovedCount.get(c.id) ?? 0) >= 1
-  ).length;
+  const cardsBuildReady = allCards.filter((c) => cardBuildReady.has(c.id)).length;
 
   const workflowSummaries = map.workflows.map((wf) => {
     const wfCards = wf.activities.flatMap((a) => a.cards);
@@ -178,9 +177,7 @@ function satisfiesOutcome(
       withTitle: wfCards.filter(
         (c) => c.title != null && String(c.title).trim().length > 0
       ).length,
-      withApproved: wfCards.filter(
-        (c) => (cardApprovedCount.get(c.id) ?? 0) >= 1
-      ).length,
+      buildReady: wfCards.filter((c) => cardBuildReady.has(c.id)).length,
     };
   });
 
@@ -188,7 +185,7 @@ function satisfiesOutcome(
     workflowCount >= 2 &&
     workflowsWithCards >= 2 &&
     cardsWithTitle >= 2 &&
-    cardsWithApprovedPlannedFiles >= 2;
+    cardsBuildReady >= 2;
 
   return {
     ok,
@@ -196,15 +193,15 @@ function satisfiesOutcome(
     workflowsWithCards,
     cardsWithTitle,
     totalCards,
-    cardsWithApprovedPlannedFiles,
+    cardsBuildReady,
     workflowSummaries,
   };
 }
 
-/** Run full flow: create → scaffold → populate → create planned files → approve → return map + counts. */
+/** Run full flow: create → scaffold → populate → create planned files → approve → add requirements → finalize → return map + build-ready card ids. */
 async function runFlow(): Promise<{
   map: MapSnapshot;
-  cardApprovedCount: Map<string, number>;
+  cardBuildReady: Set<string>;
 }> {
   const createRes = await fetch(`${BASE_URL}/api/projects`, {
     method: "POST",
@@ -267,11 +264,11 @@ async function runFlow(): Promise<{
   map = await fetchMapSnapshot(projectId);
   if (!map) throw new Error("Map fetch failed after populate");
 
-  const cardApprovedCount = new Map<string, number>();
+  const cardBuildReady = new Set<string>();
   const allCards = getAllCards(map);
-  let cardsWithPlannedFiles = 0;
+  let cardsFinalized = 0;
   for (const card of allCards.slice(0, 10)) {
-    if (cardsWithPlannedFiles >= 2) break;
+    if (cardsFinalized >= 2) break;
     const createPfRes = await fetch(
       `${BASE_URL}/api/projects/${projectId}/cards/${card.id}/planned-files`,
       {
@@ -299,22 +296,42 @@ async function runFlow(): Promise<{
       }
     );
     if (!patchRes.ok) continue;
-    cardApprovedCount.set(card.id, (cardApprovedCount.get(card.id) ?? 0) + 1);
-    cardsWithPlannedFiles++;
+
+    const reqRes = await fetch(
+      `${BASE_URL}/api/projects/${projectId}/cards/${card.id}/requirements`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: `As a user I want ${card.title ?? "feature"} to work correctly`,
+          source: "user",
+        }),
+      }
+    );
+    if (!reqRes.ok) continue;
+
+    const finalizeRes = await fetch(
+      `${BASE_URL}/api/projects/${projectId}/cards/${card.id}/finalize`,
+      { method: "POST" }
+    );
+    if (!finalizeRes.ok) continue;
+
+    cardBuildReady.add(card.id);
+    cardsFinalized++;
   }
 
-  return { map, cardApprovedCount };
+  return { map, cardBuildReady };
 }
 
 function formatDiagnostics(result: OutcomeResult): string {
   const lines = [
     `Workflows: ${result.workflowCount} (need ≥2 with cards)`,
     `Cards with title: ${result.cardsWithTitle}/${result.totalCards} (need ≥2)`,
-    `Cards with approved planned files: ${result.cardsWithApprovedPlannedFiles} (need ≥2)`,
+    `Cards build-ready (approved planned files + finalized): ${result.cardsBuildReady} (need ≥2)`,
     "Per workflow:",
     ...result.workflowSummaries.map(
       (wf) =>
-        `  - "${wf.title}": ${wf.cards} cards, ${wf.withTitle} with title, ${wf.withApproved} with approved planned files`
+        `  - "${wf.title}": ${wf.cards} cards, ${wf.withTitle} with title, ${wf.buildReady} build-ready`
     ),
   ];
   return lines.join("\n");
@@ -322,10 +339,10 @@ function formatDiagnostics(result: OutcomeResult): string {
 
 describe("project to cards flow", () => {
   it.skipIf(!canRun())(
-    "map has ≥2 workflows, cards with title, ≥2 cards build-ready (approved planned files)",
+    "map has ≥2 workflows, cards with title, ≥2 cards build-ready (approved planned files + finalized)",
     async () => {
-      const { map, cardApprovedCount } = await runFlow();
-      const result = satisfiesOutcome(map, cardApprovedCount);
+      const { map, cardBuildReady } = await runFlow();
+      const result = satisfiesOutcome(map, cardBuildReady);
 
       expect(
         result.ok,

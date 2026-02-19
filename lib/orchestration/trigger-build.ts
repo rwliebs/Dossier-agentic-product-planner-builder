@@ -99,6 +99,24 @@ export async function triggerBuild(
     };
   }
 
+  const cardsWithApprovedPlannedFiles: string[] = [];
+  for (const cardId of cardIds) {
+    const plannedFiles = await getCardPlannedFiles(db, cardId);
+    const approved = plannedFiles.filter(
+      (f) => (f as { status?: string }).status === "approved"
+    );
+    if (approved.length > 0) cardsWithApprovedPlannedFiles.push(cardId);
+  }
+  if (cardsWithApprovedPlannedFiles.length === 0) {
+    return {
+      success: false,
+      error: "No buildable cards",
+      validationErrors: [
+        "Build requires at least one card with approved planned files. Approve planned files for each card before triggering build.",
+      ],
+    };
+  }
+
   const runResult = await createRun(db, {
     project_id: input.project_id,
     scope: input.scope,

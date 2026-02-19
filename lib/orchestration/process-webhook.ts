@@ -56,6 +56,8 @@ export interface ProcessWebhookResult {
 /**
  * Writes knowledge items from webhook payload to the card.
  * Uses source: 'agent' and status: 'draft'.
+ * Positions are sequential within each table (facts, assumptions, questions),
+ * matching API routes that use items.length per type.
  */
 async function writeKnowledgeToCard(
   db: DbAdapter,
@@ -64,7 +66,14 @@ async function writeKnowledgeToCard(
 ): Promise<void> {
   if (!knowledge) return;
   const now = new Date().toISOString();
-  let position = 0;
+
+  const [existingFacts, existingAssumptions, existingQuestions] = await Promise.all([
+    db.getCardFacts(cardId),
+    db.getCardAssumptions(cardId),
+    db.getCardQuestions(cardId),
+  ]);
+
+  let factPosition = existingFacts.length;
   for (const fact of knowledge.facts ?? []) {
     await db.insertCardFact({
       card_id: cardId,
@@ -72,29 +81,33 @@ async function writeKnowledgeToCard(
       evidence_source: fact.evidence_source ?? null,
       status: "draft",
       source: "agent",
-      position: position++,
+      position: factPosition++,
       created_at: now,
       updated_at: now,
     });
   }
+
+  let assumptionPosition = existingAssumptions.length;
   for (const assumption of knowledge.assumptions ?? []) {
     await db.insertCardAssumption({
       card_id: cardId,
       text: assumption.text,
       status: "draft",
       source: "agent",
-      position: position++,
+      position: assumptionPosition++,
       created_at: now,
       updated_at: now,
     });
   }
+
+  let questionPosition = existingQuestions.length;
   for (const question of knowledge.questions ?? []) {
     await db.insertCardQuestion({
       card_id: cardId,
       text: question.text,
       status: "draft",
       source: "agent",
-      position: position++,
+      position: questionPosition++,
       created_at: now,
       updated_at: now,
     });

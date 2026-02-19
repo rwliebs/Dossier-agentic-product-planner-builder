@@ -131,4 +131,28 @@ describe("Trigger build - single-build lock (O10.6)", () => {
       "Build requires finalized cards. Finalize each card (review context and confirm) before triggering build."
     );
   });
+
+  it("rejects when card(s) have no approved planned files", async () => {
+    vi.mocked(orchestrationQueries.listOrchestrationRunsByProject).mockResolvedValue([]);
+    vi.mocked(queries.getCardById).mockResolvedValue({
+      id: cardId,
+      finalized_at: new Date().toISOString(),
+    } as never);
+    vi.mocked(queries.getCardPlannedFiles).mockResolvedValue([]);
+
+    const mockDb = createMockDbAdapter();
+    const result = await triggerBuild(mockDb, {
+      project_id: projectId,
+      scope: "card",
+      card_id: cardId,
+      trigger_type: "card",
+      initiated_by: "user",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("No buildable cards");
+    expect(result.validationErrors).toContain(
+      "Build requires at least one card with approved planned files. Approve planned files for each card before triggering build."
+    );
+  });
 });

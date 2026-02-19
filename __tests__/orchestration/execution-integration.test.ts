@@ -178,6 +178,82 @@ describe("Webhook processing", () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain("Unknown event_type");
   });
+
+  it("writes knowledge with per-type sequential positions (facts 0,1; assumptions 0; questions 0)", async () => {
+    const mockInsertCardFact = vi.fn().mockResolvedValue(undefined);
+    const mockInsertCardAssumption = vi.fn().mockResolvedValue(undefined);
+    const mockInsertCardQuestion = vi.fn().mockResolvedValue(undefined);
+    const mockDb = createMockDbAdapter({
+      getCardFacts: vi.fn().mockResolvedValue([]),
+      getCardAssumptions: vi.fn().mockResolvedValue([]),
+      getCardQuestions: vi.fn().mockResolvedValue([]),
+      insertCardFact: mockInsertCardFact,
+      insertCardAssumption: mockInsertCardAssumption,
+      insertCardQuestion: mockInsertCardQuestion,
+    });
+
+    const result = await processWebhook(mockDb, {
+      event_type: "execution_completed",
+      assignment_id: assignmentId,
+      knowledge: {
+        facts: [
+          { text: "Fact A", evidence_source: "code" },
+          { text: "Fact B" },
+        ],
+        assumptions: [{ text: "Assumption 1" }],
+        questions: [{ text: "Question 1" }],
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockInsertCardFact).toHaveBeenCalledTimes(2);
+    expect(mockInsertCardFact).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ text: "Fact A", position: 0 })
+    );
+    expect(mockInsertCardFact).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ text: "Fact B", position: 1 })
+    );
+    expect(mockInsertCardAssumption).toHaveBeenCalledTimes(1);
+    expect(mockInsertCardAssumption).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "Assumption 1", position: 0 })
+    );
+    expect(mockInsertCardQuestion).toHaveBeenCalledTimes(1);
+    expect(mockInsertCardQuestion).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "Question 1", position: 0 })
+    );
+  });
+
+  it("appends knowledge with positions offset by existing items per type", async () => {
+    const mockInsertCardFact = vi.fn().mockResolvedValue(undefined);
+    const mockInsertCardAssumption = vi.fn().mockResolvedValue(undefined);
+    const mockInsertCardQuestion = vi.fn().mockResolvedValue(undefined);
+    const mockDb = createMockDbAdapter({
+      getCardFacts: vi.fn().mockResolvedValue([{ id: "f1", position: 0 }]),
+      getCardAssumptions: vi.fn().mockResolvedValue([{ id: "a1", position: 0 }]),
+      getCardQuestions: vi.fn().mockResolvedValue([]),
+      insertCardFact: mockInsertCardFact,
+      insertCardAssumption: mockInsertCardAssumption,
+      insertCardQuestion: mockInsertCardQuestion,
+    });
+
+    await processWebhook(mockDb, {
+      event_type: "execution_completed",
+      assignment_id: assignmentId,
+      knowledge: {
+        facts: [{ text: "New fact" }],
+        assumptions: [{ text: "New assumption" }],
+      },
+    });
+
+    expect(mockInsertCardFact).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "New fact", position: 1 })
+    );
+    expect(mockInsertCardAssumption).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "New assumption", position: 1 })
+    );
+  });
 });
 
 describe("Dispatch assignment", () => {

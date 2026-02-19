@@ -46,6 +46,8 @@ interface ImplementationCardProps {
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
   onFinalizeCard?: (cardId: string) => void;
+  finalizingCardId?: string | null;
+  cardFinalizeProgress?: string;
   onSelectDoc?: (doc: ContextArtifact) => void;
   onSelectFile?: (file: CodeFileForPanel) => void;
   codeFiles?: CodeFileForPanel[];
@@ -124,6 +126,8 @@ export function ImplementationCard({
   onApprovePlannedFile,
   onBuildCard,
   onFinalizeCard,
+  finalizingCardId,
+  cardFinalizeProgress,
   onSelectDoc,
   onSelectFile,
   codeFiles = [],
@@ -286,13 +290,25 @@ export function ImplementationCard({
             </button>
           )}
           {onFinalizeCard && !(card as Record<string, unknown>).finalized_at && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onFinalizeCard(card.id); }}
-              className="w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-            >
-              {ACTION_BUTTONS.FINALIZE_CARD}
-            </button>
+            <div className="space-y-1">
+              <button
+                type="button"
+                disabled={finalizingCardId === card.id}
+                onClick={(e) => { e.stopPropagation(); onFinalizeCard(card.id); }}
+                className={`w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold rounded transition-colors ${
+                  finalizingCardId === card.id
+                    ? 'bg-indigo-400 text-white cursor-not-allowed animate-pulse'
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                }`}
+              >
+                {finalizingCardId === card.id ? 'Finalizing…' : ACTION_BUTTONS.FINALIZE_CARD}
+              </button>
+              {finalizingCardId === card.id && cardFinalizeProgress && (
+                <p className="text-[10px] font-mono text-indigo-500 truncate px-1">
+                  {cardFinalizeProgress}
+                </p>
+              )}
+            </div>
           )}
           {(card as Record<string, unknown>).finalized_at && (
             <div className="flex items-center gap-2 px-2 py-1.5 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 font-mono">

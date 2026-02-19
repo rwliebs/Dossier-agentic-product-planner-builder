@@ -19,6 +19,8 @@ export interface ActivityColumnProps {
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
   onFinalizeCard?: (cardId: string) => void;
+  finalizingCardId?: string | null;
+  cardFinalizeProgress?: string;
   onSelectDoc?: (doc: ContextArtifact) => void;
   onSelectFile?: (file: CodeFileForPanel) => void;
   codeFiles?: CodeFileForPanel[];
@@ -42,6 +44,8 @@ export function ActivityColumn({
   onApprovePlannedFile,
   onBuildCard,
   onFinalizeCard,
+  finalizingCardId,
+  cardFinalizeProgress,
   onSelectDoc,
   onSelectFile,
   codeFiles = [],
@@ -79,6 +83,8 @@ export function ActivityColumn({
               onApprovePlannedFile={onApprovePlannedFile}
               onBuildCard={onBuildCard}
               onFinalizeCard={onFinalizeCard}
+              finalizingCardId={finalizingCardId}
+              cardFinalizeProgress={cardFinalizeProgress}
               onSelectDoc={onSelectDoc}
               onSelectFile={onSelectFile}
               codeFiles={codeFiles}

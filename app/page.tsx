@@ -273,6 +273,8 @@ export default function DossierPage() {
 
   const [finalizingProject, setFinalizingProject] = useState(false);
   const [finalizeProgress, setFinalizeProgress] = useState('');
+  const [finalizingCardId, setFinalizingCardId] = useState<string | null>(null);
+  const [cardFinalizeProgress, setCardFinalizeProgress] = useState('');
 
   const handleFinalizeProject = useCallback(
     async () => {
@@ -362,6 +364,8 @@ export default function DossierPage() {
         toast.error('No project selected');
         return;
       }
+      setFinalizingCardId(cardId);
+      setCardFinalizeProgress('Starting card finalization…');
       try {
         const res = await fetch(`/api/projects/${projectId}/cards/${cardId}/finalize`, {
           method: 'POST',
@@ -369,18 +373,75 @@ export default function DossierPage() {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          const msg = (err as { message?: string }).message ?? `Finalize failed (${res.status})`;
+          const msg = (err as { message?: string }).message
+            ?? (err as { error?: string }).error
+            ?? `Finalize failed (${res.status})`;
           const { toast } = await import('sonner');
           toast.error(msg);
           return;
         }
-        const { toast } = await import('sonner');
-        toast.success('Card finalized — ready for build');
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let streamError = '';
+        let testGenerated = false;
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const blocks = buffer.split(/\n\n+/);
+            buffer = blocks.pop() ?? '';
+            for (const block of blocks) {
+              let eventType = '';
+              let dataStr = '';
+              for (const line of block.split('\n')) {
+                if (line.startsWith('event: ')) eventType = line.slice(7).trim();
+                if (line.startsWith('data: ')) dataStr = line.slice(6);
+              }
+              if (eventType === 'finalize_progress' && dataStr) {
+                try {
+                  const d = JSON.parse(dataStr) as { label?: string; step_index?: number; total_steps?: number };
+                  const stepLabel = d.total_steps
+                    ? `(${(d.step_index ?? 0) + 1}/${d.total_steps}) ${d.label ?? ''}`
+                    : d.label ?? '';
+                  setCardFinalizeProgress(stepLabel);
+                } catch { /* ignore */ }
+              }
+              if (eventType === 'phase_complete' && dataStr) {
+                try {
+                  const d = JSON.parse(dataStr) as { test_generated?: boolean };
+                  testGenerated = d.test_generated ?? false;
+                } catch { /* ignore */ }
+              }
+              if (eventType === 'error' && dataStr) {
+                try {
+                  const d = JSON.parse(dataStr);
+                  streamError = (d as { reason?: string }).reason ?? 'Finalize failed';
+                } catch {
+                  streamError = 'Finalize failed';
+                }
+              }
+            }
+          }
+        }
+        if (streamError) {
+          const { toast } = await import('sonner');
+          toast.error(streamError);
+        } else {
+          const { toast } = await import('sonner');
+          const parts = ['Card finalized'];
+          if (testGenerated) parts.push('e2e test generated');
+          toast.success(parts.join(' — '));
+        }
         refetch();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Finalize failed';
         const { toast } = await import('sonner');
         toast.error(msg);
+      } finally {
+        setFinalizingCardId(null);
+        setCardFinalizeProgress('');
       }
     },
     [projectId, refetch]
@@ -636,6 +697,8 @@ export default function DossierPage() {
                     onApprovePlannedFile={handleApprovePlannedFile}
                     onBuildCard={handleBuildCard}
                     onFinalizeCard={handleFinalizeCard}
+                    finalizingCardId={finalizingCardId}
+                    cardFinalizeProgress={cardFinalizeProgress}
                     onPopulateWorkflow={handlePopulateWorkflow}
                     populatingWorkflowId={populatingWorkflowId}
                     onFinalizeProject={handleFinalizeProject}

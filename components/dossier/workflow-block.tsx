@@ -67,6 +67,8 @@ interface WorkflowBlockProps {
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
   onFinalizeCard?: (cardId: string) => void;
+  finalizingCardId?: string | null;
+  cardFinalizeProgress?: string;
   onSelectDoc?: (doc: ContextArtifact) => void;
   onFileClick?: (file: CodeFileForPanel | CodeFile) => void;
   onUpdateFileDescription?: (fileId: string, description: string) => void;
@@ -104,6 +106,8 @@ export function WorkflowBlock({
   onApprovePlannedFile,
   onBuildCard,
   onFinalizeCard,
+  finalizingCardId,
+  cardFinalizeProgress,
   onSelectDoc,
   onFileClick,
   onUpdateFileDescription,
@@ -284,6 +288,8 @@ export function WorkflowBlock({
             onApprovePlannedFile={onApprovePlannedFile}
             onBuildCard={onBuildCard}
             onFinalizeCard={onFinalizeCard}
+            finalizingCardId={finalizingCardId}
+            cardFinalizeProgress={cardFinalizeProgress}
             onSelectDoc={onSelectDoc}
             onSelectFile={onFileClick}
             getCardKnowledge={getCardKnowledge}

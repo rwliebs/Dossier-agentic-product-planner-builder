@@ -1,6 +1,6 @@
 /**
  * Execution dispatch: fetch assignment + card + planned files,
- * retrieve memory, build payload, dispatch to claude-flow,
+ * retrieve memory, build payload, dispatch to agentic-flow,
  * create AgentExecution, update status, log event.
  *
  * @see docs/strategy/worktree-management-flow.md
@@ -9,9 +9,9 @@
 import type { DbAdapter } from "@/lib/db/adapter";
 import { MEMORY_PLANE } from "@/lib/feature-flags";
 import {
-  createClaudeFlowClient,
+  createAgenticFlowClient,
   type DispatchPayload,
-} from "./claude-flow-client";
+} from "./agentic-flow-client";
 import { logEvent } from "./event-logger";
 import {
   getCardAssignment,
@@ -40,7 +40,7 @@ export interface DispatchAssignmentResult {
 }
 
 /**
- * Dispatches a single assignment to claude-flow.
+ * Dispatches a single assignment to agentic-flow.
  * Fetches assignment, run, card, planned files; builds payload; dispatches;
  * creates AgentExecution; updates assignment status; logs event.
  */
@@ -158,7 +158,7 @@ export async function dispatchAssignment(
     context_artifacts: contextArtifacts.length > 0 ? contextArtifacts : undefined,
   };
 
-  const client = createClaudeFlowClient();
+  const client = createAgenticFlowClient();
   const dispatchResult = await client.dispatch(payload);
 
   if (!dispatchResult.success) {

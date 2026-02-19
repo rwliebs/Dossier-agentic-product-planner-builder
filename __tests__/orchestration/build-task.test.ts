@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 import { buildTaskFromPayload } from "@/lib/orchestration/build-task";
-import type { DispatchPayload } from "@/lib/orchestration/claude-flow-client";
+import type { DispatchPayload } from "@/lib/orchestration/agentic-flow-client";
 
 describe("Build task from payload (O10.5)", () => {
   it("builds task description with planned files and acceptance criteria", () => {

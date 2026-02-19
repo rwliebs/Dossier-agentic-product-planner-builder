@@ -1,13 +1,13 @@
 /**
  * O10.5: Task description builder.
- * Translates DispatchPayload into claude-flow task description with process check,
+ * Translates DispatchPayload into agentic-flow task description with process check,
  * planned files, constraints, acceptance criteria, and completion verification.
  *
  * @see REMAINING_WORK_PLAN.md §5 O10.5
  * @see docs/strategy/build_button_execution_hookup plan
  */
 
-import type { DispatchPayload } from "./claude-flow-client";
+import type { DispatchPayload } from "./agentic-flow-client";
 
 export interface BuildTaskOutput {
   /** Human-readable task description for the agent swarm */
@@ -128,7 +128,7 @@ Report your knowledge discoveries (facts found, assumptions made, questions rais
 
 /**
  * Builds a task description from a dispatch payload.
- * Used by the claude-flow client to construct agent instructions.
+ * Used by the agentic-flow client to construct agent instructions.
  */
 export function buildTaskFromPayload(payload: DispatchPayload): BuildTaskOutput {
   const allowedPaths = payload.allowed_paths ?? [];

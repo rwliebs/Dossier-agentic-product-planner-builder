@@ -57,7 +57,7 @@ Dossier runs as a standalone Next.js app on your machine. All data stays local.
 | UI + API | Next.js (React 19) |
 | Database | SQLite (via better-sqlite3) |
 | Planning LLM | Anthropic Claude |
-| Build agents | claude-flow (local, in-process) |
+| Build agents | agentic-flow (local, in-process) |
 | Embeddings | RuVector (local WASM) |
 
 ## Configuration

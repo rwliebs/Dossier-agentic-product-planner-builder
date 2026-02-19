@@ -47,14 +47,17 @@ export {
   type ResolvePullRequestCandidateResult,
 } from "./resolve-pull-request-candidate";
 export {
+  createAgenticFlowClient,
   createClaudeFlowClient,
+  createMockAgenticFlowClient,
   createMockClaudeFlowClient,
-  createRealClaudeFlowClient,
+  createRealAgenticFlowClient,
+  type AgenticFlowClient,
   type ClaudeFlowClient,
   type DispatchPayload,
   type DispatchResult,
   type ExecutionStatus,
-} from "./claude-flow-client";
+} from "./agentic-flow-client";
 export { dispatchAssignment, type DispatchAssignmentInput, type DispatchAssignmentResult } from "./dispatch";
 export { logEvent, type LogEventInput, type EventType } from "./event-logger";
 export { processWebhook, type WebhookPayload, type WebhookEventType } from "./process-webhook";

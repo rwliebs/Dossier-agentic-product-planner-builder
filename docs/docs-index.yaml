@@ -10,7 +10,7 @@ docs_index:
       tags: [architecture, system, overview]
       anchors:
         - id: overview
-          summary: "Self-deployable Next.js app; SQLite + claude-flow + RuVector"
+          summary: "Self-deployable Next.js app; SQLite + agentic-flow + RuVector"
         - id: data-flow
           summary: "Planning LLM → actions → DbAdapter; Build → orchestration → agents"
         - id: endpoints
@@ -100,7 +100,7 @@ docs_index:
         - id: contract
           summary: "OrchestrationRun → CardAssignment; checks before approval; PR user-gated"
         - id: flow
-          summary: "createRun → assignments → claude-flow → checks → approval → PR"
+          summary: "createRun → assignments → agentic-flow → checks → approval → PR"
       depends_on: [doc.system-architecture, doc.data-contracts]
       last_verified: "2026-02-18"
 

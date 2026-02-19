@@ -105,7 +105,7 @@ ttl_expires_on: null
 - PR creation and merge remain user-gated
 - Assignment snapshots immutable; card boundaries enforced
 
-**Data flow**: `OrchestrationRun → CardAssignment[] → claude-flow → RunCheck[] → ApprovalRequest → PullRequestCandidate`
+**Data flow**: `OrchestrationRun → CardAssignment[] → agentic-flow → RunCheck[] → ApprovalRequest → PullRequestCandidate`
 
 ---
 

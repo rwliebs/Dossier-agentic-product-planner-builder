@@ -42,7 +42,7 @@ docs/
 │
 ├── investigations/           # Investigations (TTL: 2 weeks)
 │   ├── investigation-ruvector-retrieval-harvest-tests.md
-│   └── o10-claude-flow-gap.md
+│   └── o10-claude-flow-gap.md (resolved: migrated to agentic-flow)
 │
 ├── adr/                      # Architecture Decision Records
 │   └── 0001-*.md, 0002-*.md, ...

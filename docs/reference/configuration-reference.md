@@ -30,7 +30,7 @@ ttl_expires_on: null
 
 | Variable | Purpose |
 |----------|---------|
-| ANTHROPIC_API_KEY | Planning LLM and claude-flow; [console.anthropic.com](https://console.anthropic.com/) |
+| ANTHROPIC_API_KEY | Planning LLM and agentic-flow; [console.anthropic.com](https://console.anthropic.com/) |
 | GITHUB_TOKEN | Push branches, create PRs; [github.com/settings/tokens](https://github.com/settings/tokens) `repo` scope |
 
 ---

@@ -10,7 +10,7 @@ anchors:
   - id: contract
     summary: "OrchestrationRun → CardAssignment; checks before approval; PR user-gated"
   - id: flow
-    summary: "createRun → assignments → claude-flow → checks → approval → PR"
+    summary: "createRun → assignments → agentic-flow → checks → approval → PR"
   - id: policy
     summary: "SystemPolicyProfile: required_checks, protected_paths, forbidden_paths"
 ttl_expires_on: null
@@ -39,7 +39,7 @@ ttl_expires_on: null
 User trigger (card | workflow)
   → createRun (validate policy, capture snapshots)
   → createAssignment per card (feature_branch, allowed_paths, forbidden_paths)
-  → dispatch to claude-flow (in-process or MCP)
+  → dispatch to agentic-flow (in-process or MCP)
   → execute checks (dependency, security, policy, lint, unit, integration, e2e)
   → approval gates: request approval only if checks pass
   → createPullRequestCandidate (draft)
@@ -56,7 +56,7 @@ User trigger (card | workflow)
 | `lib/orchestration/create-run.ts` | createRun; policy validation; snapshot capture |
 | `lib/orchestration/create-assignment.ts` | CardAssignment per card |
 | `lib/orchestration/trigger-build.ts` | Entry point for build trigger |
-| `lib/orchestration/dispatch.ts` | Dispatch to claude-flow |
+| `lib/orchestration/dispatch.ts` | Dispatch to agentic-flow |
 | `lib/orchestration/execute-checks.ts` | Run required checks |
 | `lib/orchestration/approval-gates.ts` | Check pass before approval request |
 | `lib/orchestration/create-approval-request.ts` | ApprovalRequest creation |

@@ -1,19 +1,19 @@
 /**
- * O10: Tests for local claude-flow client factory and real client.
- * - Factory returns mock when claude-flow is not available
- * - Factory returns real client when claude-flow IS available (via test override)
+ * O10: Tests for local agentic-flow client factory and real client.
+ * - Factory returns mock when agentic-flow is not available
+ * - Factory returns real client when agentic-flow IS available (via test override)
  * - buildTaskFromPayload is called during real dispatch
  * - No real Anthropic API key required
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  createClaudeFlowClient,
-  createRealClaudeFlowClient,
+  createAgenticFlowClient,
+  createRealAgenticFlowClient,
   __setRealClientAvailableForTesting,
-} from "@/lib/orchestration/claude-flow-client";
+} from "@/lib/orchestration/agentic-flow-client";
 import * as buildTask from "@/lib/orchestration/build-task";
-import type { DispatchPayload } from "@/lib/orchestration/claude-flow-client";
+import type { DispatchPayload } from "@/lib/orchestration/agentic-flow-client";
 
 vi.mock("node:child_process", async (importOriginal) => {
   const mod =
@@ -39,14 +39,14 @@ const basePayload: DispatchPayload = {
   assignment_input_snapshot: {},
 };
 
-describe("createClaudeFlowClient factory (O10)", () => {
+describe("createAgenticFlowClient factory (O10)", () => {
   beforeEach(() => {
     __setRealClientAvailableForTesting(null);
   });
 
-  it("returns mock when claude-flow is not available", async () => {
+  it("returns mock when agentic-flow is not available", async () => {
     __setRealClientAvailableForTesting(false);
-    const client = createClaudeFlowClient();
+    const client = createAgenticFlowClient();
     const result = await client.dispatch(basePayload);
 
     expect(result.success).toBe(true);
@@ -54,9 +54,9 @@ describe("createClaudeFlowClient factory (O10)", () => {
     expect(result.execution_id).toMatch(/^mock-exec-/);
   });
 
-  it("returns real client when claude-flow is available", async () => {
+  it("returns real client when agentic-flow is available", async () => {
     __setRealClientAvailableForTesting(true);
-    const client = createClaudeFlowClient();
+    const client = createAgenticFlowClient();
     const result = await client.dispatch(basePayload);
 
     expect(result.success).toBe(true);
@@ -68,7 +68,7 @@ describe("createClaudeFlowClient factory (O10)", () => {
   });
 });
 
-describe("createRealClaudeFlowClient dispatch (O10)", () => {
+describe("createRealAgenticFlowClient dispatch (O10)", () => {
   it("calls buildTaskFromPayload during dispatch", async () => {
     const buildSpy = vi.spyOn(buildTask, "buildTaskFromPayload").mockReturnValue({
       taskDescription: "Mock task from buildTaskFromPayload",
@@ -81,7 +81,7 @@ describe("createRealClaudeFlowClient dispatch (O10)", () => {
       },
     });
 
-    const client = createRealClaudeFlowClient();
+    const client = createRealAgenticFlowClient();
     const payload: DispatchPayload = {
       ...basePayload,
       feature_branch: "feat/card-123",

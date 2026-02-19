@@ -1,5 +1,5 @@
 /**
- * Webhook processing for claude-flow callbacks.
+ * Webhook processing for agentic-flow callbacks.
  * Handles: execution_started, commit_created, execution_completed, execution_failed.
  * Updates records, triggers checks on completion.
  */
@@ -36,7 +36,7 @@ export interface WebhookPayload {
     branch: string;
     message: string;
   };
-  /** Learnings from swarm memory (when real claude-flow wired). Empty = harvest no-op. */
+  /** Learnings from swarm memory (when real agentic-flow wired). Empty = harvest no-op. */
   learnings?: string[];
   /** Knowledge items discovered by the agent (facts, assumptions, questions) */
   knowledge?: {
@@ -137,7 +137,7 @@ async function findAgentExecution(
 }
 
 /**
- * Processes a claude-flow webhook event.
+ * Processes an agentic-flow webhook event.
  */
 export async function processWebhook(
   db: DbAdapter,
@@ -179,7 +179,7 @@ export async function processWebhook(
         project_id: projectId,
         run_id: runId,
         event_type: "execution_started",
-        actor: "claude-flow",
+        actor: "agentic-flow",
         payload: { assignment_id, execution_id: payload.execution_id },
       });
       break;
@@ -199,7 +199,7 @@ export async function processWebhook(
         project_id: projectId,
         run_id: runId,
         event_type: "commit_created",
-        actor: "claude-flow",
+        actor: "agentic-flow",
         payload: {
           assignment_id,
           commit: payload.commit,
@@ -232,7 +232,7 @@ export async function processWebhook(
         project_id: projectId,
         run_id: runId,
         event_type: "execution_completed",
-        actor: "claude-flow",
+        actor: "agentic-flow",
         payload: {
           assignment_id,
           summary: payload.summary,
@@ -284,7 +284,7 @@ export async function processWebhook(
         project_id: projectId,
         run_id: runId,
         event_type: "execution_failed",
-        actor: "claude-flow",
+        actor: "agentic-flow",
         payload: {
           assignment_id,
           error: payload.error,
@@ -319,7 +319,7 @@ export async function processWebhook(
         project_id: projectId,
         run_id: runId,
         event_type: "execution_blocked",
-        actor: "claude-flow",
+        actor: "agentic-flow",
         payload: {
           assignment_id,
           summary: payload.summary,

@@ -2,7 +2,7 @@
 
 ## Summary
 
-claude-flow (npm: `claude-flow`) does **not** publish a documented programmatic Node.js API for in-process agent orchestration. The package is CLI-first.
+**RESOLVED 2026-02-18**: Dossier migrated from claude-flow to agentic-flow. This investigation applied to claude-flow (npm: `claude-flow`), which did **not** publish a documented programmatic Node.js API for in-process agent orchestration. The package was CLI-first.
 
 ## Current State
 
@@ -34,4 +34,4 @@ The adapter maintains a process registry keyed by `execution_id` (UUID). No clau
 
 ## Future
 
-When claude-flow exposes a programmatic API (e.g. `import { createOrchestrator } from 'claude-flow'`), replace the subprocess adapter with direct calls. The `ClaudeFlowClient` interface remains unchanged.
+Dossier now uses agentic-flow (npm: `agentic-flow`) as the execution plane. Agentic-flow provides a richer ecosystem (CLI, MCP tools, hooks). The subprocess adapter spawns `npx agentic-flow --agent coder --task "<task>"`. The `AgenticFlowClient` interface (with backward-compatible `ClaudeFlowClient` alias) remains unchanged.

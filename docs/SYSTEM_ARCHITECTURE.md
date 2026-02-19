@@ -8,7 +8,7 @@ tags:
   - overview
 anchors:
   - id: overview
-    summary: "Self-deployable Next.js app; SQLite + claude-flow + RuVector"
+    summary: "Self-deployable Next.js app; SQLite + agentic-flow + RuVector"
   - id: data-flow
     summary: "Planning LLM → actions → DbAdapter; Build → orchestration → agents"
   - id: endpoints
@@ -43,7 +43,7 @@ ttl_expires_on: null
 │  Developer's Machine                                  │
 │                                                       │
 │  ┌────────────┐  ┌───────────┐  ┌────────────────┐   │
-│  │  Next.js   │  │  SQLite   │  │  claude-flow   │   │
+│  │  Next.js   │  │  SQLite   │  │  agentic-flow   │   │
 │  │  (UI +     │──│  (single  │  │  (in-process   │   │
 │  │   API)     │  │   file)   │  │   agents)      │   │
 │  └──────┬─────┘  └───────────┘  └───────┬────────┘   │
@@ -70,7 +70,7 @@ ttl_expires_on: null
 | Database | SQLite (better-sqlite3) | `~/.dossier/dossier.db` |
 | DB abstraction | `DbAdapter` | `lib/db/adapter.ts` |
 | Planning LLM | Anthropic Claude | `lib/llm/` |
-| Build agents | claude-flow (in-process) | TBD |
+| Build agents | agentic-flow (in-process) | TBD |
 | Embeddings | RuVector (local WASM) | TBD |
 
 ---
@@ -92,7 +92,7 @@ GET /api/projects/[id]/map → DbAdapter queries → build map tree
 
 ### Build Path (future)
 ```
-User trigger → OrchestrationRun → CardAssignment[] → claude-flow
+User trigger → OrchestrationRun → CardAssignment[] → agentic-flow
   → RuVector memory → agents → RunCheck[] → ApprovalRequest → PR
 ```
 

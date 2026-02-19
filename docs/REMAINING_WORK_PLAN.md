@@ -3,7 +3,7 @@
 > **Canonical location**: [plans/remaining-work-plan.md](plans/remaining-work-plan.md)
 >
 > Generated 2026-02-17 from gap analysis against `dual-llm-integration` and `prototype_to_functional_mvp` plans.
-> Updated 2026-02-18: Architecture pivoted to **self-deployable local-first model**. Supabase replaced by database abstraction (SQLite for self-deploy, Postgres for future hosted). claude-flow runs locally as in-process agent runtime. No cloud infrastructure required for MVP. Multi-user collaboration deferred to V2. See conversation record for strategic rationale.
+> Updated 2026-02-18: Architecture pivoted to **self-deployable local-first model**. Supabase replaced by database abstraction (SQLite for self-deploy, Postgres for future hosted). agentic-flow runs locally as in-process agent runtime. No cloud infrastructure required for MVP. Multi-user collaboration deferred to V2. See conversation record for strategic rationale.
 
 ## Architecture Model
 
@@ -16,7 +16,7 @@ Dossier runs as a standalone Next.js application on the developer's machine. All
 │  Developer's Machine                                 │
 │                                                      │
 │  ┌────────────┐  ┌───────────┐  ┌────────────────┐  │
-│  │  Next.js   │  │  SQLite   │  │  claude-flow   │  │
+│  │  Next.js   │  │  SQLite   │  │  agentic-flow   │  │
 │  │  (UI +     │──│  (single  │  │  (in-process   │  │
 │  │   API)     │  │   file)   │  │   agents)      │  │
 │  └──────┬─────┘  └───────────┘  └───────┬────────┘  │
@@ -48,7 +48,7 @@ Dossier runs as a standalone Next.js application on the developer's machine. All
 | 2 | Mutation Pipeline Hardening | Mostly done (6/7 tasks) | 0.5 | Yes |
 | **3** | **Database Abstraction Layer** | **Done** | **2-3** | **Yes** |
 | 4 | Memory Plane (RuVector local) | In progress (M1–M3, M2 done) | 3-4 | Yes |
-| 5 | Orchestration Execution (local claude-flow) | In progress (5/9 backend done) | 1-2 | Yes |
+| 5 | Orchestration Execution (local agentic-flow) | In progress (5/9 backend done) | 1-2 | Yes |
 | 6 | Hardening & Go-Live | Done (10d–10i, 10k) | 2-3 | Yes |
 | **7** | **Distribution & Packaging** | **Done** | **1** | **Yes** |
 
@@ -72,13 +72,13 @@ Dossier runs as a standalone Next.js application on the developer's machine. All
 |---|---|---|
 | Supabase (hosted Postgres + REST API) | SQLite local file via `DbAdapter` | New work group (Section 3) |
 | Vercel deployment | `next build --standalone` + CLI | New work group (Section 7) |
-| claude-flow on Railway/Fly.io | claude-flow in-process on local machine | O10 simplified dramatically |
+| agentic-flow on Railway/Fly.io | agentic-flow in-process on local machine | O10 simplified dramatically |
 | MCP over HTTP to remote host | Direct programmatic import | No adapter gap, no polling bridge |
 | Supabase Realtime subscriptions | **Removed from MVP** | Section 3 (old) eliminated entirely |
 | Auth + RLS (non-negotiable) | **Deferred to V2** (single local user) | Section 6 simplified |
 | Webhook auth (HMAC) | Not needed (in-process) | O11 eliminated |
 | Worktree provisioning | Not needed (agents work in local repo) | O12 stays deferred |
-| Deploy claude-flow infrastructure | Not needed | Track C eliminated |
+| Deploy agentic-flow infrastructure | Not needed | Track C eliminated |
 
 ## Parallelism
 
@@ -243,7 +243,7 @@ RuVector runs **locally on the developer's machine** — either as embedded WASM
 Memory content lives in SQLite (via `DbAdapter`). Vector embeddings and GNN weights live in a local RuVector data directory (`~/.dossier/ruvector/` or `<project>/.dossier/ruvector/`).
 
 The **seed → execute → harvest** lifecycle is preserved:
-- **Seed**: Query RuVector locally for similar memory, fetch content from SQLite, inject into claude-flow's swarm context.
+- **Seed**: Query RuVector locally for similar memory, fetch content from SQLite, inject into agentic-flow's swarm context.
 - **Execute**: Agents read/write shared memory during the build.
 - **Harvest**: Post-build, extract durable learnings, generate embeddings locally, save content + `embedding_ref` to SQLite.
 
@@ -255,7 +255,7 @@ The **seed → execute → harvest** lifecycle is preserved:
 | M2 | MemoryStore adapter | `lib/memory/store.ts` — MemoryStore interface. Real adapter uses `DbAdapter` for content + RuVector for vectors. Mock adapter for tests returns empty results. |
 | M3 | Database tables | Add `memory_unit`, `memory_unit_relation`, `memory_retrieval_log` to migration set (SQLite-compatible). Add corresponding methods to `DbAdapter`. |
 | M4 | Ingestion pipeline | `lib/memory/ingestion.ts` — convert card + context artifacts + approved knowledge to MemoryUnit entries. Generate embedding via local RuVector. Save content to SQLite, vector to RuVector. Trigger on approval events and build triggers. |
-| M4.5 | Build harvest pipeline | `lib/memory/harvest.ts` — post-build: read learnings from claude-flow swarm memory, filter for durable knowledge, run each through ingestion pipeline. Link to source card and project scope. |
+| M4.5 | Build harvest pipeline | `lib/memory/harvest.ts` — post-build: read learnings from agentic-flow swarm memory, filter for durable knowledge, run each through ingestion pipeline. Link to source card and project scope. |
 | M5 | Retrieval policy | `lib/memory/retrieval.ts` — query RuVector locally for semantic matches → get `memory_unit_ids` → fetch content from SQLite. Card-scoped approved first → project-scoped → never rejected. Log retrieval. |
 | M6 | Historical snapshots | `lib/memory/snapshots.ts` — append-only to RuVector on status transitions, approval, build completion. Async, never blocks SQLite writes. Include build outcome metadata for GNN learning. |
 | M7 | Orchestration wiring | Replace `retrieveMemoryForCard()` placeholder in `dispatch.ts` with real retrieval (M5). Seed swarm memory pre-dispatch. Wire harvest (M4.5) into post-build callback on `execution_completed`. |
@@ -277,7 +277,7 @@ If RuVector unavailable or fails to initialize: mock adapter returns empty memor
 
 ---
 
-## 5. Orchestration Execution (Local claude-flow)
+## 5. Orchestration Execution (Local agentic-flow)
 
 **Parent refs:** `dual-llm-integration` Phase 4-5 · `prototype_to_functional_mvp` Step 9 completion · Strategy §Orchestration Flow
 
@@ -293,7 +293,7 @@ Agents operate directly on the local git repo. No worktree provisioning needed. 
 
 ### What's Done
 
-- **O1 Client interface** (`lib/orchestration/claude-flow-client.ts`): `ClaudeFlowClient` interface with `dispatch`, `status`, `cancel`. Mock client.
+- **O1 Client interface** (`lib/orchestration/agentic-flow-client.ts`): `AgenticFlowClient` interface with `dispatch`, `status`, `cancel`. Mock client.
 - **O2 Execution dispatch** (`lib/orchestration/dispatch.ts`): Fetches assignment + card + planned files, retrieves memory (placeholder), builds payload, dispatches, creates `AgentExecution`, updates status, logs event.
 - **O3 Webhook processing** (`lib/orchestration/process-webhook.ts`): Handles all 4 event types. Updates records, triggers checks on completion.
 - **O8 EventLog wiring** (`lib/orchestration/event-logger.ts`): Writes to `event_log`.
@@ -314,8 +314,8 @@ Agents operate directly on the local git repo. No worktree provisioning needed. 
 | O7 | Approval controls UI | Backend complete. Needs: Approve PR Creation / Approve Merge buttons, retry on failures. | ⏳ Partial |
 | O8 | EventLog wiring | All event types, used throughout orchestration flows | ✅ Done |
 | O9 | Integration tests | Single-build lock, build-task, trigger-build tests added. Full lifecycle with local client deferred. | ✅ Done |
-| O10 | **Local claude-flow client** | Replace mock in `claude-flow-client.ts` with direct programmatic import of claude-flow. Call `dispatch` → spawn local agent swarm, `status` → query in-process state, `cancel` → terminate swarm. | ❌ Not started |
-| O10.5 | **Task description builder** | `lib/orchestration/build-task.ts` — translate `DispatchPayload` into claude-flow task description with planned files, constraints, acceptance criteria, and swarm agent workflow instructions. | ✅ Done |
+| O10 | **Local agentic-flow client** | Subprocess adapter in `agentic-flow-client.ts` spawns `npx agentic-flow --agent coder --task "<task>"`. `status`/`cancel` via process registry. | ✅ Done |
+| O10.5 | **Task description builder** | `lib/orchestration/build-task.ts` — translate `DispatchPayload` into agentic-flow task description with planned files, constraints, acceptance criteria, and swarm agent workflow instructions. | ✅ Done |
 | O10.6 | **Single-build lock** | Check for running `OrchestrationRun` in project before allowing new dispatch. UI shows "Build in progress" state. | ✅ Done |
 | O13 | Env documentation | Add `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `DB_DRIVER` to `.env.example`. Document optional vars. | ✅ Done |
 
@@ -323,13 +323,13 @@ Agents operate directly on the local git repo. No worktree provisioning needed. 
 
 | ID | Task | Reason Removed |
 |----|------|----------------|
-| O10.7 | Status polling bridge | Not needed — claude-flow runs in-process, status is synchronous/callback-based |
+| O10.7 | Status polling bridge | Not needed — agentic-flow runs in-process, status is synchronous/callback-based |
 | O11 | Webhook authentication | Not needed — no remote webhooks, all communication is in-process |
 | O12 | Worktree provisioning | Deferred — agents work in local repo directly. Single-card builds only for MVP. |
 
 ### External Dependencies
 
-- **claude-flow** — installed locally. Programmatic API for multi-agent swarm coordination.
+- **agentic-flow** — installed locally. CLI and MCP tools for multi-agent swarm coordination.
 - **RuVector** — embedded in claude-flow or imported directly. Local vector storage.
 - **Local git repo** — agents read/write files and commit directly.
 - **GitHub API** — for PR creation (requires `GITHUB_TOKEN`).
@@ -337,7 +337,7 @@ Agents operate directly on the local git repo. No worktree provisioning needed. 
 
 ### Exit Criteria
 
-- Full lifecycle: trigger → seed memory → dispatch to local claude-flow → swarm executes → harvest memory → checks → approval → PR
+- Full lifecycle: trigger → seed memory → dispatch to local agentic-flow → swarm executes → harvest memory → checks → approval → PR
 - All events logged to event_log
 - Build button appears only when preconditions met (approved planned files, no active build)
 - Run status visible in UI

@@ -1,13 +1,13 @@
 /**
  * Integration tests for orchestration execution:
- * - Claude-flow mock client (dispatch, status, cancel)
+ * - Agentic-flow mock client (dispatch, status, cancel)
  * - Webhook processing (execution_completed, execution_failed)
  * - Event logger
- * - Dispatch with mock claude-flow
+ * - Dispatch with mock agentic-flow
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createMockClaudeFlowClient } from "@/lib/orchestration/claude-flow-client";
+import { createMockAgenticFlowClient } from "@/lib/orchestration/agentic-flow-client";
 import { logEvent } from "@/lib/orchestration/event-logger";
 import { processWebhook } from "@/lib/orchestration/process-webhook";
 import { dispatchAssignment } from "@/lib/orchestration/dispatch";
@@ -36,9 +36,9 @@ vi.mock("@/lib/supabase/queries", () => ({
   getArtifactById: vi.fn(),
 }));
 
-describe("Claude-flow mock client", () => {
+describe("Agentic-flow mock client", () => {
   it("dispatch returns execution_id", async () => {
-    const client = createMockClaudeFlowClient();
+    const client = createMockAgenticFlowClient();
     const result = await client.dispatch({
       run_id: runId,
       assignment_id: assignmentId,
@@ -54,7 +54,7 @@ describe("Claude-flow mock client", () => {
   });
 
   it("status returns completed for mock execution", async () => {
-    const client = createMockClaudeFlowClient();
+    const client = createMockAgenticFlowClient();
     const dispatchResult = await client.dispatch({
       run_id: runId,
       assignment_id: assignmentId,
@@ -70,7 +70,7 @@ describe("Claude-flow mock client", () => {
   });
 
   it("cancel removes execution", async () => {
-    const client = createMockClaudeFlowClient();
+    const client = createMockAgenticFlowClient();
     const dispatchResult = await client.dispatch({
       run_id: runId,
       assignment_id: assignmentId,

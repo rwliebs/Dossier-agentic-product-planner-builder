@@ -4,7 +4,7 @@ import { processWebhook, type WebhookPayload } from "@/lib/orchestration/process
 import { json, validationError, internalError } from "@/lib/api/response-helpers";
 
 /**
- * Webhook receiver for claude-flow callbacks.
+ * Webhook receiver for agentic-flow callbacks.
  * Handles: execution_started, commit_created, execution_completed, execution_failed.
  */
 export async function POST(request: NextRequest) {
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     return json({ received: true, processed: true }, 202);
   } catch (err) {
-    console.error("Claude-flow webhook error:", err);
+    console.error("Agentic-flow webhook error:", err);
     return internalError();
   }
 }

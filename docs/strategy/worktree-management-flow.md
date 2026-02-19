@@ -1,7 +1,7 @@
 # Worktree Management Flow
 
 ## Purpose
-Define how `Dossier`, `claude-flow`, and `GitHub` interact during build execution when worktrees are used for isolation.
+Define how `Dossier`, `agentic-flow`, and `GitHub` interact during build execution when worktrees are used for isolation.
 
 This document is an implementation reference for run orchestration, branch strategy, assignment isolation, checks, and cleanup.
 
@@ -10,7 +10,7 @@ This document is an implementation reference for run orchestration, branch strat
 - `Dossier` (control plane):
   - Owns policy, run creation, worktree/branch topology decisions, assignment constraints, and approval gates.
   - Provisions execution envelopes (scope, branches, paths, snapshots).
-- `claude-flow` (execution plane):
+- `agentic-flow` (execution plane):
   - Routes/coordinators workers and executes coding tasks inside Dossier-provided worktree and branch context.
   - Returns execution metadata (status, summaries, commit SHAs, errors).
 - `GitHub` (remote source of truth):
@@ -55,20 +55,20 @@ Dossier (or a Dossier-managed infra worker):
    - `forbidden_paths`
    - `assignment_input_snapshot`
 
-### 3) Task Dispatch (Dossier -> claude-flow)
+### 3) Task Dispatch (Dossier -> agentic-flow)
 
-Dossier sends claude-flow a per-assignment payload:
+Dossier sends agentic-flow a per-assignment payload:
 
 - task intent and acceptance criteria
 - branch + worktree location
 - allowed/forbidden path policy
 - approved context artifacts and memory references
 
-claude-flow executes workers within those constraints and produces commits on the assigned branch.
+agentic-flow executes workers within those constraints and produces commits on the assigned branch.
 
-### 4) Execution Results (claude-flow -> Dossier)
+### 4) Execution Results (agentic-flow -> Dossier)
 
-claude-flow reports:
+agentic-flow reports:
 
 - assignment/run status
 - summary and errors
@@ -98,7 +98,7 @@ For MVP, the quality gate implementation is intentionally lean and high-signal:
 If checks pass:
 
 - Dossier consolidates branches (if multi-branch strategy) or uses umbrella branch directly.
-- Dossier or claude-flow PR mode creates a draft PR in GitHub.
+- Dossier or agentic-flow PR mode creates a draft PR in GitHub.
 - Merge to protected branches remains approval-gated by Dossier policy.
 
 ### 7) Merge and Cleanup
@@ -189,7 +189,7 @@ Lower levels may narrow scope, never relax higher-level constraints.
 Worktree management is a Dossier-governed isolation and policy mechanism.
 
 - Dossier decides where and how work can happen.
-- claude-flow performs the work inside those boundaries.
+- agentic-flow performs the work inside those boundaries.
 - GitHub stores and governs remote branch/PR lifecycle.
 
 This separation preserves safety while enabling parallel multi-agent execution.

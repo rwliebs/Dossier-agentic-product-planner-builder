@@ -1,6 +1,6 @@
 # ADR 0006: Build Orchestration via Claude-Flow
 
-- Status: Accepted
+- Status: Superseded by 0008
 - Date: 2026-02-12
 - Supersedes: 0006-agentic-flow-execution-plane (agentic-flow scrapped)
 

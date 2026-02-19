@@ -8,7 +8,7 @@ import { RightPanel } from '@/components/dossier/right-panel';
 import { Sparkles } from 'lucide-react';
 import type { ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 import type { CodeFileForPanel } from '@/components/dossier/implementation-card';
-import { useMapSnapshot, useCardKnowledge, useCardPlannedFiles, useCardContextArtifacts, useArtifacts, useProjectFiles, useSubmitAction, useTriggerBuild } from '@/lib/hooks';
+import { useMapSnapshot, useCardKnowledge, useCardPlannedFiles, useCardContextArtifacts, useArtifacts, useProjectFiles, useSubmitAction, useTriggerBuild, useDocsIndex, docsEntryToArtifact, fetchRefDocContent } from '@/lib/hooks';
 import { useProjects } from '@/lib/hooks/use-projects';
 import { MapErrorBoundary } from '@/components/dossier/map-error-boundary';
 import { ChatErrorBoundary } from '@/components/dossier/chat-error-boundary';
@@ -79,7 +79,11 @@ export default function DossierPage() {
     expandedCardId ?? undefined
   );
   const { data: projectArtifacts } = useArtifacts(appMode === 'active' ? projectId : undefined);
+  const { data: docsIndex } = useDocsIndex();
   const { data: projectFilesTree } = useProjectFiles(appMode === 'active' ? projectId : undefined);
+
+  const referenceDocs = (docsIndex ?? []).map(docsEntryToArtifact);
+  const allDocsList = [...(projectArtifacts ?? []), ...referenceDocs];
   const cardKnowledgeLoadingState = cardKnowledgeLoading || cardPlannedFilesLoading || cardContextArtifactsLoading;
 
   const getCardKnowledgeLoading = useCallback(
@@ -675,9 +679,21 @@ export default function DossierPage() {
               onTabChange={setRightPanelTab}
               projectId={appMode === 'active' ? projectId : undefined}
               width={rightWidth}
-              docsList={projectArtifacts ?? []}
-              onSelectDoc={(doc) => {
-                setSelectedDoc(doc ?? null);
+              docsList={allDocsList}
+              onSelectDoc={async (doc) => {
+                if (!doc) {
+                  setSelectedDoc(null);
+                  setRightPanelTab('docs');
+                  setRightPanelOpen(true);
+                  return;
+                }
+                const refDoc = doc as ContextArtifact & { _refPath?: string };
+                if (refDoc._refPath && refDoc.content == null) {
+                  const content = await fetchRefDocContent(refDoc._refPath);
+                  setSelectedDoc({ ...refDoc, content });
+                } else {
+                  setSelectedDoc(doc);
+                }
                 setRightPanelTab('docs');
                 setRightPanelOpen(true);
               }}

@@ -32,6 +32,16 @@ docs_index:
       depends_on: [doc.system-architecture]
       last_verified: "2026-02-18"
 
+    - id: doc.design-system
+      path: design/design-system.md
+      tokens_estimate: 400
+      tags: [design, components, ui]
+      anchors:
+        - id: contract
+          summary: "Single source for colors, typography, spacing, components"
+      depends_on: [doc.system-architecture]
+      last_verified: "2026-02-18"
+
     - id: doc.user-workflows
       path: product/user-workflows-reference.md
       tokens_estimate: 900

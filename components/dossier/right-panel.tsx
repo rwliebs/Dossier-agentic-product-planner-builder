@@ -274,21 +274,50 @@ export function RightPanel({
                 </div>
               </div>
             ) : docsList.length > 0 ? (
-              <div className="p-3 space-y-1">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 mb-2">
-                  Project documents
-                </p>
-                {docsList.map((doc) => (
-                  <button
-                    key={doc.id}
-                    type="button"
-                    onClick={() => onSelectDoc?.(doc)}
-                    className="block w-full text-left text-xs px-3 py-2 rounded-md border border-border bg-background hover:bg-accent/50 hover:border-accent-foreground/20 transition-colors text-foreground"
-                  >
-                    <span className="font-medium truncate block">{doc.title ?? doc.name}</span>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{doc.type}</span>
-                  </button>
-                ))}
+              <div className="p-3 space-y-4">
+                {(() => {
+                  const projectDocs = docsList.filter((d) => !d.id.startsWith("ref:"));
+                  const referenceDocs = docsList.filter((d) => d.id.startsWith("ref:"));
+                  const DocButton = ({ doc }: { doc: (typeof docsList)[0] }) => (
+                    <button
+                      key={doc.id}
+                      type="button"
+                      onClick={() => onSelectDoc?.(doc)}
+                      className="block w-full text-left text-xs px-3 py-2 rounded-md border border-border bg-background hover:bg-accent/50 hover:border-accent-foreground/20 transition-colors text-foreground"
+                    >
+                      <span className="font-medium truncate block">{doc.title ?? doc.name}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{doc.type}</span>
+                    </button>
+                  );
+                  return (
+                    <>
+                      {projectDocs.length > 0 && (
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 mb-2">
+                            Project documents
+                          </p>
+                          <div className="space-y-1">
+                            {projectDocs.map((doc) => (
+                              <DocButton key={doc.id} doc={doc} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {referenceDocs.length > 0 && (
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 mb-2">
+                            Reference docs
+                          </p>
+                          <div className="space-y-1">
+                            {referenceDocs.map((doc) => (
+                              <DocButton key={doc.id} doc={doc} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             ) : (
               <div className="h-full flex items-center justify-center">

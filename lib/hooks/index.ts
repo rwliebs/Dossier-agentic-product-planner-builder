@@ -27,6 +27,13 @@ export type { UseCardContextArtifactsResult } from "./use-card-context-artifacts
 export { useArtifacts } from "./use-artifacts";
 export type { UseArtifactsResult } from "./use-artifacts";
 
+export {
+  useDocsIndex,
+  docsEntryToArtifact,
+  fetchRefDocContent,
+} from "./use-docs-index";
+export type { DocsIndexEntry } from "./use-docs-index";
+
 export { useProjectFiles } from "./use-project-files";
 export type { UseProjectFilesResult, FileNode } from "./use-project-files";
 

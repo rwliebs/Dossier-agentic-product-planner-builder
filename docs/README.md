@@ -34,6 +34,7 @@ docs/
 │
 ├── strategy/                 # Strategic decisions
 │   ├── dual-llm-integration-strategy.md
+│   ├── finalization-phase-strategy.md
 │   └── worktree-management-flow.md
 │
 ├── plans/                    # Work plans
@@ -59,3 +60,4 @@ docs/
 - [Data Contracts](domains/data-contracts-reference.md)
 - [User Workflows](product/user-workflows-reference.md)
 - [Dual LLM Strategy](strategy/dual-llm-integration-strategy.md)
+- [Finalization Phase](strategy/finalization-phase-strategy.md)

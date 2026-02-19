@@ -17,6 +17,7 @@ ttl_expires_on: null
 - **Goal**: Move from product idea to production-grade software
 - **Needs**: Visual planning, context-scoped builds, human-controlled quality gates
 - **Actions**: Describe ideas in chat, shape story map, approve planned files, trigger builds, review PRs
+- **Finalization actions**: Finalize Project (generate context docs + e2e tests), Finalize per card (confirm build readiness), then trigger Build
 
 ## Related
 - [user-workflows-reference.md](user-workflows-reference.md)

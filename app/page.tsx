@@ -186,6 +186,9 @@ export default function DossierPage() {
         setRightPanelTab('files');
         setRightPanelOpen(true);
         refetch();
+      } else if (result.error) {
+        const { toast } = await import('sonner');
+        toast.error(result.error);
       }
     },
     [triggerBuild, refetch]

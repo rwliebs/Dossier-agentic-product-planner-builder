@@ -15,6 +15,8 @@ anchors:
     summary: "Build trigger to draft PR: agents, checks, approval"
   - id: workflow-d
     summary: "Knowledge lifecycle: draft → approved/rejected"
+  - id: workflow-e
+    summary: "Finalization: project docs, e2e tests, per-card finalize gate"
 ttl_expires_on: null
 ---
 # User Workflows Reference
@@ -64,12 +66,12 @@ ttl_expires_on: null
 | 1 | User or agent | Links context artifacts to card |
 | 2 | Planning LLM | Proposes planned files (logical_file_name, artifact_kind, action, intent_summary) |
 | 3 | User | Reviews and approves planned files per card |
-| 4 | System | Card build-ready when ≥1 CardPlannedFile status = approved |
+| 4 | System | Card has approved planned files; still requires finalization (Workflow E) before build |
 
 **Success outcomes**:
 - Context linked via CardContextArtifact
 - Planned files follow schema; artifact_kind excludes test artifacts
-- Build cannot trigger without approved planned files for targeted cards
+- Build cannot trigger without approved planned files **and** finalized_at for targeted cards
 
 **Data flow**: `linkContextArtifact`, `upsertCardPlannedFile`, `approveCardPlannedFile` actions
 
@@ -81,13 +83,22 @@ ttl_expires_on: null
 
 | Step | Actor | Action |
 |------|-------|--------|
-| 1 | User | Triggers build (card or workflow scope) |
-| 2 | System | Resolves system-wide and per-build input contracts |
-| 3 | System | Memory retrieval (card-scoped first) |
-| 4 | Agents | Execute within assignment boundaries |
-| 5 | System | Required checks run (dependency, security, policy, lint, unit, integration, e2e) |
-| 6 | System | Approval requested only after checks pass |
-| 7 | User | Reviews draft PR; approves merge |
+| 1 | User | Clicks **Build** on a card (or Build All for workflow) |
+| 2 | System | Validates: card has finalized_at and ≥1 approved planned file; rejects with toast if not |
+| 3 | System | Resolves system-wide and per-build input contracts |
+| 4 | System | Memory retrieval (card-scoped first) |
+| 5 | Agents | Execute within assignment boundaries |
+| 6 | System | Required checks run (dependency, security, policy, lint, unit, integration, e2e) |
+| 7 | System | Approval requested only after checks pass |
+| 8 | User | Reviews draft PR; approves merge |
+
+**Build button states** (per card):
+- **Build** — Ready; click to trigger
+- **Queued...** — Build submitted, waiting to start
+- **Building...** — Agent actively executing
+- **Blocked — answer questions** — Agent paused; answer card questions to unblock
+
+**Rejection behavior**: If user triggers build on a non-finalized card, the system returns a validation error (e.g. "Build requires finalized cards. Finalize each card (review context and confirm) before triggering build.") and shows a toast. No run is created.
 
 **Success outcomes**:
 - No run requests approval without required checks completed
@@ -119,25 +130,29 @@ ttl_expires_on: null
 
 ## Workflow E: Finalization (Build Readiness)
 
-**User intent**: Generate context documents and e2e tests, then review and finalize each card before build.
+**User intent**: Generate context documents and e2e tests, then finalize each card before build.
 
 | Step | Actor | Action |
 |------|-------|--------|
-| 1 | User | Triggers "Finalize Project" after planning phases 1-3 |
+| 1 | User | Clicks **Finalize Project** (Implementation Map header) after planning phases 1-3 |
 | 2 | Planning LLM (finalize mode) | Produces project-wide context docs (architectural summary, data contracts, domain summaries, workflow summaries, design system) + per-card e2e tests |
-| 3 | System | Saves as ContextArtifact records; tests linked to cards |
-| 4 | User | Clicks "Finalize" on individual card |
-| 5 | System | Assembles finalization package (project docs + card context + tests) |
-| 6 | User | Reviews and edits context; confirms finalization |
-| 7 | System | Sets card.finalized_at; card is build-ready |
+| 3 | System | Saves as ContextArtifact records; tests linked to cards; toast shows count created |
+| 4 | User | Clicks **Finalize** on individual card (shown when card has requirements + planned files, not yet finalized) |
+| 5 | System | Validates requirements + planned files; sets card.finalized_at; card is build-ready |
+| 6 | UI | Shows "Finalized" badge on card; Build button becomes available |
+
+**UI elements**:
+- **Finalize Project** — Button in Implementation Map header (next to status counts). Triggers streaming LLM call; shows "Finalizing Project" while running.
+- **Finalize** — Per-card button (indigo). Visible when card has ≥1 requirement, ≥1 planned file, and no finalized_at. Hidden after finalization.
+- **Finalized** — Badge on card after confirmation (indigo background, check icon).
 
 **Success outcomes**:
 - 5 project-wide context documents exist after project finalization
-- Each card with requirements has a linked e2e test artifact (type: test)
-- User can review and edit all finalization output before confirming
+- Each card with requirements gets a linked e2e test artifact (type: test)
 - Build trigger requires finalized_at in addition to approved planned files
+- Build rejects with clear message if user tries to build non-finalized card
 
-**Data flow**: `POST /chat/stream (mode: finalize) → createContextArtifact actions → GET /cards/[id]/finalize → POST /cards/[id]/finalize`
+**Data flow**: `POST /chat/stream (mode: finalize) → createContextArtifact actions → POST /cards/[id]/finalize` (confirms per-card finalization)
 
 ---
 

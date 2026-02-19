@@ -37,8 +37,9 @@ Starts Next.js in development mode with hot reload on port 3000.
 1. **Describe your idea** — Chat with the planning agent to generate an implementation roadmap
 2. **Shape the plan** — Review workflows, activities, and cards on the story map canvas
 3. **Set context** — Approve planned files, add requirements, answer questions per card
-4. **Build** — Trigger agents to build card-by-card with precise boundaries
-5. **Review** — Monitor runs, approve PRs, iterate
+4. **Finalize** — Click "Finalize Project" to generate context docs and e2e tests from your plan; click "Finalize" on each card to confirm build readiness
+5. **Build** — Trigger agents to build card-by-card with precise boundaries (requires finalized cards)
+6. **Review** — Monitor runs, approve PRs, iterate
 
 ## Architecture
 
@@ -112,7 +113,7 @@ Full documentation lives in [`docs/`](docs/):
 | **Getting started** | [Development](docs/development-reference.md), [Testing](docs/testing-reference.md), [Configuration](docs/reference/configuration-reference.md) |
 | **Domains** | [Data contracts](docs/domains/data-contracts-reference.md), [API](docs/domains/api-reference.md), [Planning](docs/domains/planning-reference.md), [Map](docs/domains/map-reference.md), [Mutation](docs/domains/mutation-reference.md), [Orchestration](docs/domains/orchestration-reference.md), [Memory](docs/domains/memory-reference.md) |
 | **Product** | [User workflows](docs/product/user-workflows-reference.md), [User personas](docs/product/user-personas.md), [User stories](docs/product/user-stories.md) |
-| **Strategy** | [Dual LLM integration](docs/strategy/dual-llm-integration-strategy.md), [Worktree management](docs/strategy/worktree-management-flow.md) |
+| **Strategy** | [Dual LLM integration](docs/strategy/dual-llm-integration-strategy.md), [Finalization phase](docs/strategy/finalization-phase-strategy.md), [Worktree management](docs/strategy/worktree-management-flow.md) |
 | **Reference** | [API endpoints](docs/reference/api-endpoints.md), [Database schema](docs/reference/database-schema.md) |
 | **Plans** | [Remaining work plan](docs/plans/remaining-work-plan.md) |
 | **ADR** | [Architecture decisions](docs/adr/) |

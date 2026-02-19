@@ -32,6 +32,10 @@ interface RightPanelProps {
   projectId?: string;
   /** Controlled width in pixels */
   width?: number;
+  /** Project docs to show in the Docs tab list when no doc is selected */
+  docsList?: ContextArtifact[];
+  /** Called when user selects a doc from the list; pass null to clear selection */
+  onSelectDoc?: (doc: ContextArtifact | null) => void;
 }
 
 function FileTreeNode({
@@ -92,6 +96,8 @@ export function RightPanel({
   onTabChange,
   projectId,
   width,
+  docsList = [],
+  onSelectDoc,
 }: RightPanelProps) {
   const { data: projectFiles, loading: filesLoading } = useProjectFiles(projectId);
   const fileTree = projectFiles && projectFiles.length > 0 ? projectFiles : [];
@@ -199,6 +205,15 @@ export function RightPanel({
           <ScrollArea className="h-full">
             {activeDoc ? (
               <div className="p-4 space-y-3">
+                {docsList.length > 0 && onSelectDoc && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectDoc(null)}
+                    className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground mb-2 flex items-center gap-1"
+                  >
+                    ← All docs
+                  </button>
+                )}
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h3 className="font-mono font-bold text-sm text-foreground">{activeDoc.title ?? activeDoc.name}</h3>
@@ -258,12 +273,32 @@ export function RightPanel({
                   )}
                 </div>
               </div>
+            ) : docsList.length > 0 ? (
+              <div className="p-3 space-y-1">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 mb-2">
+                  Project documents
+                </p>
+                {docsList.map((doc) => (
+                  <button
+                    key={doc.id}
+                    type="button"
+                    onClick={() => onSelectDoc?.(doc)}
+                    className="block w-full text-left text-xs px-3 py-2 rounded-md border border-border bg-background hover:bg-accent/50 hover:border-accent-foreground/20 transition-colors text-foreground"
+                  >
+                    <span className="font-medium truncate block">{doc.title ?? doc.name}</span>
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{doc.type}</span>
+                  </button>
+                ))}
+              </div>
             ) : (
               <div className="h-full flex items-center justify-center">
                 <div className="text-center">
                   <FileText className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
                   <p className="text-xs text-muted-foreground">
                     Select a context doc to view
+                  </p>
+                  <p className="text-[10px] text-muted-foreground/70 mt-1">
+                    Add docs via chat or link from a card
                   </p>
                 </div>
               </div>

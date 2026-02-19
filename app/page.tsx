@@ -675,6 +675,12 @@ export default function DossierPage() {
               onTabChange={setRightPanelTab}
               projectId={appMode === 'active' ? projectId : undefined}
               width={rightWidth}
+              docsList={projectArtifacts ?? []}
+              onSelectDoc={(doc) => {
+                setSelectedDoc(doc ?? null);
+                setRightPanelTab('docs');
+                setRightPanelOpen(true);
+              }}
             />
           </>
         )}

@@ -25,7 +25,6 @@ export interface IngestScope {
   projectId: string;
   workflowId?: string | null;
   activityId?: string | null;
-  stepId?: string | null;
 }
 
 export interface IngestContentInput {
@@ -90,9 +89,6 @@ export async function ingestMemoryUnit(
   if (scope.activityId) {
     relations.push({ entity_type: "activity", entity_id: scope.activityId, role: "supports" });
   }
-  if (scope.stepId) {
-    relations.push({ entity_type: "step", entity_id: scope.stepId, role: "supports" });
-  }
 
   for (const r of relations) {
     await db.insertMemoryUnitRelation({
@@ -114,7 +110,7 @@ export async function ingestCardContext(
   db: DbAdapter,
   cardId: string,
   projectId: string,
-  options?: { workflowId?: string | null; activityId?: string | null; stepId?: string | null }
+  options?: { workflowId?: string | null; activityId?: string | null }
 ): Promise<number> {
   const rv = getRuvectorClient();
   if (!rv) return 0;
@@ -130,7 +126,6 @@ export async function ingestCardContext(
     projectId,
     workflowId: options?.workflowId ?? null,
     activityId: options?.activityId ?? null,
-    stepId: options?.stepId ?? null,
   };
 
   let count = 0;

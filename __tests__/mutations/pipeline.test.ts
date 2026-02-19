@@ -28,7 +28,6 @@ import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
 const projectId = "11111111-1111-4111-8111-111111111111";
 const workflowId = "22222222-2222-4222-8222-222222222222";
 const activityId = "33333333-3333-4333-8333-333333333333";
-const stepId = "44444444-4444-4444-8444-444444444444";
 const cardId = "55555555-5555-4555-8555-555555555555";
 
 function createPipelineMockDb() {
@@ -36,7 +35,6 @@ function createPipelineMockDb() {
     getProject: vi.fn().mockResolvedValue({ id: projectId, name: "Test" }),
     getWorkflowsByProject: vi.fn().mockResolvedValue([]),
     getActivitiesByWorkflow: vi.fn().mockResolvedValue([]),
-    getStepsByActivity: vi.fn().mockResolvedValue([]),
   });
 }
 
@@ -111,13 +109,6 @@ describe("preview/apply match", () => {
       {
         id: "a1",
         project_id: projectId,
-        action_type: "createStep",
-        target_ref: { workflow_activity_id: activityId },
-        payload: { id: stepId, title: "Step 1", position: 0 },
-      },
-      {
-        id: "a2",
-        project_id: projectId,
         action_type: "createCard",
         target_ref: { workflow_activity_id: activityId },
         payload: {
@@ -126,19 +117,17 @@ describe("preview/apply match", () => {
           status: "todo",
           priority: 1,
           position: 0,
-          step_id: stepId,
         },
       },
     ];
 
     const previews = previewActionBatch(actions, state);
     expect(previews).not.toBeNull();
-    expect(previews).toHaveLength(2);
+    expect(previews).toHaveLength(1);
 
     const batchResult = applyActionBatch(actions, state);
     expect(batchResult.success).toBe(true);
-    expect(batchResult.applied_count).toBe(2);
-    expect(batchResult.final_state?.steps.size).toBe(1);
+    expect(batchResult.applied_count).toBe(1);
     expect(batchResult.final_state?.cards.size).toBe(1);
   });
 });

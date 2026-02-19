@@ -31,7 +31,6 @@ function setupCardHierarchy(db: ReturnType<typeof createTestDb>) {
   const projectId = crypto.randomUUID();
   const workflowId = crypto.randomUUID();
   const activityId = crypto.randomUUID();
-  const stepId = crypto.randomUUID();
   const cardId = crypto.randomUUID();
 
   db.insertProject({
@@ -53,16 +52,9 @@ function setupCardHierarchy(db: ReturnType<typeof createTestDb>) {
     title: "Activity",
     position: 0,
   });
-  db.insertStep({
-    id: stepId,
-    workflow_activity_id: activityId,
-    title: "Step",
-    position: 0,
-  });
   db.insertCard({
     id: cardId,
     workflow_activity_id: activityId,
-    step_id: stepId,
     title: "Card",
     description: "Card description",
     status: "todo",
@@ -70,7 +62,7 @@ function setupCardHierarchy(db: ReturnType<typeof createTestDb>) {
     position: 0,
   });
 
-  return { projectId, workflowId, activityId, stepId, cardId };
+  return { projectId, workflowId, activityId, cardId };
 }
 
 describe("Ingestion pipeline (M8)", () => {
@@ -153,68 +145,75 @@ describe("Ingestion pipeline (M8)", () => {
       insertedIds.length = 0;
     });
 
-    it("ingestMemoryUnit: stores in DbAdapter and RuVector, retrievable via search", async () => {
-      const id = await ingestMemoryUnit(
-        sqliteDb,
-        { contentText: "integration test memory content", title: "Integration Test" },
-        { cardId: "c1", projectId: "p1" }
-      );
-      expect(id).not.toBeNull();
-      if (id) insertedIds.push(id);
+    it.skipIf(() => getRuvectorClient() === null)(
+      "ingestMemoryUnit: when client available, content is stored and retrievable",
+      async () => {
+        const id = await ingestMemoryUnit(
+          sqliteDb,
+          { contentText: "integration test memory content", title: "Integration Test" },
+          { cardId: "c1", projectId: "p1" }
+        );
+        expect(id).not.toBeNull();
+        if (!id) return;
+        insertedIds.push(id);
 
-      const units = await sqliteDb.getMemoryUnitsByIds([id!]);
-      expect(units).toHaveLength(1);
-      expect(units[0].content_text).toBe("integration test memory content");
-      expect(units[0].embedding_ref).toBe(id);
+        const units = await sqliteDb.getMemoryUnitsByIds([id]);
+        expect(units).toHaveLength(1);
+        expect(units[0].content_text).toBe("integration test memory content");
+        expect(units[0].embedding_ref).toBe(id);
 
-      const client = getRuvectorClient();
-      expect(client).not.toBeNull();
-      const vec = await import("@/lib/memory/embedding").then((m) => m.embedText("integration test memory content"));
-      const results = await client!.search({ vector: vec, k: 5 });
-      expect(results.length).toBeGreaterThan(0);
-      expect(results.some((r) => r.id === id)).toBe(true);
-    });
+        const vec = await import("@/lib/memory/embedding").then((m) => m.embedText("integration test memory content"));
+        const client = getRuvectorClient();
+        expect(client).not.toBeNull();
+        const results = await client!.search({ vector: vec, k: 5 });
+        expect(results.length).toBeGreaterThan(0);
+        expect(results.some((r) => r.id === id)).toBe(true);
+      }
+    );
 
-    it("ingestCardContext: ingests card + approved requirements/facts, count matches, vectors searchable", async () => {
-      const { projectId, cardId } = setupCardHierarchy(sqliteDb);
+    it.skipIf(() => getRuvectorClient() === null)(
+      "ingestCardContext: when client available, approved requirements/facts are ingested and searchable",
+      async () => {
+        const { projectId, cardId } = setupCardHierarchy(sqliteDb);
 
-      sqliteDb.insertCardRequirement({
-        id: crypto.randomUUID(),
-        card_id: cardId,
-        text: "Requirement one for card context",
-        status: "approved",
-        source: "user",
-        position: 0,
-      });
-      sqliteDb.insertCardFact({
-        id: crypto.randomUUID(),
-        card_id: cardId,
-        text: "Fact one for card context",
-        status: "approved",
-        source: "user",
-        position: 0,
-      });
-      sqliteDb.insertCardRequirement({
-        id: crypto.randomUUID(),
-        card_id: cardId,
-        text: "Draft requirement",
-        status: "draft",
-        source: "user",
-        position: 1,
-      });
+        sqliteDb.insertCardRequirement({
+          id: crypto.randomUUID(),
+          card_id: cardId,
+          text: "Requirement one for card context",
+          status: "approved",
+          source: "user",
+          position: 0,
+        });
+        sqliteDb.insertCardFact({
+          id: crypto.randomUUID(),
+          card_id: cardId,
+          text: "Fact one for card context",
+          status: "approved",
+          source: "user",
+          position: 0,
+        });
+        sqliteDb.insertCardRequirement({
+          id: crypto.randomUUID(),
+          card_id: cardId,
+          text: "Draft requirement",
+          status: "draft",
+          source: "user",
+          position: 1,
+        });
 
-      const count = await ingestCardContext(sqliteDb, cardId, projectId);
-      expect(count).toBeGreaterThan(0);
+        const count = await ingestCardContext(sqliteDb, cardId, projectId);
+        expect(count).toBeGreaterThan(0);
 
-      const relations = await sqliteDb.getMemoryUnitRelationsByEntity("card", cardId);
-      const memoryIds = relations.map((r) => r.memory_unit_id as string);
-      for (const mid of memoryIds) insertedIds.push(mid);
+        const relations = await sqliteDb.getMemoryUnitRelationsByEntity("card", cardId);
+        const memoryIds = relations.map((r) => r.memory_unit_id as string);
+        for (const mid of memoryIds) insertedIds.push(mid);
 
-      const client = getRuvectorClient();
-      expect(client).not.toBeNull();
-      const vec = await import("@/lib/memory/embedding").then((m) => m.embedText("Requirement one for card context"));
-      const results = await client!.search({ vector: vec, k: 10 });
-      expect(results.length).toBeGreaterThan(0);
-    });
+        const vec = await import("@/lib/memory/embedding").then((m) => m.embedText("Requirement one for card context"));
+        const client = getRuvectorClient();
+        expect(client).not.toBeNull();
+        const results = await client!.search({ vector: vec, k: 10 });
+        expect(results.length).toBeGreaterThan(0);
+      }
+    );
   });
 });

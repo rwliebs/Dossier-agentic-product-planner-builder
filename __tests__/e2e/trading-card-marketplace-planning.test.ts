@@ -179,7 +179,6 @@ describe("trading card marketplace planning", () => {
     }
 
     let totalActivities = 0;
-    let totalSteps = 0;
     let totalCards = 0;
 
     for (const workflowId of workflowIds.slice(0, 3)) {
@@ -206,7 +205,6 @@ describe("trading card marketplace planning", () => {
 
       for (const a of populateActions as { action_type?: string }[]) {
         if (a?.action_type === "createActivity") totalActivities++;
-        if (a?.action_type === "createStep") totalSteps++;
         if (a?.action_type === "createCard") totalCards++;
       }
     }

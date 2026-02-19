@@ -1,0 +1,157 @@
+# Documentation index — document-steward schema
+# See .cursor/agents/document-steward.md for directory schema and conventions
+
+docs_index:
+  version: 1
+  documents:
+    - id: doc.system-architecture
+      path: docs/SYSTEM_ARCHITECTURE.md
+      tokens_estimate: 1200
+      tags: [architecture, system, overview]
+      anchors:
+        - id: overview
+          summary: "Self-deployable Next.js app; SQLite + claude-flow + RuVector"
+        - id: data-flow
+          summary: "Planning LLM → actions → DbAdapter; Build → orchestration → agents"
+        - id: endpoints
+          summary: "REST API under /api/projects; map, actions, artifacts, cards"
+      depends_on: []
+      last_verified: "2026-02-18"
+
+    - id: doc.data-contracts
+      path: docs/domains/data-contracts-reference.md
+      tokens_estimate: 1800
+      tags: [schemas, types, api, contracts]
+      anchors:
+        - id: contract
+          summary: "Zod schemas in lib/schemas/; slice-a/b/c + action-payloads"
+        - id: core-entities
+          summary: "Project, Workflow, WorkflowActivity, Step, Card hierarchy"
+        - id: actions
+          summary: "PlanningAction payloads and target_ref per action_type"
+      depends_on: [doc.system-architecture]
+      last_verified: "2026-02-18"
+
+    - id: doc.user-workflows
+      path: docs/product/user-workflows-reference.md
+      tokens_estimate: 900
+      tags: [ux, workflows, user-journey]
+      anchors:
+        - id: workflow-a
+          summary: "Idea to structured map: chat → LLM → map canvas"
+        - id: workflow-b
+          summary: "Card context: artifacts, planned files, approval"
+        - id: workflow-c
+          summary: "Build trigger to draft PR: agents, checks, approval"
+      depends_on: [doc.system-architecture]
+      last_verified: "2026-02-18"
+
+    - id: doc.api-reference
+      path: docs/domains/api-reference.md
+      tokens_estimate: 400
+      tags: [api, endpoints]
+      anchors:
+        - id: endpoints
+          summary: "REST API under /api/projects; map, actions, artifacts, cards"
+      depends_on: [doc.system-architecture]
+      last_verified: "2026-02-18"
+
+    - id: doc.planning
+      path: docs/domains/planning-reference.md
+      tokens_estimate: 700
+      tags: [planning, llm, chat]
+      anchors:
+        - id: contract
+          summary: "Planning LLM converts ideas to PlanningAction[]; never code-gen"
+        - id: modes
+          summary: "Scaffold, populate, full; mode selected by map state"
+      depends_on: [doc.system-architecture, doc.data-contracts]
+      last_verified: "2026-02-18"
+
+    - id: doc.mutation
+      path: docs/domains/mutation-reference.md
+      tokens_estimate: 650
+      tags: [mutation, actions, pipeline]
+      anchors:
+        - id: contract
+          summary: "All map changes via PlanningAction; validate → apply in transaction"
+        - id: pipeline
+          summary: "validate-action → apply-action; idempotency via key"
+      depends_on: [doc.system-architecture, doc.data-contracts]
+      last_verified: "2026-02-18"
+
+    - id: doc.map
+      path: docs/domains/map-reference.md
+      tokens_estimate: 550
+      tags: [map, snapshot, story-map]
+      anchors:
+        - id: contract
+          summary: "Map = Project + Workflow→Activity→Step→Card tree; PlanningState"
+        - id: build
+          summary: "fetchMapSnapshot → PlanningState; buildMapTree → API response"
+      depends_on: [doc.system-architecture, doc.data-contracts]
+      last_verified: "2026-02-18"
+
+    - id: doc.orchestration
+      path: docs/domains/orchestration-reference.md
+      tokens_estimate: 750
+      tags: [orchestration, build, runs]
+      anchors:
+        - id: contract
+          summary: "OrchestrationRun → CardAssignment; checks before approval; PR user-gated"
+        - id: flow
+          summary: "createRun → assignments → claude-flow → checks → approval → PR"
+      depends_on: [doc.system-architecture, doc.data-contracts]
+      last_verified: "2026-02-18"
+
+    - id: doc.testing
+      path: docs/testing-reference.md
+      tokens_estimate: 800
+      tags: [testing, vitest, quality]
+      anchors:
+        - id: commands
+          summary: "npm run test, test:watch, test:coverage"
+      depends_on: [doc.system-architecture]
+      last_verified: "2026-02-18"
+
+    - id: doc.development
+      path: docs/development-reference.md
+      tokens_estimate: 700
+      tags: [development, setup, workflow]
+      anchors:
+        - id: setup
+          summary: "Node 18+, npm install, .env.local"
+      depends_on: [doc.system-architecture]
+      last_verified: "2026-02-18"
+
+    - id: doc.database-schema
+      path: docs/reference/database-schema.md
+      tokens_estimate: 900
+      tags: [database, schema]
+      anchors:
+        - id: tables
+          summary: "project, workflow, card, planning_action"
+      depends_on: [doc.data-contracts]
+      last_verified: "2026-02-18"
+
+    - id: doc.configuration
+      path: docs/reference/configuration-reference.md
+      tokens_estimate: 600
+      tags: [configuration, env]
+      anchors:
+        - id: precedence
+          summary: "process.env > .env.local > ~/.dossier/config"
+      depends_on: [doc.development]
+      last_verified: "2026-02-18"
+
+    - id: doc.memory
+      path: docs/domains/memory-reference.md
+      tokens_estimate: 600
+      tags: [memory, ruvector, embeddings]
+      anchors:
+        - id: contract
+          summary: "RuVector local WASM; card-scoped approved first; never rejected"
+        - id: flow
+          summary: "ingestion → store; retrieval → card/project; harvest post-build"
+      depends_on: [doc.system-architecture]
+      last_verified: "2026-02-18"

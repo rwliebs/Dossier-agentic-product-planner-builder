@@ -32,7 +32,6 @@ export const planningActionTypeSchema = z.enum([
   "updateProject",
   "createWorkflow",
   "createActivity",
-  "createStep",
   "createCard",
   "updateCard",
   "reorderCard",
@@ -68,17 +67,9 @@ export const workflowActivitySchema = z.object({
   position: z.number().int(),
 });
 
-export const stepSchema = z.object({
-  id: z.string().uuid(),
-  workflow_activity_id: z.string().uuid(),
-  title: z.string().min(1),
-  position: z.number().int(),
-});
-
 export const cardSchema = z.object({
   id: z.string().uuid(),
   workflow_activity_id: z.string().uuid(),
-  step_id: z.string().uuid().nullable().optional(),
   title: z.string().min(1),
   description: z.string().nullable().optional(),
   status: cardStatusSchema,
@@ -98,7 +89,6 @@ export const planningActionSchema = z.object({
 export type Project = z.infer<typeof projectSchema>;
 export type Workflow = z.infer<typeof workflowSchema>;
 export type WorkflowActivity = z.infer<typeof workflowActivitySchema>;
-export type Step = z.infer<typeof stepSchema>;
 export type Card = z.infer<typeof cardSchema>;
 export type CardStatus = z.infer<typeof cardStatusSchema>;
 export type PlanningAction = z.infer<typeof planningActionSchema>;

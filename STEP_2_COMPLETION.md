@@ -16,7 +16,7 @@
 Created a comprehensive type system based on the DUAL_LLM_INTEGRATION_STRATEGY:
 
 - **Slice A** (Core Planning - existing)
-  - Project, Workflow, WorkflowActivity, Step, Card
+  - Project, Workflow, WorkflowActivity, Card
   - PlanningAction envelope
 
 - **Slice B** (Context & Knowledge - NEW)
@@ -41,7 +41,6 @@ interface PlanningState {
   project: Project;
   workflows: Map<string, Workflow>;
   activities: Map<string, WorkflowActivity>;
-  steps: Map<string, Step>;
   cards: Map<string, Card>;
   contextArtifacts: Map<string, ContextArtifact>;
   cardContextLinks: Map<string, Set<string>>;
@@ -72,8 +71,7 @@ Implemented comprehensive validation with clear error semantics:
 - Validates all referenced entities exist
 - Per-action type validation:
   - createActivity: workflow_id must exist
-  - createStep: activity_id must exist
-  - createCard: activity_id + optional step_id must exist
+  - createCard: workflow_activity_id must exist
   - etc.
 
 **Stage 3: Policy Validation**
@@ -91,15 +89,14 @@ Implemented 11 action type handlers with guaranteed deterministic behavior:
 
 1. **createWorkflow**: Create workflow, assign UUID
 2. **createActivity**: Create activity under workflow
-3. **createStep**: Create step under activity
-4. **createCard**: Create card under activity/step
-5. **updateCard**: Update card properties (title, status, priority, description)
-6. **reorderCard**: Move card position
-7. **linkContextArtifact**: Link artifact to card
-8. **upsertCardPlannedFile**: Create/update planned file
-9. **approveCardPlannedFile**: Update planned file status (proposed → approved)
-10. **upsertCardKnowledgeItem**: Create/update any knowledge item
-11. **setCardKnowledgeStatus**: Change knowledge item status (draft → approved/rejected)
+3. **createCard**: Create card under activity
+4. **updateCard**: Update card properties (title, status, priority, description)
+5. **reorderCard**: Move card position within activity
+6. **linkContextArtifact**: Link artifact to card
+7. **upsertCardPlannedFile**: Create/update planned file
+8. **approveCardPlannedFile**: Update planned file status (proposed → approved)
+9. **upsertCardKnowledgeItem**: Create/update any knowledge item
+10. **setCardKnowledgeStatus**: Change knowledge item status (draft → approved/rejected)
 
 **Key Properties**:
 - Immutable (clone state before mutations)

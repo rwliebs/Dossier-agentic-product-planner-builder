@@ -87,6 +87,23 @@ describe("parseActionsFromStream", () => {
     expect(actions.length).toBe(1);
   });
 
+  it("parses JSON when LLM adds preamble text before the object", async () => {
+    const actions: unknown[] = [];
+    const pid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    const withPreamble =
+      'Here are the activities and cards for the workflow:\n' +
+      `{"type":"actions","message":"Done.","actions":[{"id":"b2c3d4e5-f6a7-8901-bcde-f12345678901","project_id":"${pid}","action_type":"createActivity","target_ref":{"workflow_id":"wf-1"},"payload":{"title":"Browse","position":0}},{"id":"c3d4e5f6-a7b8-9012-cdef-123456789012","project_id":"${pid}","action_type":"createCard","target_ref":{"workflow_activity_id":"b2c3d4e5-f6a7-8901-bcde-f12345678901"},"payload":{"title":"View list","status":"todo","priority":1}}]}`;
+    const stream = await streamFromStrings([withPreamble]);
+
+    for await (const result of parseActionsFromStream(stream)) {
+      if (result.type === "action") actions.push(result.action);
+    }
+
+    expect(actions.length).toBe(2);
+    expect((actions[0] as { action_type?: string }).action_type).toBe("createActivity");
+    expect((actions[1] as { action_type?: string }).action_type).toBe("createCard");
+  });
+
   it("yields done at end", async () => {
     const results: string[] = [];
     const stream = await streamFromStrings(['{"type":"clarification","message":"Tell me more","actions":[]}\n']);

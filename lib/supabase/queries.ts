@@ -10,7 +10,6 @@ export const TABLES = {
   projects: "project",
   workflows: "workflow",
   workflow_activities: "workflow_activity",
-  steps: "step",
   cards: "card",
   context_artifacts: "context_artifact",
   card_context_artifacts: "card_context_artifact",
@@ -48,18 +47,6 @@ export async function getActivitiesByWorkflow(db: DbAdapter, workflowId: string)
 
 export async function getActivitiesByProject(db: DbAdapter, projectId: string) {
   return db.getActivitiesByProject(projectId);
-}
-
-export async function getStepsByActivity(db: DbAdapter, activityId: string) {
-  return db.getStepsByActivity(activityId);
-}
-
-export async function getStepsByProject(db: DbAdapter, projectId: string) {
-  return db.getStepsByProject(projectId);
-}
-
-export async function getCardsByStep(db: DbAdapter, stepId: string) {
-  return db.getCardsByStep(stepId);
 }
 
 export async function getCardsByActivity(db: DbAdapter, activityId: string) {

@@ -46,7 +46,6 @@ export function previewAction(
 
     case "createWorkflow":
     case "createActivity":
-    case "createStep":
     case "createCard":
       delta.created_ids.push(
         (action.target_ref as Record<string, unknown>).id as string || "new",

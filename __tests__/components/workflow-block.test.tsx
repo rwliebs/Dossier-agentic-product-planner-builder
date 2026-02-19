@@ -4,7 +4,7 @@ import { WorkflowBlock } from "@/components/dossier/workflow-block";
 import type { MapSnapshot } from "@/lib/types/ui";
 
 const minimalSnapshot: MapSnapshot = {
-  project: { id: "p1", name: "Acme App", repo_url: null, default_branch: "main" },
+  project: { id: "p1", name: "Acme App", description: null, repo_url: null, default_branch: "main" },
   workflows: [
     {
       id: "wf1",
@@ -20,26 +20,16 @@ const minimalSnapshot: MapSnapshot = {
           title: "User Management",
           color: "blue",
           position: 0,
-          steps: [
+          cards: [
             {
-              id: "s1",
+              id: "c1",
               workflow_activity_id: "a1",
-              title: "Auth",
-              position: 0,
-              cards: [
-                {
-                  id: "c1",
-                  workflow_activity_id: "a1",
-                  step_id: "s1",
-                  title: "Login form",
-                  description: null,
-                  status: "active",
-                  priority: 1,
-                },
-              ],
+              title: "Login form",
+              description: null,
+              status: "active",
+              priority: 1,
             },
           ],
-          cards: [],
         },
       ],
     },

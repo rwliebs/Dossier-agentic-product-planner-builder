@@ -1,5 +1,7 @@
 # Remaining Work Plan
 
+> **Canonical location**: [plans/remaining-work-plan.md](plans/remaining-work-plan.md)
+>
 > Generated 2026-02-17 from gap analysis against `dual-llm-integration` and `prototype_to_functional_mvp` plans.
 > Updated 2026-02-18: Architecture pivoted to **self-deployable local-first model**. Supabase replaced by database abstraction (SQLite for self-deploy, Postgres for future hosted). claude-flow runs locally as in-process agent runtime. No cloud infrastructure required for MVP. Multi-user collaboration deferred to V2. See conversation record for strategic rationale.
 
@@ -62,6 +64,7 @@ Dossier runs as a standalone Next.js application on the developer's machine. All
 - Step 8: Planning LLM — Claude client, prompt, parser, chat endpoint, preview UI
 - Step 9 foundation: Orchestration schemas, API, service layer, approval gates
 - Step 9 execution (partial): Client interface (mock + HTTP), dispatch logic, webhook processing, event logger, trigger-build orchestrator, 13 API routes
+- **User-actions follow-up:** After creating workflows and cards, the agent seamlessly prompts users to define user actions per workflow and per card (e.g. View Details & Edit, Monitor, Reply, Test, Build). Implemented via planning prompts (scaffold, populate, full) and a post-populate agent message in the left sidebar. Persistence of user-defined actions per card is a possible V2 extension.
 
 ## What Changed (Self-Deploy Pivot)
 
@@ -110,7 +113,7 @@ Frontend uses prototype types (`Epic`, `UserActivity`, `Iteration`, `ContextDoc`
 |----|------|---------|
 | 5a | Create data-fetching hooks | `lib/hooks/` — useProject, useMapSnapshot, useSubmitAction, useKnowledgeItems, usePlannedFiles, useArtifacts. Each returns `{ data, loading, error, refetch }` using canonical types. |
 | 5b | Canonical UI type re-exports | `lib/types/ui.ts` re-exporting from `lib/schemas/`. Deprecate `components/dossier/types.ts`. |
-| 5c | Migrate canvas components | IterationBlock → WorkflowBlock. EpicRow → WorkflowRow. ActivityColumn receives WorkflowActivity with Step[] children. Add StepGroup. |
+| 5c | Migrate canvas components | IterationBlock → WorkflowBlock. EpicRow → WorkflowRow. ActivityColumn receives WorkflowActivity with Card[] children. |
 | 5d | Migrate ImplementationCard | Canonical Card props. Add planned-file section with approval actions. Knowledge items with draft/approved/rejected badges. Build state indicator. |
 | 5e | Migrate RightPanel | Replace mockFileTree and hardcoded terminalLines with live data. Docs tab renders ContextArtifact. |
 | 5f | Migrate page.tsx state | useMapSnapshot(projectId) hook. Wire mutations through useSubmitAction(). Remove mapSnapshotToIterations. |
@@ -123,9 +126,8 @@ Frontend uses prototype types (`Epic`, `UserActivity`, `Iteration`, `ContextDoc`
 |-----------|-----------|--------|
 | Iteration | Removed | Content → Project + workflow tree |
 | Epic | Workflow | Children: WorkflowActivity[] |
-| UserActivity | WorkflowActivity | Children: Step[] → Card[] |
-| (none) | Step | New layer between activity and card |
-| Card | Card | +step_id, +build_state; -testFileIds, -codeFileIds |
+| UserActivity | WorkflowActivity | Children: Card[] (columns) |
+| Card | Card | +build_state; -testFileIds, -codeFileIds |
 | ContextDoc | ContextArtifact | Expanded type enum; +uri, +locator, +integration_ref |
 | KnownFact | CardKnownFact | +status, +source, +confidence, +position |
 | Assumption | CardAssumption | Same enrichment |
@@ -430,6 +432,19 @@ Dossier currently requires Supabase cloud + Vercel to run. For self-deploy, it n
 - [x] Setup flow saves to `~/.dossier/config` — no restart required
 - [x] Config location is Tauri-compatible (user data dir, not app bundle)
 - [x] Works on macOS and Linux (Windows via WSL)
+
+---
+
+## User actions per workflow and card
+
+The agent keeps the conversation moving from **workflows → cards → user actions**:
+
+1. **Scaffold:** Creates workflows; prompt instructs the LLM to mention that after populating, the next step will be defining user actions.
+2. **Populate:** Creates activities (user action columns) and cards for each workflow; prompt instructs the LLM to ask the user to define actions (View Details & Edit, Monitor, Reply, Test, Build, or custom).
+3. **Post-populate (UI):** After the populate loop completes, the left sidebar adds an agent message that prompts: "Next: let's define user actions for each workflow and card…" so the user is seamlessly asked without typing anything.
+4. **Full planning:** When the map already has cards, the planning prompt tells the LLM to include a follow-up asking for user actions if they have not yet been defined.
+
+Persistence of user-defined actions (e.g. a `card_user_actions` table and planning action type) is a possible V2 extension; for now the flow ensures the agent consistently prompts users to determine and create those actions in conversation.
 
 ---
 

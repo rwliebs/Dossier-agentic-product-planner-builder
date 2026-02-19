@@ -39,15 +39,7 @@ export interface DbAdapter {
   insertWorkflowActivity(row: DbRow): Promise<void>;
   upsertWorkflowActivity(row: DbRow): Promise<void>;
 
-  // --- Steps ---
-  getStepsByActivity(activityId: string): Promise<DbRow[]>;
-  /** Batch: all steps for activities in project. Avoids N+1. */
-  getStepsByProject(projectId: string): Promise<DbRow[]>;
-  insertStep(row: DbRow): Promise<void>;
-  upsertStep(row: DbRow): Promise<void>;
-
   // --- Cards ---
-  getCardsByStep(stepId: string): Promise<DbRow[]>;
   getCardsByActivity(activityId: string): Promise<DbRow[]>;
   /** Batch: all cards (with step or activity) in project. Avoids N+1. */
   getCardsByProject(projectId: string): Promise<DbRow[]>;

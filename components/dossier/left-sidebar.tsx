@@ -55,7 +55,7 @@ interface ChatPreviewResponse {
   message?: string;
   actions?: Array<{ id: string; action_type: string; target_ref: unknown; payload: unknown }>;
   preview?: {
-    added: { workflows: string[]; activities: string[]; steps: string[]; cards: string[] };
+    added: { workflows: string[]; activities: string[]; cards: string[] };
     modified: { cards: string[]; artifacts: string[] };
     reordered: string[];
     summary: string;
@@ -193,7 +193,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
     if (populateConfirmWorkflowIds?.length && pendingPreview === null) {
       const wfIds = populateConfirmWorkflowIds;
       setPendingPreview({
-        added: { workflows: wfIds, activities: [], steps: [], cards: [] },
+        added: { workflows: wfIds, activities: [], cards: [] },
         modified: { cards: [], artifacts: [] },
         reordered: [],
         summary: `Populate ${wfIds.length} workflow(s) with activities and cards?`,
@@ -407,7 +407,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
                   setPopulateOriginalMessage(text);
                   const wfIds = Array.isArray(data.workflow_ids) ? data.workflow_ids : [];
                   setPendingPreview({
-                    added: { workflows: wfIds, activities: [], steps: [], cards: [] },
+                    added: { workflows: wfIds, activities: [], cards: [] },
                     modified: { cards: [], artifacts: [] },
                     reordered: [],
                     summary: `Populate ${wfIds.length} workflow(s) with activities and cards?`,
@@ -504,6 +504,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
       setPopulateProgress(null);
       setIsPopulating(false);
       addMessage('agent', `Populated ${total} workflow(s) with activities and cards.`);
+      addMessage('agent', "Next: let's define user actions for each workflow and card. What should users be able to do on each one? For example: View Details & Edit, Monitor, Reply, Test, Build, or custom actions. Reply with your choices per card or workflow, or say \"use defaults\" to keep the standard actions.");
       onPlanningApplied?.();
       return;
     }

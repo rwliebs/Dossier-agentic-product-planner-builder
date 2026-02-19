@@ -2,7 +2,6 @@ import type {
   Project,
   Workflow,
   WorkflowActivity,
-  Step,
   Card,
 } from "./slice-a";
 import type {
@@ -24,7 +23,6 @@ export interface PlanningState {
   project: Project;
   workflows: Map<string, Workflow>;
   activities: Map<string, WorkflowActivity>;
-  steps: Map<string, Step>;
   cards: Map<string, Card>;
   contextArtifacts: Map<string, ContextArtifact>;
   cardContextLinks: Map<string, Set<string>>; // card_id -> Set<artifact_id>
@@ -43,7 +41,6 @@ export function createEmptyPlanningState(project: Project): PlanningState {
     project,
     workflows: new Map(),
     activities: new Map(),
-    steps: new Map(),
     cards: new Map(),
     contextArtifacts: new Map(),
     cardContextLinks: new Map(),
@@ -99,13 +96,6 @@ export function activityExists(
 }
 
 /**
- * Check if a step exists in the state
- */
-export function stepExists(state: PlanningState, stepId: string): boolean {
-  return state.steps.has(stepId);
-}
-
-/**
  * Check if a card exists in the state
  */
 export function cardExists(state: PlanningState, cardId: string): boolean {
@@ -135,26 +125,7 @@ export function getWorkflowActivities(
 }
 
 /**
- * Get all steps within an activity
- */
-export function getActivitySteps(
-  state: PlanningState,
-  activityId: string,
-): Step[] {
-  return Array.from(state.steps.values()).filter(
-    (s) => s.workflow_activity_id === activityId,
-  );
-}
-
-/**
- * Get all cards within a step
- */
-export function getStepCards(state: PlanningState, stepId: string): Card[] {
-  return Array.from(state.cards.values()).filter((c) => c.step_id === stepId);
-}
-
-/**
- * Get all cards within an activity (including those without steps)
+ * Get all cards within an activity
  */
 export function getActivityCards(
   state: PlanningState,
@@ -205,7 +176,6 @@ export function clonePlanningState(state: PlanningState): PlanningState {
     project: { ...state.project },
     workflows: new Map(state.workflows),
     activities: new Map(state.activities),
-    steps: new Map(state.steps),
     cards: new Map(state.cards),
     contextArtifacts: new Map(state.contextArtifacts),
     cardContextLinks: new Map(

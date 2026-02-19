@@ -9,7 +9,6 @@ import {
   getProject,
   getWorkflowsByProject,
   getActivitiesByWorkflow,
-  getStepsByActivity,
   getCardById,
   getArtifactById,
   verifyCardInProject,
@@ -149,8 +148,6 @@ export async function applyAction(
       return applyCreateWorkflow(db, projectId, action);
     case "createActivity":
       return applyCreateActivity(db, projectId, action);
-    case "createStep":
-      return applyCreateStep(db, projectId, action);
     case "createCard":
       return applyCreateCard(db, projectId, action);
     case "updateCard":
@@ -271,58 +268,12 @@ async function applyCreateActivity(
   return { applied: true };
 }
 
-async function applyCreateStep(
-  db: DbAdapter,
-  projectId: string,
-  action: ActionInput
-): Promise<ApplyResult> {
-  const activityId = action.target_ref.workflow_activity_id as string;
-  if (!activityId) {
-    return { applied: false, rejectionReason: "workflow_activity_id is required in target_ref" };
-  }
-
-  const workflows = await getWorkflowsByProject(db, projectId);
-  let found = false;
-  for (const wf of workflows) {
-    const activities = await getActivitiesByWorkflow(db, wf.id as string);
-    if (activities.some((a) => a.id === activityId)) {
-      found = true;
-      break;
-    }
-  }
-  if (!found) {
-    return { applied: false, rejectionReason: "Workflow activity not found" };
-  }
-
-  const id = (action.payload.id as string) ?? crypto.randomUUID();
-  const title = action.payload.title as string;
-  const steps = await getStepsByActivity(db, activityId);
-  const position = (action.payload.position as number) ?? steps.length;
-
-  if (!title || typeof title !== "string" || title.trim().length === 0) {
-    return { applied: false, rejectionReason: "Step title is required" };
-  }
-
-  try {
-    await db.insertStep({
-      id,
-      workflow_activity_id: activityId,
-      title: title.trim(),
-      position,
-    });
-  } catch (error) {
-    return { applied: false, rejectionReason: error instanceof Error ? error.message : String(error) };
-  }
-  return { applied: true };
-}
-
 async function applyCreateCard(
   db: DbAdapter,
   projectId: string,
   action: ActionInput
 ): Promise<ApplyResult> {
   const activityId = action.target_ref.workflow_activity_id as string;
-  const stepId = action.target_ref.step_id as string | undefined;
 
   if (!activityId) {
     return { applied: false, rejectionReason: "workflow_activity_id is required in target_ref" };
@@ -339,13 +290,6 @@ async function applyCreateCard(
   }
   if (!found) {
     return { applied: false, rejectionReason: "Workflow activity not found" };
-  }
-
-  if (stepId) {
-    const steps = await getStepsByActivity(db, activityId);
-    if (!steps.some((s) => s.id === stepId)) {
-      return { applied: false, rejectionReason: "Step not found in activity" };
-    }
   }
 
   const id = (action.payload.id as string) ?? crypto.randomUUID();
@@ -353,6 +297,7 @@ async function applyCreateCard(
   const description = (action.payload.description as string) ?? null;
   const status = (action.payload.status as string) ?? "todo";
   const priority = (action.payload.priority as number) ?? 0;
+  const position = (action.payload.position as number) ?? 0;
 
   if (!title || typeof title !== "string" || title.trim().length === 0) {
     return { applied: false, rejectionReason: "Card title is required" };
@@ -367,11 +312,11 @@ async function applyCreateCard(
     await db.insertCard({
       id,
       workflow_activity_id: activityId,
-      step_id: stepId ?? null,
       title: title.trim(),
       description,
       status,
       priority,
+      position,
     });
   } catch (error) {
     return { applied: false, rejectionReason: error instanceof Error ? error.message : String(error) };
@@ -428,30 +373,13 @@ async function applyReorderCard(
     return { applied: false, rejectionReason: "Card not found or not in project" };
   }
 
-  const newStepId = (action.payload.new_step_id as string) ?? undefined;
   const newPosition = action.payload.new_position as number;
 
   if (typeof newPosition !== "number" || newPosition < 0) {
     return { applied: false, rejectionReason: "new_position is required and must be non-negative" };
   }
 
-  const card = await getCardById(db, cardId);
-  if (!card) {
-    return { applied: false, rejectionReason: "Card not found" };
-  }
-
-  const activityId = (card as Record<string, unknown>).workflow_activity_id as string;
-  if (newStepId !== undefined) {
-    const steps = await getStepsByActivity(db, activityId);
-    if (!steps.some((s) => s.id === newStepId)) {
-      return { applied: false, rejectionReason: "new_step_id not found in card's activity" };
-    }
-  }
-
   const updates: Record<string, unknown> = { position: newPosition };
-  if (newStepId !== undefined) {
-    updates.step_id = newStepId;
-  }
 
   try {
     await db.updateCard(cardId, updates);

@@ -7,7 +7,6 @@ export interface ChatPreviewData {
   added: {
     workflows: string[];
     activities: string[];
-    steps: string[];
     cards: string[];
   };
   modified: { cards: string[]; artifacts: string[] };
@@ -35,7 +34,6 @@ export function ChatPreviewPanel({
   const hasChanges =
     (added.workflows?.length ?? 0) > 0 ||
     (added.activities?.length ?? 0) > 0 ||
-    (added.steps?.length ?? 0) > 0 ||
     (added.cards?.length ?? 0) > 0 ||
     (modified.cards?.length ?? 0) > 0 ||
     (modified.artifacts?.length ?? 0) > 0 ||
@@ -68,14 +66,6 @@ export function ChatPreviewPanel({
               <span className="text-muted-foreground">Activities: </span>
               <span className="text-foreground">
                 +{added.activities!.length}
-              </span>
-            </div>
-          )}
-          {(added.steps?.length ?? 0) > 0 && (
-            <div>
-              <span className="text-muted-foreground">Steps: </span>
-              <span className="text-foreground">
-                +{added.steps!.length}
               </span>
             </div>
           )}

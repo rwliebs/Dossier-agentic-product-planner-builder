@@ -21,7 +21,7 @@ function sseEvent(event: string, data: unknown): string {
 /**
  * POST /api/projects/[projectId]/chat/stream
  * Streaming planning endpoint. Returns SSE with actions as they are parsed and applied.
- * Supports scaffold (workflows only) and populate (activities/steps/cards for one workflow) modes.
+ * Supports scaffold (workflows only) and populate (activities/cards for one workflow) modes.
  */
 export async function POST(
   request: NextRequest,

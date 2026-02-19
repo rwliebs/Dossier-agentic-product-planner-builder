@@ -6,7 +6,7 @@ import { LeftSidebar } from '@/components/dossier/left-sidebar';
 import { WorkflowBlock } from '@/components/dossier/workflow-block';
 import { RightPanel } from '@/components/dossier/right-panel';
 import { ProjectSelector } from '@/components/dossier/project-selector';
-import { MessageSquare, Bot, Clock, Sparkles } from 'lucide-react';
+import { MessageSquare, Sparkles } from 'lucide-react';
 import type { ProjectContext, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 import type { CodeFileForPanel } from '@/components/dossier/implementation-card';
 import { useMapSnapshot, useCardKnowledge, useCardPlannedFiles, useSubmitAction, useTriggerBuild } from '@/lib/hooks';
@@ -341,17 +341,7 @@ export default function DossierPage() {
                       selectedProjectId={projectId}
                       onSelectProjectId={handleSelectProjectId}
                     />
-                    <div className="flex items-center gap-2 text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <Bot className="h-3.5 w-3.5 text-green-500" />
-                        <span className="text-green-500 font-mono font-bold">{projectContext.activeAgents}</span>
-                        <span className="text-muted-foreground">agents working</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      <span>Updated {projectContext.lastUpdate}</span>
-                    </div>
+                    {/* Placeholder indicators hidden for now: agents working, last update */}
                   </div>
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">

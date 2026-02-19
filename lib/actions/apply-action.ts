@@ -6,13 +6,11 @@ import {
   cardExists,
   getMaxPosition,
   getActivityCards,
-  getStepCards,
 } from "@/lib/schemas/planning-state";
 import type {
   UpdateProjectPayload,
   CreateWorkflowPayload,
   CreateActivityPayload,
-  CreateStepPayload,
   CreateCardPayload,
   UpdateCardPayload,
   ReorderCardPayload,
@@ -61,9 +59,6 @@ export function applyAction(
 
       case "createActivity":
         return applyCreateActivity(action, newState);
-
-      case "createStep":
-        return applyCreateStep(action, newState);
 
       case "createCard":
         return applyCreateCard(action, newState);
@@ -166,24 +161,6 @@ function applyCreateActivity(
   return { success: true, newState: state };
 }
 
-function applyCreateStep(
-  action: PlanningAction,
-  state: PlanningState,
-): MutationResult {
-  const payload = action.payload as CreateStepPayload & { id?: string };
-  const target_ref = action.target_ref as { workflow_activity_id: string };
-  const stepId = payload.id ?? action.id ?? uuidv4();
-
-  state.steps.set(stepId, {
-    id: stepId,
-    workflow_activity_id: target_ref.workflow_activity_id,
-    title: payload.title,
-    position: payload.position,
-  });
-
-  return { success: true, newState: state };
-}
-
 function applyCreateCard(
   action: PlanningAction,
   state: PlanningState,
@@ -195,7 +172,6 @@ function applyCreateCard(
   state.cards.set(cardId, {
     id: cardId,
     workflow_activity_id: target_ref.workflow_activity_id,
-    step_id: payload.step_id || null,
     title: payload.title,
     description: payload.description || null,
     status: payload.status,
@@ -260,7 +236,6 @@ function applyReorderCard(
 
   state.cards.set(target_ref.card_id, {
     ...card,
-    step_id: payload.new_step_id !== undefined ? payload.new_step_id : card.step_id,
     position: payload.new_position,
   });
 

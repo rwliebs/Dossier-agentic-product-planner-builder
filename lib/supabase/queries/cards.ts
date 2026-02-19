@@ -10,16 +10,10 @@ export async function getCard(id: string): Promise<Card | null> {
   throw new Error("Not implemented");
 }
 
-export async function listCardsByStep(stepId: string): Promise<Card[]> {
-  // TODO: Implement in Step 4 - fetch cards for step, ordered by priority
-  void stepId;
-  throw new Error("Not implemented");
-}
-
 export async function listCardsByActivity(
   workflowActivityId: string
 ): Promise<Card[]> {
-  // TODO: Implement in Step 4 - fetch cards for activity (including those without step_id)
+  // TODO: Implement in Step 4 - fetch cards for activity
   void workflowActivityId;
   throw new Error("Not implemented");
 }

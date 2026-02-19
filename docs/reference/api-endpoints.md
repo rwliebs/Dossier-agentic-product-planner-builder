@@ -1,6 +1,6 @@
 # API Endpoints Reference
 
-Step 4 API layer for the Dossier planning system. Aligns with [DUAL_LLM_INTEGRATION_STRATEGY.md](../DUAL_LLM_INTEGRATION_STRATEGY.md) Phase 2: Persistence and API Baseline.
+Step 4 API layer for the Dossier planning system. Aligns with [dual-llm-integration-strategy.md](../strategy/dual-llm-integration-strategy.md) Phase 2: Persistence and API Baseline.
 
 ## Setup
 

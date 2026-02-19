@@ -36,13 +36,53 @@ function normalizeAction(obj: Record<string, unknown>): PlanningAction {
 }
 
 /**
- * Extract JSON-serializable text from LLM output that may be wrapped in markdown.
+ * Extract a single JSON object from text that may have preamble/trailing text or markdown.
+ * Tries: (1) markdown code block, (2) whole string, (3) first balanced { ... }.
  */
 function extractJsonText(text: string): string {
   let s = text.trim();
   const jsonBlock = /^```(?:json)?\s*([\s\S]*?)```\s*$/;
   const m = s.match(jsonBlock);
   if (m) s = m[1].trim();
+  if (!s) return "";
+
+  // If the whole string parses as JSON, use it (handles "Output ONLY the JSON" responses)
+  try {
+    JSON.parse(s);
+    return s;
+  } catch {
+    /* continue to fallback */
+  }
+
+  // LLM often adds preamble e.g. "Here are the actions:\n{ ... }" — find first { and matching }
+  const start = s.indexOf("{");
+  if (start === -1) return s;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let quote = "";
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (inString) {
+      if (c === "\\") escape = true;
+      else if (c === quote) inString = false;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      inString = true;
+      quote = c;
+      continue;
+    }
+    if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) return s.slice(start, i + 1);
+    }
+  }
   return s;
 }
 

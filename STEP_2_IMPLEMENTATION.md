@@ -14,8 +14,7 @@ Step 2 implements the canonical domain model with comprehensive type validation 
 - `projectSchema`: Project entity
 - `workflowSchema`: Workflow grouping
 - `workflowActivitySchema`: Activity (collapsed Epic + UserActivity)
-- `stepSchema`: Step within activity
-- `cardSchema`: Card within step
+- `cardSchema`: Card within activity
 - `planningActionSchema`: Mutation action envelope
 
 #### **New: Slice B Schemas (Context & Knowledge)**
@@ -37,7 +36,7 @@ All knowledge items include:
 #### **New: Action Payload Schemas**
 - **Location**: `lib/schemas/action-payloads.ts`
 - Type-safe payload definitions for each action type:
-  - `createWorkflow`, `createActivity`, `createStep`, `createCard`
+  - `createWorkflow`, `createActivity`, `createCard`
   - `updateCard`, `reorderCard`
   - `linkContextArtifact`
   - `upsertCardPlannedFile`, `approveCardPlannedFile`
@@ -52,7 +51,6 @@ interface PlanningState {
   project: Project;
   workflows: Map<string, Workflow>;
   activities: Map<string, WorkflowActivity>;
-  steps: Map<string, Step>;
   cards: Map<string, Card>;
   contextArtifacts: Map<string, ContextArtifact>;
   cardContextLinks: Map<string, Set<string>>;
@@ -73,8 +71,8 @@ This representation:
 **Helper Functions**:
 - `createEmptyPlanningState(project)`: Initialize empty state
 - `clonePlanningState(state)`: Deep clone for immutable mutations
-- `workflowExists()`, `activityExists()`, `stepExists()`, `cardExists()`: Quick lookups
-- `getWorkflowActivities()`, `getActivitySteps()`, `getStepCards()`: Relationship traversal
+- `workflowExists()`, `activityExists()`, `cardExists()`: Quick lookups
+- `getWorkflowActivities()`, `getActivityCards()`: Relationship traversal
 - `containsCodeGenerationIntent()`: Policy check for forbidden actions
 
 ### 3. Action Validation Pipeline
@@ -98,8 +96,7 @@ validateReferentialIntegrity(action, state): ValidationError[]
 - Ensures all referenced entities exist in current state
 - For each action type, validates:
   - `createActivity`: workflow_id exists
-  - `createStep`: workflow_activity_id exists
-  - `createCard`: workflow_activity_id and optional step_id exist
+  - `createCard`: workflow_activity_id exists
   - `updateCard`: card_id exists
   - `linkContextArtifact`: card_id and artifact_id exist
   - etc.
@@ -151,19 +148,9 @@ Each action type has a dedicated handler that mutates state deterministically:
 
 - `applyCreateWorkflow`: Creates new workflow, assigns UUID
 - `applyCreateActivity`: Creates activity under workflow
-- `applyCreateStep`: Creates step under activity
-- `applyCreateCard`: Creates card under activity/step
+- `applyCreateCard`: Creates card under activity
 - `applyUpdateCard`: Updates card properties
-- `applyReorderCard`: Moves card position and/or step (updates `step_id` and `position` from payload)
-
-```typescript
-// applyReorderCard: Updates card with new_position and optionally new_step_id
-state.cards.set(target_ref.card_id, {
-  ...card,
-  step_id: payload.new_step_id !== undefined ? payload.new_step_id : card.step_id,
-  position: payload.new_position,
-});
-```
+- `applyReorderCard`: Moves card position within activity
 - `applyLinkContextArtifact`: Links artifact to card
 - `applyUpsertCardPlannedFile`: Creates or updates planned file
 - `applyApproveCardPlannedFile`: Updates planned file status

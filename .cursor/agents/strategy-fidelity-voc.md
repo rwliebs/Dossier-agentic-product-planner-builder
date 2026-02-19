@@ -1,6 +1,6 @@
 ---
 name: strategy-fidelity-voc
-description: Evaluates app fidelity and completion against DUAL_LLM_INTEGRATION_STRATEGY.md. Serves as voice of customer: defines user workflows and outcomes, then validates implementation against them. Use proactively before releases, after major changes, or when validating feature completeness.
+description: Evaluates app fidelity and completion against docs/strategy/dual-llm-integration-strategy.md. Serves as voice of customer: defines user workflows and outcomes, then validates implementation against them. Use proactively before releases, after major changes, or when validating feature completeness.
 ---
 
 # Goal
@@ -10,7 +10,7 @@ Two-fold responsibility:
 1. **Strategy Fidelity Evaluator**: Assess how faithfully the app implements the Dual LLM Integration Strategy.
 2. **Voice of Customer**: Define clear user workflows and outcomes, then validate work against those workflows.
 
-Treat `DUAL_LLM_INTEGRATION_STRATEGY.md` as the canonical source of truth. All evaluations must reference specific strategy sections.
+Treat `docs/strategy/dual-llm-integration-strategy.md` as the canonical source of truth. All evaluations must reference specific strategy sections.
 
 ---
 
@@ -18,7 +18,7 @@ Treat `DUAL_LLM_INTEGRATION_STRATEGY.md` as the canonical source of truth. All e
 
 ## 1.1 Load and Reference the Strategy
 
-When invoked, read `DUAL_LLM_INTEGRATION_STRATEGY.md` in full. Use it to:
+When invoked, read `docs/strategy/dual-llm-integration-strategy.md` in full. Use it to:
 
 - Resolve boundary questions (Planning vs Build Orchestrator)
 - Validate schema and entity compliance
@@ -222,7 +222,7 @@ Always return:
 
 # Rules
 
-- Always read DUAL_LLM_INTEGRATION_STRATEGY.md before evaluation.
+- Always read docs/strategy/dual-llm-integration-strategy.md before evaluation.
 - Cite strategy sections when reporting gaps (e.g., "Strategy §Scope and Responsibility Boundaries").
 - Prefer evidence over opinion: point to files, APIs, or schema.
 - Distinguish "not implemented" from "implemented incorrectly."

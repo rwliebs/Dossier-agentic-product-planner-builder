@@ -3,8 +3,8 @@
  * Append-only to RuVector on status transitions, approval, build completion.
  * Async, never blocks. Include build outcome metadata for GNN learning.
  *
- * @see REMAINING_WORK_PLAN.md §4 M6
- * @see DUAL_LLM_INTEGRATION_STRATEGY §Storage Architecture
+ * @see docs/plans/remaining-work-plan.md §4 M6
+ * @see docs/strategy/dual-llm-integration-strategy.md §Storage Architecture
  */
 
 import { getRuvectorClient } from "@/lib/ruvector/client";
@@ -15,7 +15,6 @@ export interface CardSnapshotInput {
   projectId: string;
   workflowId?: string | null;
   activityId?: string | null;
-  stepId?: string | null;
   title?: string | null;
   description?: string | null;
   status?: string | null;

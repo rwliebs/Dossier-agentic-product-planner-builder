@@ -3,7 +3,7 @@
  * retrieve memory, build payload, dispatch to claude-flow,
  * create AgentExecution, update status, log event.
  *
- * @see WORKTREE_MANAGEMENT_FLOW.md
+ * @see docs/strategy/worktree-management-flow.md
  */
 
 import type { DbAdapter } from "@/lib/db/adapter";

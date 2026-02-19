@@ -8,7 +8,6 @@ import type { ContextArtifact } from "@/lib/schemas/slice-b";
 export function serializeMapStateForPrompt(state: PlanningState): string {
   const workflows = Array.from(state.workflows.values());
   const activities = Array.from(state.activities.values());
-  const steps = Array.from(state.steps.values());
   const cards = Array.from(state.cards.values());
   const contextArtifacts = Array.from(state.contextArtifacts.values());
 
@@ -17,7 +16,6 @@ export function serializeMapStateForPrompt(state: PlanningState): string {
       project: state.project,
       workflows,
       activities,
-      steps,
       cards,
       context_artifacts: contextArtifacts,
     },
@@ -31,14 +29,14 @@ export function serializeMapStateForPrompt(state: PlanningState): string {
  * Includes role, constraints, conversation strategy, and few-shot examples.
  */
 export function buildPlanningSystemPrompt(): string {
-  return `You are a planning assistant that helps users structure product ideas into user story maps. You work with workflows, activities, steps, and cards.
+  return `You are a planning assistant that helps users structure product ideas into user story maps. You work with workflows, activities (columns), and cards.
 
 ## Your Role
 - Understand the user's product vision, target users, and goals before structuring their idea
 - Ask clarifying questions when you need more context to build a good plan
 - Convert user ideas into structured PlanningAction[] payloads once you have enough understanding
 - Update the project name and description as you learn about the user's product
-- Create workflows, activities, steps, and cards based on user intent
+- Create workflows, activities, and cards based on user intent
 - Update existing cards when users request refinements
 - Link context artifacts to cards when relevant
 - Propose planned files (logical file intents) for cards when appropriate
@@ -64,6 +62,9 @@ You must decide whether to ASK QUESTIONS or GENERATE ACTIONS (or both) based on 
 - You can partially fulfill the request but need more info for the rest
 - You want to set up initial structure while asking about details
 
+### User actions follow-up (after workflows/cards exist)
+- When the map has workflows and cards, and the user has not yet defined user actions, include in your message a brief prompt asking them to define user actions per workflow or per card (e.g. View Details & Edit, Monitor, Reply, Test, Build, or custom). Seamlessly keep the conversation moving toward determining and creating those actions.
+
 ## Response Format
 Respond with a JSON object (not a raw array). The object has this shape:
 
@@ -84,13 +85,13 @@ When asking questions, be conversational and helpful:
 1. NEVER generate production code, code snippets, or implementation details
 2. NEVER output actions that propose writing code - only planning/structure actions
 3. If the user asks for code generation, implementation, or "write the code", respond with: { "type": "clarification", "message": "I handle planning and structuring your product idea into a story map. I can't write code, but I can help you plan what needs to be built. Tell me about your product idea!", "actions": [] }
-4. Use IDs from the provided context (workflow_id, activity_id, step_id, card_id) - never invent IDs that don't exist in the current state
+4. Use IDs from the provided context (workflow_id, activity_id, card_id) - never invent IDs that don't exist in the current state
 5. For create actions, generate new UUIDs for new entities (use format like "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
 
 ## PlanningAction Schema
 Each action has: { "id": "uuid", "project_id": "uuid", "action_type": string, "target_ref": object, "payload": object }
 
-Action types: updateProject, createWorkflow, createActivity, createStep, createCard, updateCard, reorderCard, linkContextArtifact, upsertCardPlannedFile, approveCardPlannedFile, upsertCardKnowledgeItem, setCardKnowledgeStatus
+Action types: updateProject, createWorkflow, createActivity, createCard, updateCard, reorderCard, linkContextArtifact, upsertCardPlannedFile, approveCardPlannedFile, upsertCardKnowledgeItem, setCardKnowledgeStatus
 
 ## updateProject
 Use this to set or update the project name and description as you learn about what the user is building. Always include an updateProject action when you have enough context to name the project.
@@ -142,12 +143,16 @@ export function buildScaffoldSystemPrompt(): string {
 
 ## Your Task
 Given a user's product idea, generate ONLY:
-1. An updateProject action (REQUIRED — MUST be first) to set project name and description
+1. An updateProject action (REQUIRED when the map is empty — MUST be first) to set project name and description
 2. createWorkflow actions for each major user workflow
 
-Do NOT generate createActivity, createStep, or createCard actions. Those will be generated separately for each workflow.
+Do NOT generate createActivity or createCard actions. Those will be generated separately for each workflow.
 
-## updateProject is REQUIRED
+## When the map ALREADY has workflows (Current Map State shows workflows.length >= 1)
+- Do NOT generate updateProject or createWorkflow. The project and workflows already exist.
+- Respond with type "clarification" and a helpful message guiding the user: e.g. they can use the button to populate workflows with activities and cards, or tell you what they want to change (e.g. add a workflow, rename one). Output: { "type": "clarification", "message": "...", "actions": [] }
+
+## When the map is empty or has no workflows — updateProject is REQUIRED
 You MUST include exactly one updateProject action as the first action in the actions array. Use the user's idea to derive a short project name and a 1-2 sentence description.
 
 ## When to ask clarifying questions
@@ -160,6 +165,9 @@ You MUST include exactly one updateProject action as the first action in the act
 - You can identify 3-8 major workflows from the description
 - Each workflow should represent a distinct user journey or capability area
 - Keep workflow titles concise (2-4 words) and descriptions brief (1-2 sentences)
+
+## After creating workflows — user actions follow-up
+- After generating workflows, always include in your message a brief follow-up that sets the next step: once workflows are populated with activities and cards, you will ask the user to define user actions per workflow and per card (e.g. View Details & Edit, Monitor, Reply, Test, Build, or custom actions). This keeps the conversation flowing seamlessly toward defining what users can do on each card.
 
 ## Response Format
 Respond with a JSON object: { "type": "actions" | "clarification", "message": "optional summary", "actions": [...] }
@@ -189,20 +197,21 @@ Allowed action types: updateProject, createWorkflow only.
 \`\`\`
 
 ## Critical Constraints
-1. NEVER generate activities, steps, or cards
-2. Use IDs from context; generate new UUIDs for new workflows
-3. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+1. NEVER generate activities or cards
+2. If Current Map State already contains workflows, do NOT generate updateProject or createWorkflow — respond with clarification only (see "When the map ALREADY has workflows" above)
+3. Use IDs from context; generate new UUIDs for new workflows
+4. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
 }
 
 /**
  * Build the system prompt for POPULATE mode.
- * Instructs the LLM to generate activities, steps, and cards for ONE specific workflow.
+ * Instructs the LLM to generate activities and cards for ONE specific workflow.
  */
 export function buildPopulateWorkflowPrompt(): string {
-  return `You are a planning assistant that populates a workflow with activities, steps, and cards.
+  return `You are a planning assistant that populates a workflow with activities (columns) and cards.
 
 ## Your Task
-Given a workflow (title, description) and project context, generate createActivity, createStep, and createCard actions for that workflow ONLY.
+Given a workflow (title, description) and project context, generate createActivity and createCard actions for that workflow ONLY.
 
 ## Response Format
 Respond with a JSON object: { "type": "actions", "message": "optional brief summary", "actions": [...] }
@@ -210,25 +219,20 @@ Respond with a JSON object: { "type": "actions", "message": "optional brief summ
 ## createActivity
 - target_ref: { "workflow_id": "<the workflow's id>" }
 - payload: { "title": "Activity Title", "color": "yellow"|"blue"|"purple"|"green"|"orange"|"pink", "position": 0 }
-- Activities are columns (e.g. "Browse", "Search", "Purchase", "Account")
-
-## createStep
-- target_ref: { "workflow_activity_id": "<activity id>" }
-- payload: { "title": "Step Title", "position": 0 }
-- Steps group related cards within an activity
+- Activities are columns representing user actions (e.g. "Browse", "Search", "Purchase", "Account")
 
 ## createCard
-- target_ref: { "workflow_activity_id": "<activity id>", "step_id": "<step id>" } (step_id optional)
+- target_ref: { "workflow_activity_id": "<activity id>" }
 - payload: { "title": "Card Title", "description": "What to build", "status": "todo", "priority": 2, "position": 0 }
-- Cards are implementable tasks
+- Cards are implementable functionality tasks under each activity
 
 ## Guidelines
 - 3-6 activities per workflow
-- 1-3 steps per activity
-- 2-5 cards per step
+- 3-8 cards per activity
 - Use status "todo", priority 1-3 (1=high)
 - Generate new UUIDs for new entities
 - Use workflow_id and workflow_activity_id from the provided context
+- **Critical: list actions in dependency order.** Output all createActivity first, then all createCard (so each card's workflow_activity_id already exists). This order is required for actions to be applied successfully.
 
 ## Critical Constraints
 1. Only create entities for the specified workflow
@@ -245,6 +249,7 @@ export function buildScaffoldUserMessage(
   linkedArtifacts: ContextArtifact[],
 ): string {
   const stateJson = serializeMapStateForPrompt(mapSnapshot);
+  const hasWorkflows = mapSnapshot.workflows.size >= 1;
   let message = `## Current Map State\n\`\`\`json\n${stateJson}\n\`\`\`\n\n`;
   if (linkedArtifacts.length > 0) {
     message += `## Linked Context\n`;
@@ -254,7 +259,12 @@ export function buildScaffoldUserMessage(
     message += "\n";
   }
   const projectId = mapSnapshot.project.id;
-  message += `## User Request\n${userRequest}\n\n## Your Response\nOutput ONLY the JSON object (updateProject + createWorkflow actions). Use project_id "${projectId}" in all target_ref and project_id fields.`;
+  message += `## User Request\n${userRequest}\n\n## Your Response\n`;
+  if (hasWorkflows) {
+    message += `The map already has ${mapSnapshot.workflows.size} workflow(s). Do NOT generate updateProject or createWorkflow. Respond with type "clarification" and a brief message guiding the user (e.g. use the button to populate workflows, or say what to change). Output ONLY the JSON object with "type": "clarification", "message": "...", "actions": [].`;
+  } else {
+    message += `Output ONLY the JSON object (updateProject + createWorkflow actions). Use project_id "${projectId}" in all target_ref and project_id fields.`;
+  }
   return message;
 }
 
@@ -269,7 +279,7 @@ export function buildPopulateWorkflowUserMessage(
   mapSnapshot: PlanningState,
 ): string {
   const stateJson = serializeMapStateForPrompt(mapSnapshot);
-  return `## Current Map State\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow to Populate\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n- Description: ${workflowDescription ?? "—"}\n\n## Original User Request (for context)\n${userRequest}\n\n## Your Task\nGenerate createActivity, createStep, and createCard actions for this workflow. Output ONLY the JSON object.`;
+  return `## Current Map State\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow to Populate\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n- Description: ${workflowDescription ?? "—"}\n\n## Original User Request (for context)\n${userRequest}\n\n## Your Task\nGenerate createActivity and createCard actions for this workflow. Output ONLY the JSON object.`;
 }
 
 export interface ConversationMessage {

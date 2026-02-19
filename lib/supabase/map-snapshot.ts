@@ -3,7 +3,6 @@ import type {
   Project,
   Workflow,
   WorkflowActivity,
-  Step,
   Card,
 } from "@/lib/schemas/slice-a";
 import type { ContextArtifact } from "@/lib/schemas/slice-b";
@@ -15,7 +14,6 @@ import {
   getProject,
   getWorkflowsByProject,
   getActivitiesByProject,
-  getStepsByProject,
   getCardsByProject,
   getArtifactsByProject,
   getCardContextLinksByProject,
@@ -42,11 +40,10 @@ export async function fetchMapSnapshot(
 
   const state = createEmptyPlanningState(project);
 
-  const [workflows, activities, steps, cards, artifacts, cardContextLinks] =
+  const [workflows, activities, cards, artifacts, cardContextLinks] =
     await Promise.all([
       getWorkflowsByProject(db, projectId),
       getActivitiesByProject(db, projectId),
-      getStepsByProject(db, projectId),
       getCardsByProject(db, projectId),
       getArtifactsByProject(db, projectId),
       getCardContextLinksByProject(db, projectId),
@@ -75,21 +72,10 @@ export async function fetchMapSnapshot(
     state.activities.set(a.id, activity);
   }
 
-  for (const s of steps ?? []) {
-    const step: Step = {
-      id: s.id,
-      workflow_activity_id: s.workflow_activity_id,
-      title: s.title,
-      position: s.position,
-    };
-    state.steps.set(s.id, step);
-  }
-
   for (const c of cards ?? []) {
     const card: Card = {
       id: c.id,
       workflow_activity_id: c.workflow_activity_id,
-      step_id: c.step_id ?? null,
       title: c.title,
       description: c.description ?? null,
       status: c.status,

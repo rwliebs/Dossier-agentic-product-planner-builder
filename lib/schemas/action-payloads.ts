@@ -56,20 +56,7 @@ export const createActivityTargetRefSchema = z.object({
 });
 
 // ============================================================================
-// createStep: Create a new step within an activity
-// ============================================================================
-
-export const createStepPayloadSchema = z.object({
-  title: z.string().min(1),
-  position: z.number().int().nonnegative(),
-});
-
-export const createStepTargetRefSchema = z.object({
-  workflow_activity_id: z.string().uuid(),
-});
-
-// ============================================================================
-// createCard: Create a new card within a step or activity
+// createCard: Create a new card within an activity
 // ============================================================================
 
 export const createCardPayloadSchema = z.object({
@@ -78,7 +65,6 @@ export const createCardPayloadSchema = z.object({
   status: cardStatusSchema,
   priority: z.number().int().nonnegative(),
   position: z.number().int().nonnegative(),
-  step_id: z.string().uuid().nullable().optional(),
 });
 
 export const createCardTargetRefSchema = z.object({
@@ -103,12 +89,11 @@ export const updateCardTargetRefSchema = z.object({
 });
 
 // ============================================================================
-// reorderCard: Move card within or between steps
+// reorderCard: Move card within an activity
 // ============================================================================
 
 export const reorderCardPayloadSchema = z.object({
   new_position: z.number().int().nonnegative(),
-  new_step_id: z.string().uuid().nullable().optional(),
 });
 
 export const reorderCardTargetRefSchema = z.object({
@@ -202,7 +187,6 @@ export const payloadSchemaByActionType: Record<
   updateProject: updateProjectPayloadSchema,
   createWorkflow: createWorkflowPayloadSchema,
   createActivity: createActivityPayloadSchema,
-  createStep: createStepPayloadSchema,
   createCard: createCardPayloadSchema,
   updateCard: updateCardPayloadSchema,
   reorderCard: reorderCardPayloadSchema,
@@ -220,7 +204,6 @@ export const targetRefSchemaByActionType: Record<
   updateProject: updateProjectTargetRefSchema,
   createWorkflow: createWorkflowTargetRefSchema,
   createActivity: createActivityTargetRefSchema,
-  createStep: createStepTargetRefSchema,
   createCard: createCardTargetRefSchema,
   updateCard: updateCardTargetRefSchema,
   reorderCard: reorderCardTargetRefSchema,
@@ -239,7 +222,6 @@ export const actionPayloadsSchema = z.union([
   updateProjectPayloadSchema,
   createWorkflowPayloadSchema,
   createActivityPayloadSchema,
-  createStepPayloadSchema,
   createCardPayloadSchema,
   updateCardPayloadSchema,
   reorderCardPayloadSchema,
@@ -254,7 +236,6 @@ export const actionTargetRefsSchema = z.union([
   updateProjectTargetRefSchema,
   createWorkflowTargetRefSchema,
   createActivityTargetRefSchema,
-  createStepTargetRefSchema,
   createCardTargetRefSchema,
   updateCardTargetRefSchema,
   reorderCardTargetRefSchema,
@@ -282,7 +263,6 @@ export const validatedPlanningActionSchema = planningActionSchema.extend({
 export type UpdateProjectPayload = z.infer<typeof updateProjectPayloadSchema>;
 export type CreateWorkflowPayload = z.infer<typeof createWorkflowPayloadSchema>;
 export type CreateActivityPayload = z.infer<typeof createActivityPayloadSchema>;
-export type CreateStepPayload = z.infer<typeof createStepPayloadSchema>;
 export type CreateCardPayload = z.infer<typeof createCardPayloadSchema>;
 export type UpdateCardPayload = z.infer<typeof updateCardPayloadSchema>;
 export type ReorderCardPayload = z.infer<typeof reorderCardPayloadSchema>;

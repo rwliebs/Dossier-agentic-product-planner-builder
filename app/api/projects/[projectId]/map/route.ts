@@ -4,25 +4,15 @@ import {
   getProject,
   getWorkflowsByProject,
   getActivitiesByProject,
-  getStepsByProject,
   getCardsByProject,
 } from "@/lib/supabase/queries";
 import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
 
 type RouteParams = { params: Promise<{ projectId: string }> };
 
-export interface MapStep {
-  id: string;
-  workflow_activity_id: string;
-  title: string;
-  position: number;
-  cards: MapCard[];
-}
-
 export interface MapCard {
   id: string;
   workflow_activity_id: string;
-  step_id: string | null;
   title: string;
   description: string | null;
   status: string;
@@ -39,7 +29,6 @@ export interface MapActivity {
   title: string;
   color: string | null;
   position: number;
-  steps: MapStep[];
   cards: MapCard[];
 }
 
@@ -69,10 +58,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       return notFoundError("Project not found");
     }
 
-    const [workflows, activities, steps, cards] = await Promise.all([
+    const [workflows, activities, cards] = await Promise.all([
       getWorkflowsByProject(db, projectId),
       getActivitiesByProject(db, projectId),
-      getStepsByProject(db, projectId),
       getCardsByProject(db, projectId),
     ]);
 
@@ -82,24 +70,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       if (!activityByWf.has(wfId)) activityByWf.set(wfId, []);
       activityByWf.get(wfId)!.push(a);
     }
-    const stepsByAct = new Map<string, typeof steps>();
-    for (const s of steps) {
-      const actId = s.workflow_activity_id as string;
-      if (!stepsByAct.has(actId)) stepsByAct.set(actId, []);
-      stepsByAct.get(actId)!.push(s);
-    }
-    const cardsByStep = new Map<string, typeof cards>();
     const cardsByAct = new Map<string, typeof cards>();
     for (const c of cards) {
-      const stepId = c.step_id as string | null;
       const actId = c.workflow_activity_id as string;
-      if (stepId) {
-        if (!cardsByStep.has(stepId)) cardsByStep.set(stepId, []);
-        cardsByStep.get(stepId)!.push(c);
-      } else {
-        if (!cardsByAct.has(actId)) cardsByAct.set(actId, []);
-        cardsByAct.get(actId)!.push(c);
-      }
+      if (!cardsByAct.has(actId)) cardsByAct.set(actId, []);
+      cardsByAct.get(actId)!.push(c);
     }
 
     const workflowsWithTree: MapWorkflow[] = workflows.map((wf) => {
@@ -107,24 +82,15 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
         (a, b) => ((a.position as number) ?? 0) - ((b.position as number) ?? 0)
       );
       const activitiesWithTree: MapActivity[] = wfActivities.map((act) => {
-        const actSteps = (stepsByAct.get(act.id as string) ?? []).sort(
-          (a, b) => ((a.position as number) ?? 0) - ((b.position as number) ?? 0)
-        );
-        const stepsWithCards: MapStep[] = actSteps.map((step) => ({
-          id: step.id as string,
-          workflow_activity_id: step.workflow_activity_id as string,
-          title: step.title as string,
-          position: (step.position as number) ?? 0,
-          cards: (cardsByStep.get(step.id as string) ?? []).map(normalizeCard),
-        }));
-        const activityCards = (cardsByAct.get(act.id as string) ?? []).map(normalizeCard);
+        const activityCards = (cardsByAct.get(act.id as string) ?? [])
+          .map(normalizeCard)
+          .sort((a, b) => a.priority - b.priority || 0);
         return {
           id: act.id as string,
           workflow_id: act.workflow_id as string,
           title: act.title as string,
           color: (act.color as string) ?? null,
           position: (act.position as number) ?? 0,
-          steps: stepsWithCards,
           cards: activityCards,
         };
       });
@@ -163,7 +129,6 @@ function normalizeCard(row: Record<string, unknown>): MapCard {
   return {
     id: row.id as string,
     workflow_activity_id: row.workflow_activity_id as string,
-    step_id: (row.step_id as string) ?? null,
     title: row.title as string,
     description: (row.description as string) ?? null,
     status: row.status as string,

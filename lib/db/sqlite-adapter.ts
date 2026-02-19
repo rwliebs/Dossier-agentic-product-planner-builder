@@ -199,61 +199,10 @@ export function createSqliteAdapter(dbPath: string | ":memory:"): DbAdapter {
       );
     },
 
-    // --- Steps ---
-    async getStepsByActivity(activityId: string) {
-      const rows = db
-        .prepare("SELECT * FROM step WHERE workflow_activity_id = ? ORDER BY position ASC")
-        .all(activityId) as DbRow[];
-      return rows.map((r) => parseRow("step", r));
-    },
-    async getStepsByProject(projectId: string) {
-      const rows = db
-        .prepare(
-          `SELECT s.* FROM step s
-           INNER JOIN workflow_activity wa ON s.workflow_activity_id = wa.id
-           INNER JOIN workflow w ON wa.workflow_id = w.id
-           WHERE w.project_id = ? ORDER BY w.position ASC, wa.position ASC, s.position ASC`
-        )
-        .all(projectId) as DbRow[];
-      return rows.map((r) => parseRow("step", r));
-    },
-    async insertStep(row: DbRow) {
-      db.prepare(
-        "INSERT INTO step (id, workflow_activity_id, title, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
-      ).run(
-        row.id ?? crypto.randomUUID(),
-        row.workflow_activity_id,
-        row.title,
-        row.position ?? 0,
-        (row.created_at as string) ?? new Date().toISOString(),
-        (row.updated_at as string) ?? new Date().toISOString()
-      );
-    },
-    async upsertStep(row: DbRow) {
-      db.prepare(
-        `INSERT INTO step (id, workflow_activity_id, title, position, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET title=excluded.title, position=excluded.position, updated_at=excluded.updated_at`
-      ).run(
-        row.id ?? crypto.randomUUID(),
-        row.workflow_activity_id,
-        row.title,
-        row.position ?? 0,
-        (row.created_at as string) ?? new Date().toISOString(),
-        (row.updated_at as string) ?? new Date().toISOString()
-      );
-    },
-
     // --- Cards ---
-    async getCardsByStep(stepId: string) {
-      const rows = db
-        .prepare("SELECT * FROM card WHERE step_id = ? ORDER BY priority ASC")
-        .all(stepId) as DbRow[];
-      return rows.map((r) => parseRow("card", r));
-    },
     async getCardsByActivity(activityId: string) {
       const rows = db
-        .prepare("SELECT * FROM card WHERE workflow_activity_id = ? AND step_id IS NULL ORDER BY priority ASC")
+        .prepare("SELECT * FROM card WHERE workflow_activity_id = ? ORDER BY priority ASC, position ASC")
         .all(activityId) as DbRow[];
       return rows.map((r) => parseRow("card", r));
     },
@@ -274,11 +223,10 @@ export function createSqliteAdapter(dbPath: string | ":memory:"): DbAdapter {
     },
     async insertCard(row: DbRow) {
       db.prepare(
-        "INSERT INTO card (id, workflow_activity_id, step_id, title, description, status, priority, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO card (id, workflow_activity_id, title, description, status, priority, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
       ).run(
         row.id ?? crypto.randomUUID(),
         row.workflow_activity_id,
-        row.step_id ?? null,
         row.title,
         row.description ?? null,
         row.status ?? "todo",
@@ -289,7 +237,7 @@ export function createSqliteAdapter(dbPath: string | ":memory:"): DbAdapter {
       );
     },
     async updateCard(cardId: string, updates: DbRow) {
-      const allowed = ["title", "description", "status", "priority", "position", "step_id", "quick_answer"];
+      const allowed = ["title", "description", "status", "priority", "position", "quick_answer"];
       const set: string[] = ["updated_at = datetime('now')"];
       const vals: unknown[] = [];
       for (const [k, v] of Object.entries(updates)) {
@@ -303,13 +251,12 @@ export function createSqliteAdapter(dbPath: string | ":memory:"): DbAdapter {
     },
     async upsertCard(row: DbRow) {
       db.prepare(
-        `INSERT INTO card (id, workflow_activity_id, step_id, title, description, status, priority, position, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET title=excluded.title, description=excluded.description, status=excluded.status, priority=excluded.priority, position=excluded.position, step_id=excluded.step_id, updated_at=excluded.updated_at`
+        `INSERT INTO card (id, workflow_activity_id, title, description, status, priority, position, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET title=excluded.title, description=excluded.description, status=excluded.status, priority=excluded.priority, position=excluded.position, updated_at=excluded.updated_at`
       ).run(
         row.id ?? crypto.randomUUID(),
         row.workflow_activity_id,
-        row.step_id ?? null,
         row.title,
         row.description ?? null,
         row.status ?? "todo",
@@ -648,15 +595,10 @@ export function createSqliteAdapter(dbPath: string | ":memory:"): DbAdapter {
       const activities = await adapter.getActivitiesByWorkflow(workflowId);
       const ids: string[] = [];
       for (const act of activities) {
-        const steps = await adapter.getStepsByActivity(act.id as string);
-        for (const step of steps) {
-          const cards = await adapter.getCardsByStep(step.id as string);
-          ids.push(...cards.map((c) => c.id as string));
-        }
         const activityCards = await adapter.getCardsByActivity(act.id as string);
         ids.push(...activityCards.map((c) => c.id as string));
       }
-      return [...new Set(ids)];
+      return ids;
     },
     async getCardIdsByProject(projectId: string) {
       const workflows = await adapter.getWorkflowsByProject(projectId);

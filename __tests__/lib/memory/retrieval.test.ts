@@ -87,26 +87,30 @@ describe("Retrieval policy (M8)", () => {
       insertedIds.length = 0;
     });
 
-    it("retrieveForCard end-to-end: ingest content, retrieve with semantically similar query, results non-empty", async () => {
-      const cardId = "retrieval-test-card";
-      const projectId = "retrieval-test-project";
+    it.skipIf(() => getRuvectorClient() === null)(
+      "retrieveForCard end-to-end: when client available, ingest then retrieve returns relevant results",
+      async () => {
+        const cardId = "retrieval-test-card";
+        const projectId = "retrieval-test-project";
 
-      const id = await ingestMemoryUnit(
-        sqliteDb,
-        { contentText: "User authentication must support OAuth2 and SSO", title: "Auth requirement" },
-        { cardId, projectId }
-      );
-      expect(id).not.toBeNull();
-      if (id) insertedIds.push(id);
+        const id = await ingestMemoryUnit(
+          sqliteDb,
+          { contentText: "User authentication must support OAuth2 and SSO", title: "Auth requirement" },
+          { cardId, projectId }
+        );
+        expect(id).not.toBeNull();
+        if (!id) return;
+        insertedIds.push(id);
 
-      const refs = await retrieveForCard(
-        sqliteDb,
-        cardId,
-        projectId,
-        "how does login work with OAuth"
-      );
-      expect(refs.length).toBeGreaterThan(0);
-      expect(refs.some((s) => s.includes("OAuth2") || s.includes("authentication"))).toBe(true);
-    });
+        const refs = await retrieveForCard(
+          sqliteDb,
+          cardId,
+          projectId,
+          "how does login work with OAuth"
+        );
+        expect(refs.length).toBeGreaterThan(0);
+        expect(refs.some((s) => s.includes("OAuth2") || s.includes("authentication"))).toBe(true);
+      }
+    );
   });
 });

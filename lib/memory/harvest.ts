@@ -17,7 +17,6 @@ export interface HarvestInput {
   projectId: string;
   workflowId?: string | null;
   activityId?: string | null;
-  stepId?: string | null;
   /** Learnings from swarm memory. When empty, harvest is no-op. */
   learnings?: string[];
 }
@@ -38,7 +37,6 @@ export async function harvestBuildLearnings(
     projectId: input.projectId,
     workflowId: input.workflowId ?? null,
     activityId: input.activityId ?? null,
-    stepId: input.stepId ?? null,
   };
 
   let count = 0;

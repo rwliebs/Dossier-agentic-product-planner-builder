@@ -24,7 +24,7 @@ export interface ChatResponse {
   message?: string;
   actions: PlanningAction[];
   preview: {
-    added: { workflows: string[]; activities: string[]; steps: string[]; cards: string[] };
+    added: { workflows: string[]; activities: string[]; cards: string[] };
     modified: { cards: string[]; artifacts: string[] };
     reordered: string[];
     summary: string;

@@ -18,7 +18,7 @@ Enable users to move from product idea to production-grade software through:
 ### Planning Context Engine (Planning LLM)
 - Primary channels: chat column and storyboard canvas.
 - Allowed actions:
-  - Create/modify workflows, activities, steps, and cards.
+  - Create/modify workflows, activities, and cards.
   - Refine jobs-to-be-done and feature requirements.
   - Create/modify context artifacts attached to cards.
   - Propose file intents on cards (`create`/`edit`) with per-file purpose and constraints.
@@ -57,7 +57,7 @@ Enable users to move from product idea to production-grade software through:
 4. Card-scoped execution:
    - Agent work is bounded by card context, allowed files, and linked artifacts.
 5. Memory with provenance:
-   - Every memory write and retrieval includes project/workflow/activity/step/card provenance metadata.
+   - Every memory write and retrieval includes project/workflow/activity/card provenance metadata.
 6. Safe progressive rollout:
    - Ship behind feature flags with measurable phase gates.
 
@@ -137,7 +137,7 @@ Enable users to move from product idea to production-grade software through:
 The system uses a split storage model to maximize both relational integrity and self-learning.
 
 **Postgres (Supabase): Current State (Source of Truth)**
-- All canonical entities: Project, Workflow, WorkflowActivity, Step, Card, ContextArtifact, CardPlannedFile, knowledge items, runs, approvals.
+- All canonical entities: Project, Workflow, WorkflowActivity, Card, ContextArtifact, CardPlannedFile, knowledge items, runs, approvals.
 - Memory content and metadata: `memory_unit` (content + `embedding_ref`), `memory_unit_relation` (provenance), `memory_retrieval_log`.
 - Single source of truth for current state and memory content.
 - ACID transactions, referential integrity, exact lookups, aggregations.
@@ -239,7 +239,7 @@ The system uses a split storage model to maximize both relational integrity and 
 ### Planning Agent Reliability for Visual Build Execution
 - We do not depend on Mermaid or diagram DSLs as execution truth.
 - The visual build is driven by canonical structured state + mutation actions:
-  - State truth: workflows, activities, steps, cards, artifacts, and planned files.
+  - State truth: workflows, activities, cards, artifacts, and planned files.
   - Mutation truth: validated `PlanningAction` records only.
 - Execution protocol for planning agents:
   1. Read latest canonical state snapshot.
@@ -301,7 +301,7 @@ The system uses a split storage model to maximize both relational integrity and 
   - Full planning chat transcript storage is optional and disabled by default.
   - Required persistence is limited to structured artifacts and approvals.
 - Truth is stored in persistent artifacts:
-  - Story map entities (workflows, activities, steps, cards).
+  - Story map entities (workflows, activities, cards).
   - Card context artifacts.
   - Card planned files and approvals.
   - Approved project-level summaries/constraints.
@@ -377,18 +377,9 @@ This schema is the implementation contract for Phase 1+ APIs, storage, and UI wi
   - `version_label_key` (text, nullable, fk `VersionLabel.key`)
   - `depends_on_activity_ids` (uuid[], nullable)
   - `position` (int, required)
-- `Step`
-  - `id` (uuid, pk)
-  - `workflow_activity_id` (uuid, fk, indexed)
-  - `title` (text, required)
-  - `workflow_label_key` (text, nullable, fk `WorkflowLabel.key`)
-  - `version_label_key` (text, nullable, fk `VersionLabel.key`)
-  - `depends_on_step_ids` (uuid[], nullable)
-  - `position` (int, required)
 - `Card`
   - `id` (uuid, pk)
-  - `workflow_activity_id` (uuid, fk, indexed)   // fallback target if step granularity is skipped
-  - `step_id` (uuid, fk `Step.id`, nullable, indexed)
+  - `workflow_activity_id` (uuid, fk, indexed)
   - `title` (text, required)
   - `description` (text, nullable)
   - `status` (`card_status`, required)
@@ -493,7 +484,7 @@ This schema is the implementation contract for Phase 1+ APIs, storage, and UI wi
 - `PlanningAction`
   - `id` (uuid, pk)
   - `project_id` (uuid, fk, indexed)
-  - `action_type` (`createWorkflow | createActivity | createStep | createCard | updateCard | reorderCard | linkContextArtifact | upsertCardPlannedFile | approveCardPlannedFile | upsertCardKnowledgeItem | setCardKnowledgeStatus`, required)
+  - `action_type` (`createWorkflow | createActivity | createCard | updateCard | reorderCard | linkContextArtifact | upsertCardPlannedFile | approveCardPlannedFile | upsertCardKnowledgeItem | setCardKnowledgeStatus`, required)
   - `target_ref` (jsonb, required)
   - `payload` (jsonb, required)
   - `validation_status` (`accepted | rejected`, required)
@@ -530,14 +521,14 @@ RuVector is the memory substrate, embedded in claude-flow on the dedicated host.
   - `updated_at` (timestamptz, required)
 - `MemoryUnitRelation` (many-to-many scope mapping)
   - `memory_unit_id` (uuid, fk, indexed)
-  - `entity_type` (`project | workflow | activity | step | card | schema`, required)
+  - `entity_type` (`project | workflow | activity | card | schema`, required)
   - `entity_id` (uuid/text, required)
   - `relation_role` (`source | supports | constrains`, nullable)
   - pk: (`memory_unit_id`, `entity_type`, `entity_id`)
 - `MemoryRetrievalLog` (optional, minimal observability)
   - `id` (uuid, pk)
   - `query_text` (text, required)
-  - `scope_entity_type` (`project | workflow | activity | step | card | schema`, required)
+  - `scope_entity_type` (`project | workflow | activity | card | schema`, required)
   - `scope_entity_id` (uuid/text, required)
   - `result_memory_ids` (uuid[], required)
   - `created_at` (timestamptz, required)
@@ -636,9 +627,9 @@ RuVector is the memory substrate, embedded in claude-flow on the dedicated host.
 ### Relationship Rules
 - `Project` 1:N `Workflow`, `ContextArtifact`, `CodeFile`, `OrchestrationRun`.
 - `Project` 1:1 `SystemPolicyProfile`.
-- `MemoryUnit` is associated to project/workflow/activity/step/card/schema via `MemoryUnitRelation`.
+- `MemoryUnit` is associated to project/workflow/activity/card/schema via `MemoryUnitRelation`.
 - `Project` 1:N `PlanningAction`.
-- `Workflow` 1:N `WorkflowActivity`; `WorkflowActivity` 1:N `Step`; `Step` 1:N `Card` (with `workflow_activity_id` fallback).
+- `Workflow` 1:N `WorkflowActivity`; `WorkflowActivity` 1:N `Card`.
 - `Card` N:M `ContextArtifact` via `CardContextArtifact`.
 - `Card` 1:N `CardPlannedFile` (required for build-ready cards in MVP).
 - `Card` N:M `CodeFile` via `CardCodeFile`.
@@ -678,8 +669,7 @@ RuVector is the memory substrate, embedded in claude-flow on the dedicated host.
 
 ### Indexing Baseline
 - Composite indexes:
-  - `Card(step_id, priority)`
-  - `Step(workflow_activity_id, position)`
+  - `Card(workflow_activity_id, priority)`
   - `WorkflowActivity(workflow_id, position)`
   - `MemoryUnit(status, updated_at desc)`
   - `MemoryUnitRelation(entity_type, entity_id, memory_unit_id)`
@@ -714,7 +704,7 @@ RuVector is the memory substrate, embedded in claude-flow on the dedicated host.
 
 ### Risk: Memory contamination across projects, cards, or invocations
 - Mitigation:
-  - Strict metadata partitioning (`projectId`, `workflowId`, `stepId`, `cardId`, `repo`, `invocationId`).
+  - Strict metadata partitioning (`projectId`, `workflowId`, `activityId`, `cardId`, `repo`, `invocationId`).
   - Scoped retrieval policies by default; broad retrieval only for integration tasks.
 
 ### Risk: Incorrect or low-quality LLM outputs mutate map state
@@ -763,7 +753,7 @@ RuVector is the memory substrate, embedded in claude-flow on the dedicated host.
 
 ## Validation Strategy
 - Contract tests (core-first):
-  - Slice A contracts first (`Project`, `Workflow`, `WorkflowActivity`, `Step`, `Card`, `PlanningAction`).
+  - Slice A contracts first (`Project`, `Workflow`, `WorkflowActivity`, `Card`, `PlanningAction`).
   - Planning action schema validation and rejection paths.
   - Orchestration command schema and card-boundary enforcement.
 - Integration tests (core-first):
@@ -799,7 +789,7 @@ This is the concrete transition path from the current UI-heavy prototype to a pr
 
 ### Phase 1: Contract Hardening (UI + Types)
 - Freeze canonical map contracts:
-  - `Workflow -> WorkflowActivity -> Step -> Card`
+  - `Workflow -> WorkflowActivity -> Card`
   - `PlanningAction` as the only mutation contract.
 - Align frontend types/components to canonical schema and remove prototype-only contract drift.
 - Introduce client-side action validation helpers to reject malformed mutations before API calls.

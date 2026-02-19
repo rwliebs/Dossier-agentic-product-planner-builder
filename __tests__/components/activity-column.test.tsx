@@ -3,39 +3,29 @@ import { render, screen } from "@testing-library/react";
 import { ActivityColumn } from "@/components/dossier/activity-column";
 import type { MapActivity } from "@/lib/types/ui";
 
-const activityWithSteps: MapActivity = {
+const activityWithCards: MapActivity = {
   id: "a1",
   workflow_id: "wf1",
   title: "User Management",
   color: "blue",
   position: 0,
-  steps: [
+  cards: [
     {
-      id: "s1",
+      id: "c1",
       workflow_activity_id: "a1",
-      title: "Auth",
-      position: 0,
-      cards: [
-        {
-          id: "c1",
-          workflow_activity_id: "a1",
-          step_id: "s1",
-          title: "Login",
-          description: null,
-          status: "active",
-          priority: 1,
-        },
-      ],
+      title: "Login",
+      description: null,
+      status: "active",
+      priority: 1,
     },
   ],
-  cards: [],
 };
 
 describe("ActivityColumn", () => {
-  it("renders activity title and step content", () => {
+  it("renders activity title and card content", () => {
     render(
       <ActivityColumn
-        activity={activityWithSteps}
+        activity={activityWithCards}
         expandedCardId={null}
         onExpandCard={() => {}}
         onCardAction={() => {}}
@@ -44,7 +34,6 @@ describe("ActivityColumn", () => {
     );
 
     expect(screen.getByText("User Management")).toBeInTheDocument();
-    expect(screen.getByText("Auth")).toBeInTheDocument();
     expect(screen.getByText("Login")).toBeInTheDocument();
   });
 });

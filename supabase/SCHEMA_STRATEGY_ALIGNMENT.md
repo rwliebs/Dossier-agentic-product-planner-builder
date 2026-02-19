@@ -1,6 +1,6 @@
 # Supabase schema: strategy-aligned approach
 
-This doc uses **DUAL_LLM_INTEGRATION_STRATEGY.md** and **.cursor/agents/strategy-fidelity-voc.md** to recommend a single schema approach after a DB wipe.
+This doc uses **docs/strategy/dual-llm-integration-strategy.md** and **.cursor/agents/strategy-fidelity-voc.md** to recommend a single schema approach after a DB wipe.
 
 ---
 

@@ -65,12 +65,12 @@ docs:
     path: docs/Feature Plans
     ttl_days: 30
 product_documents:
-  root: "Product Documents"
+  root: "docs/product"
   files:
     - user-personas.md
     - user-stories.md
   ux:
-    path: "Product Documents/ux"
+    path: "docs/product"
     naming: "{domain}-ux-reference.md"
 naming:
   lowercase_only: true
@@ -206,7 +206,7 @@ ttl_expires_on: null
 - RULE: Domain docs contain implementation patterns
 
 ### User Documentation
-**Location**: `/Product Documents/`
+**Location**: `/docs/product/`
 
 | Document | Purpose | Update Trigger |
 |----------|---------|----------------|

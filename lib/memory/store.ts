@@ -3,8 +3,8 @@
  * Real adapter: DbAdapter for content, RuVector for embeddings/search.
  * Mock adapter: returns empty results for tests and when RuVector unavailable.
  *
- * @see REMAINING_WORK_PLAN.md §4 Memory Plane
- * @see DUAL_LLM_INTEGRATION_STRATEGY §Memory and Retrieval
+ * @see docs/plans/remaining-work-plan.md §4 Memory Plane
+ * @see docs/strategy/dual-llm-integration-strategy.md §Memory and Retrieval
  */
 
 import type { DbAdapter } from "@/lib/db/adapter";

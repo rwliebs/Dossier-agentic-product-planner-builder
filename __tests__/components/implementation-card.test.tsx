@@ -6,7 +6,6 @@ import type { MapCard } from "@/lib/types/ui";
 const card: MapCard = {
   id: "card-1",
   workflow_activity_id: "activity-1",
-  step_id: null,
   title: "Lead intake form",
   description: "Capture name and phone",
   status: "active",

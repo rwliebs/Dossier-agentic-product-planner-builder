@@ -1,7 +1,6 @@
 'use client';
 
 import { ImplementationCard, type CodeFileForPanel } from './implementation-card';
-import { StepGroup, type StepGroupProps } from './step-group';
 import type { MapActivity, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 
 export interface ActivityColumnProps {
@@ -35,9 +34,7 @@ export function ActivityColumn({
   getCardKnowledge,
   getCardKnowledgeLoading,
 }: ActivityColumnProps) {
-  const sortedSteps = [...activity.steps].sort((a, b) => a.position - b.position);
-  const activityLevelCards = activity.cards.filter((c) => !c.step_id);
-  const sortedActivityCards = [...activityLevelCards].sort((a, b) => a.priority - b.priority);
+  const sortedCards = [...activity.cards].sort((a, b) => a.priority - b.priority || 0);
 
   return (
     <div className="flex flex-col min-w-72 max-w-80">
@@ -48,25 +45,7 @@ export function ActivityColumn({
       </div>
 
       <div className="space-y-4">
-        {sortedSteps.map((step) => (
-          <StepGroup
-            key={step.id}
-            step={step}
-            expandedCardId={expandedCardId}
-            onExpandCard={onExpandCard}
-            onCardAction={onCardAction}
-            onUpdateCardDescription={onUpdateCardDescription}
-            onUpdateQuickAnswer={onUpdateQuickAnswer}
-            onApprovePlannedFile={onApprovePlannedFile}
-            onBuildCard={onBuildCard}
-            onSelectDoc={onSelectDoc}
-            onSelectFile={onSelectFile}
-            codeFiles={codeFiles}
-            getCardKnowledge={getCardKnowledge}
-            getCardKnowledgeLoading={getCardKnowledgeLoading}
-          />
-        ))}
-        {sortedActivityCards.map((card) => {
+        {sortedCards.map((card) => {
           const k = getCardKnowledge?.(card.id);
           return (
             <ImplementationCard

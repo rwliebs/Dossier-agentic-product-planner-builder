@@ -8,7 +8,6 @@ export type {
   Project,
   Workflow,
   WorkflowActivity,
-  Step,
   Card,
   PlanningAction,
 } from "@/lib/schemas/slice-a";
@@ -33,7 +32,6 @@ import type { Card as SchemaCard } from "@/lib/schemas/slice-a";
 export interface MapCard {
   id: string;
   workflow_activity_id: string;
-  step_id: string | null;
   title: string;
   description: string | null;
   status: string;
@@ -44,21 +42,12 @@ export interface MapCard {
   last_build_ref?: string | null;
 }
 
-export interface MapStep {
-  id: string;
-  workflow_activity_id: string;
-  title: string;
-  position: number;
-  cards: MapCard[];
-}
-
 export interface MapActivity {
   id: string;
   workflow_id: string;
   title: string;
   color: string | null;
   position: number;
-  steps: MapStep[];
   cards: MapCard[];
 }
 

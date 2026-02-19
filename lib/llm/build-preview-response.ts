@@ -6,7 +6,6 @@ export interface ChatPreviewResponse {
   added: {
     workflows: string[];
     activities: string[];
-    steps: string[];
     cards: string[];
   };
   modified: {
@@ -30,7 +29,6 @@ export function buildPreviewFromActions(
   const added = {
     workflows: [] as string[],
     activities: [] as string[],
-    steps: [] as string[],
     cards: [] as string[],
   };
   const modified = { cards: [] as string[], artifacts: [] as string[] };
@@ -50,9 +48,6 @@ export function buildPreviewFromActions(
         break;
       case "createActivity":
         added.activities.push(preview.created_ids[0] ?? "new");
-        break;
-      case "createStep":
-        added.steps.push(preview.created_ids[0] ?? "new");
         break;
       case "createCard":
         added.cards.push(preview.created_ids[0] ?? "new");

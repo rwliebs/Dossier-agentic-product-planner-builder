@@ -33,21 +33,10 @@ export async function persistPlanningState(
     });
   }
 
-  for (const s of state.steps.values()) {
-    await db.upsertStep({
-      id: s.id,
-      workflow_activity_id: s.workflow_activity_id,
-      title: s.title,
-      position: s.position,
-      updated_at: new Date().toISOString(),
-    });
-  }
-
   for (const c of state.cards.values()) {
     await db.upsertCard({
       id: c.id,
       workflow_activity_id: c.workflow_activity_id,
-      step_id: c.step_id,
       title: c.title,
       description: c.description,
       status: c.status,

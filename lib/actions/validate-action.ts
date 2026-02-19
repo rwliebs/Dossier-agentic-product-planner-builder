@@ -9,7 +9,6 @@ import {
   ValidationError,
   workflowExists,
   activityExists,
-  stepExists,
   cardExists,
   contextArtifactExists,
   containsCodeGenerationIntent,
@@ -101,18 +100,6 @@ export function validateReferentialIntegrity(
       }
       break;
 
-    case "createStep":
-      if (
-        target_ref.workflow_activity_id &&
-        !activityExists(state, target_ref.workflow_activity_id)
-      ) {
-        errors.push({
-          code: "referential_integrity",
-          message: `Referenced activity ${target_ref.workflow_activity_id} does not exist`,
-        });
-      }
-      break;
-
     case "createCard":
       if (
         target_ref.workflow_activity_id &&
@@ -122,16 +109,6 @@ export function validateReferentialIntegrity(
           code: "referential_integrity",
           message: `Referenced activity ${target_ref.workflow_activity_id} does not exist`,
         });
-      }
-      const createCardPayload = action.payload as Record<string, unknown>;
-      if (createCardPayload.step_id) {
-        const stepId = createCardPayload.step_id as string;
-        if (!stepExists(state, stepId)) {
-          errors.push({
-            code: "referential_integrity",
-            message: `Referenced step ${stepId} does not exist`,
-          });
-        }
       }
       break;
 

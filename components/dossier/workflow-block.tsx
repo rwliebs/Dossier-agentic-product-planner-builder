@@ -12,10 +12,7 @@ const EPIC_COLORS = ['yellow', 'blue', 'purple', 'green', 'orange', 'pink'] as c
 
 function allCardsFromSnapshot(snapshot: MapSnapshot): MapCard[] {
   return snapshot.workflows.flatMap((wf) =>
-    wf.activities.flatMap((act) => [
-      ...act.steps.flatMap((s) => s.cards),
-      ...act.cards,
-    ])
+    wf.activities.flatMap((act) => act.cards)
   );
 }
 

@@ -14,7 +14,6 @@ describe("Action Application (Mutations)", () => {
   const projectId = "11111111-1111-4111-8111-111111111111";
   const workflowId = "22222222-2222-4222-8222-222222222222";
   const activityId = "33333333-3333-4333-8333-333333333333";
-  const stepId = "44444444-4444-4444-8444-444444444444";
   const cardId = "55555555-5555-4555-8555-555555555555";
 
   let project: Project;
@@ -117,24 +116,18 @@ describe("Action Application (Mutations)", () => {
   });
 
   describe("Reorder Card", () => {
-    it("updates card position and step_id when reordering", () => {
+    it("updates card position when reordering", () => {
       initialState.activities.set(activityId, {
         id: activityId,
         workflow_id: workflowId,
         title: "Planning",
         position: 0,
       });
-      initialState.steps.set(stepId, {
-        id: stepId,
-        workflow_activity_id: activityId,
-        title: "Step 1",
-        position: 0,
-      });
       initialState.cards.set(cardId, {
         id: cardId,
         workflow_activity_id: activityId,
-        step_id: null,
         title: "Card",
+        description: null,
         status: "todo",
         priority: 1,
         position: 0,
@@ -147,7 +140,6 @@ describe("Action Application (Mutations)", () => {
         target_ref: { card_id: cardId },
         payload: {
           new_position: 2,
-          new_step_id: stepId,
         },
       };
 
@@ -156,48 +148,6 @@ describe("Action Application (Mutations)", () => {
 
       const reorderedCard = result.newState!.cards.get(cardId);
       expect(reorderedCard!.position).toBe(2);
-      expect(reorderedCard!.step_id).toBe(stepId);
-    });
-
-    it("keeps step_id when new_step_id is omitted", () => {
-      initialState.activities.set(activityId, {
-        id: activityId,
-        workflow_id: workflowId,
-        title: "Planning",
-        position: 0,
-      });
-      initialState.steps.set(stepId, {
-        id: stepId,
-        workflow_activity_id: activityId,
-        title: "Step 1",
-        position: 0,
-      });
-      initialState.cards.set(cardId, {
-        id: cardId,
-        workflow_activity_id: activityId,
-        step_id: stepId,
-        title: "Card",
-        status: "todo",
-        priority: 1,
-        position: 0,
-      });
-
-      const action: PlanningAction = {
-        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        project_id: projectId,
-        action_type: "reorderCard",
-        target_ref: { card_id: cardId },
-        payload: {
-          new_position: 1,
-        },
-      };
-
-      const result = applyAction(action, initialState);
-      expect(result.success).toBe(true);
-
-      const reorderedCard = result.newState!.cards.get(cardId);
-      expect(reorderedCard!.position).toBe(1);
-      expect(reorderedCard!.step_id).toBe(stepId);
     });
   });
 
@@ -207,6 +157,7 @@ describe("Action Application (Mutations)", () => {
         id: cardId,
         workflow_activity_id: activityId,
         title: "Old Title",
+        description: null,
         status: "todo",
         priority: 1,
         position: 0,
@@ -240,6 +191,7 @@ describe("Action Application (Mutations)", () => {
         id: cardId,
         workflow_activity_id: activityId,
         title: "Design",
+        description: null,
         status: "todo",
         priority: 1,
         position: 0,
@@ -279,6 +231,7 @@ describe("Action Application (Mutations)", () => {
         id: cardId,
         workflow_activity_id: activityId,
         title: "Auth Component",
+        description: null,
         status: "todo",
         priority: 1,
         position: 0,
@@ -316,6 +269,7 @@ describe("Action Application (Mutations)", () => {
         id: cardId,
         workflow_activity_id: activityId,
         title: "Auth",
+        description: null,
         status: "todo",
         priority: 1,
         position: 0,
@@ -361,6 +315,7 @@ describe("Action Application (Mutations)", () => {
         id: cardId,
         workflow_activity_id: activityId,
         title: "API Design",
+        description: null,
         status: "todo",
         priority: 1,
         position: 0,
@@ -462,6 +417,7 @@ describe("Action Application (Mutations)", () => {
         id: cardId,
         workflow_activity_id: activityId,
         title: "API Design",
+        description: null,
         status: "todo",
         priority: 1,
         position: 0,

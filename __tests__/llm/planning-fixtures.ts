@@ -6,7 +6,6 @@ import { v4 as uuidv4 } from "uuid";
 const PROJECT_ID = "11111111-1111-1111-1111-111111111111";
 const WORKFLOW_ID = "22222222-2222-2222-2222-222222222222";
 const ACTIVITY_ID = "33333333-3333-3333-3333-333333333333";
-const STEP_ID = "44444444-4444-4444-4444-444444444444";
 const CARD_ID = "55555555-5555-5555-5555-555555555555";
 
 /**
@@ -37,17 +36,9 @@ export function createFixtureState(): PlanningState {
     position: 0,
   });
 
-  state.steps.set(STEP_ID, {
-    id: STEP_ID,
-    workflow_activity_id: ACTIVITY_ID,
-    title: "Login form",
-    position: 0,
-  });
-
   state.cards.set(CARD_ID, {
     id: CARD_ID,
     workflow_activity_id: ACTIVITY_ID,
-    step_id: STEP_ID,
     title: "Implement login form UI",
     description: "Create form with email/password",
     status: "todo",
@@ -242,4 +233,4 @@ export const planningFixtures: FixtureScenario[] = [
   },
 ];
 
-export { PROJECT_ID, WORKFLOW_ID, ACTIVITY_ID, STEP_ID, CARD_ID };
+export { PROJECT_ID, WORKFLOW_ID, ACTIVITY_ID, CARD_ID };

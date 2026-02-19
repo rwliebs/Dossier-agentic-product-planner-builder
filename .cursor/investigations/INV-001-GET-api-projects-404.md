@@ -8,7 +8,7 @@
 ## 2. Expected Behavior
 
 - [ ] **Expected behavior:** `GET /api/projects` returns `200` with a JSON array of project objects.
-- [ ] **Source:** [docs/API_ENDPOINTS.md](docs/API_ENDPOINTS.md) lines 40–50; [app/api/projects/route.ts](app/api/projects/route.ts) lines 12–20.
+- [ ] **Source:** [docs/reference/api-endpoints.md](docs/reference/api-endpoints.md) lines 40–50; [app/api/projects/route.ts](app/api/projects/route.ts) lines 12–20.
 
 **Expected behavior established:** YES
 
@@ -55,7 +55,7 @@
 | | Current | Expected |
 |---|--------|----------|
 | **Behavior** | Test fails: `expected 404 to be 200` | Test passes when server returns 200 |
-| **Source** | Test output; `curl localhost:3000/api/projects` → 404 | docs/API_ENDPOINTS.md; route implementation |
+| **Source** | Test output; `curl localhost:3000/api/projects` → 404 | docs/reference/api-endpoints.md; route implementation |
 
 #### 3.5.2 Root Cause (5 Whys)
 

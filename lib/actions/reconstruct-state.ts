@@ -94,7 +94,6 @@ export interface DriftReport {
   hasDrift: boolean;
   workflowCountDiff?: number;
   activityCountDiff?: number;
-  stepCountDiff?: number;
   cardCountDiff?: number;
   details?: string[];
 }
@@ -110,12 +109,10 @@ export function detectDrift(
   const details: string[] = [];
   const wfDiff = reconstructed.workflows.size - actual.workflows.size;
   const actDiff = reconstructed.activities.size - actual.activities.size;
-  const stepDiff = reconstructed.steps.size - actual.steps.size;
   const cardDiff = reconstructed.cards.size - actual.cards.size;
 
   if (wfDiff !== 0) details.push(`Workflows: ${wfDiff > 0 ? "+" : ""}${wfDiff}`);
   if (actDiff !== 0) details.push(`Activities: ${actDiff > 0 ? "+" : ""}${actDiff}`);
-  if (stepDiff !== 0) details.push(`Steps: ${stepDiff > 0 ? "+" : ""}${stepDiff}`);
   if (cardDiff !== 0) details.push(`Cards: ${cardDiff > 0 ? "+" : ""}${cardDiff}`);
 
   const hasDrift = details.length > 0;
@@ -124,7 +121,6 @@ export function detectDrift(
     hasDrift,
     workflowCountDiff: wfDiff !== 0 ? wfDiff : undefined,
     activityCountDiff: actDiff !== 0 ? actDiff : undefined,
-    stepCountDiff: stepDiff !== 0 ? stepDiff : undefined,
     cardCountDiff: cardDiff !== 0 ? cardDiff : undefined,
     details: hasDrift ? details : undefined,
   };

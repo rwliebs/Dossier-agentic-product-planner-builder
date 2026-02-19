@@ -17,7 +17,7 @@ Plan workflows from ideas. Set precise agent context per feature. Trigger multi-
 ```bash
 git clone https://github.com/your-org/dossier.git
 cd dossier
-npm install
+npm install   # or pnpm install
 npm run build
 npm run dossier
 ```
@@ -52,7 +52,7 @@ Dossier runs as a standalone Next.js app on your machine. All data stays local.
 ```
 
 | Component | Technology |
-|-----------|-----------|
+|-----------|------------|
 | UI + API | Next.js (React 19) |
 | Database | SQLite (via better-sqlite3) |
 | Planning LLM | Anthropic Claude |
@@ -87,11 +87,37 @@ npm run dossier -- --help        # Show help
 ## Development
 
 ```bash
-npm run dev          # Dev server with hot reload
-npm run build        # Production build
-npm test             # Run tests
-npm run lint         # Lint
+npm run dev              # Dev server with hot reload (port 3000)
+npm run build            # Production build
+npm run start            # Start production server
+npm run test             # Run full test suite
+npm run test:watch       # Vitest watch mode
+npm run test:coverage    # Coverage report
+npm run test:planning    # Planning LLM tests (mocked)
+npm run test:planning:e2e # Planning E2E (trading card marketplace)
+npm run test:db          # DB adapter tests
+npm run test:e2e:adaptive # Adaptive E2E flows
+npm run lint             # ESLint
+npm run rebuild          # Rebuild and restart (dev)
+npm run rebuild:prod     # Rebuild and restart (prod)
 ```
+
+## Documentation
+
+Full documentation lives in [`docs/`](docs/):
+
+| Category | Key docs |
+|----------|----------|
+| **Overview** | [System Architecture](docs/SYSTEM_ARCHITECTURE.md) |
+| **Getting started** | [Development](docs/development-reference.md), [Testing](docs/testing-reference.md), [Configuration](docs/reference/configuration-reference.md) |
+| **Domains** | [Data contracts](docs/domains/data-contracts-reference.md), [API](docs/domains/api-reference.md), [Planning](docs/domains/planning-reference.md), [Map](docs/domains/map-reference.md), [Mutation](docs/domains/mutation-reference.md), [Orchestration](docs/domains/orchestration-reference.md), [Memory](docs/domains/memory-reference.md) |
+| **Product** | [User workflows](docs/product/user-workflows-reference.md), [User personas](docs/product/user-personas.md), [User stories](docs/product/user-stories.md) |
+| **Strategy** | [Dual LLM integration](docs/strategy/dual-llm-integration-strategy.md), [Worktree management](docs/strategy/worktree-management-flow.md) |
+| **Reference** | [API endpoints](docs/reference/api-endpoints.md), [Database schema](docs/reference/database-schema.md) |
+| **Plans** | [Remaining work plan](docs/plans/remaining-work-plan.md) |
+| **ADR** | [Architecture decisions](docs/adr/) |
+
+See [docs/README.md](docs/README.md) for the full structure.
 
 ## License
 

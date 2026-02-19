@@ -20,6 +20,10 @@ import {
 export const createProjectSchema = z.object({
   name: z.string().min(1),
   description: z.string().nullable().optional(),
+  customer_personas: z.string().nullable().optional(),
+  tech_stack: z.string().nullable().optional(),
+  deployment: z.string().nullable().optional(),
+  design_inspiration: z.string().nullable().optional(),
   repo_url: z.string().url().nullable().optional(),
   default_branch: z.string().min(1).optional(),
 });
@@ -27,6 +31,10 @@ export const createProjectSchema = z.object({
 export const updateProjectSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
+  customer_personas: z.string().nullable().optional(),
+  tech_stack: z.string().nullable().optional(),
+  deployment: z.string().nullable().optional(),
+  design_inspiration: z.string().nullable().optional(),
   repo_url: z.string().url().nullable().optional(),
   default_branch: z.string().min(1).optional(),
 });

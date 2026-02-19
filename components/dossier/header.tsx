@@ -1,20 +1,20 @@
 'use client';
 
-import { Zap, Eye, Database } from 'lucide-react';
+import { Eye, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ACTION_BUTTONS } from '@/lib/constants/action-buttons';
 import { SettingsMenu } from '@/components/dossier/settings-menu';
 
 interface DossierHeaderProps {
   viewMode: 'functionality' | 'architecture';
   onViewModeChange: (mode: 'functionality' | 'architecture') => void;
   agentStatus: 'idle' | 'building' | 'reviewing';
-  onBuildAll?: (workflowId: string) => void;
-  firstWorkflowId?: string | null;
   selectedProjectId: string;
   onSelectProjectId: (id: string) => void;
+  onSaveCurrentProject?: () => void | Promise<void>;
 }
 
-export function Header({ viewMode, onViewModeChange, agentStatus, onBuildAll, firstWorkflowId, selectedProjectId, onSelectProjectId }: DossierHeaderProps) {
+export function Header({ viewMode, onViewModeChange, agentStatus, selectedProjectId, onSelectProjectId, onSaveCurrentProject }: DossierHeaderProps) {
   const statusColors = {
     idle: 'text-muted-foreground',
     building: 'text-green-400 animate-pulse',
@@ -53,7 +53,7 @@ export function Header({ viewMode, onViewModeChange, agentStatus, onBuildAll, fi
               className="h-6 px-2 text-xs uppercase tracking-widest font-mono"
             >
               <Eye className="h-3 w-3 mr-1" />
-              Functionality
+              {ACTION_BUTTONS.VIEW_MODE.functionality}
             </Button>
             <div className="w-px h-4 bg-grid-line" />
             <Button
@@ -63,7 +63,7 @@ export function Header({ viewMode, onViewModeChange, agentStatus, onBuildAll, fi
               className="h-6 px-2 text-xs uppercase tracking-widest font-mono"
             >
               <Database className="h-3 w-3 mr-1" />
-              Architecture
+              {ACTION_BUTTONS.VIEW_MODE.architecture}
             </Button>
           </div>
 
@@ -72,16 +72,8 @@ export function Header({ viewMode, onViewModeChange, agentStatus, onBuildAll, fi
             <SettingsMenu
               selectedProjectId={selectedProjectId}
               onSelectProjectId={onSelectProjectId}
+              onSaveCurrentProject={onSaveCurrentProject}
             />
-            {onBuildAll && firstWorkflowId && (
-              <Button
-                className="h-8 gap-2 bg-primary text-primary-foreground"
-                onClick={() => onBuildAll(firstWorkflowId)}
-              >
-                <Zap className="h-3 w-3" />
-                <span className="text-xs uppercase tracking-widest font-mono">Build All</span>
-              </Button>
-            )}
           </div>
         </div>
       </div>

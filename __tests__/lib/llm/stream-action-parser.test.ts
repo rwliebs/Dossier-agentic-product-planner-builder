@@ -104,6 +104,22 @@ describe("parseActionsFromStream", () => {
     expect((actions[1] as { action_type?: string }).action_type).toBe("createCard");
   });
 
+  it("normalizes createCard target_ref: activity_id -> workflow_activity_id", async () => {
+    const pid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    const wfId = "22cb49ef-34aa-4cb3-ab3e-81063a2cba0d";
+    const actId = "a1f8c3d2-4e5f-6a7b-8c9d-0e1f2a3b4c5d";
+    const json = `{"type":"actions","message":"Done.","actions":[{"action_type":"createActivity","target_ref":{"workflow_id":"${wfId}"},"payload":{"id":"${actId}","title":"Register","position":0}},{"action_type":"createCard","target_ref":{"activity_id":"${actId}"},"payload":{"title":"Sign up","status":"todo","priority":1,"position":0}}]}`;
+    const stream = await streamFromStrings([json]);
+    const actions: unknown[] = [];
+    for await (const result of parseActionsFromStream(stream)) {
+      if (result.type === "action") actions.push(result.action);
+    }
+    expect(actions.length).toBe(2);
+    const createCard = actions[1] as { action_type?: string; target_ref?: { workflow_activity_id?: string } };
+    expect(createCard.action_type).toBe("createCard");
+    expect(createCard.target_ref?.workflow_activity_id).toBe(actId);
+  });
+
   it("parses actions with 'action' field (LLM alternate format)", async () => {
     const pid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
     const wfId = "22cb49ef-34aa-4cb3-ab3e-81063a2cba0d";
@@ -117,6 +133,24 @@ describe("parseActionsFromStream", () => {
     expect(actions.length).toBe(2);
     expect((actions[0] as { action_type?: string }).action_type).toBe("createActivity");
     expect((actions[1] as { action_type?: string }).action_type).toBe("createCard");
+  });
+
+  it("accepts createCard with non-UUID id (normalizes to UUID)", async () => {
+    const pid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    const wfId = "22cb49ef-34aa-4cb3-ab3e-81063a2cba0d";
+    const actId = "a1f8c3d2-4e5f-6a7b-8c9d-0e1f2a3b4c5d";
+    const json = `{"type":"actions","actions":[{"id":"${actId}","action_type":"createActivity","target_ref":{"workflow_id":"${wfId}"},"payload":{"id":"${actId}","title":"Browse","position":0}},{"id":"c1","action_type":"createCard","target_ref":{"workflow_activity_id":"${actId}"},"payload":{"title":"View list","status":"todo","priority":1,"position":0}}]}`;
+    const stream = await streamFromStrings([json]);
+    const actions: unknown[] = [];
+    for await (const result of parseActionsFromStream(stream)) {
+      if (result.type === "action") actions.push(result.action);
+    }
+    expect(actions.length).toBe(2);
+    const createCard = actions[1] as { id?: string; action_type?: string };
+    expect(createCard.action_type).toBe("createCard");
+    expect(createCard.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    );
   });
 
   it("yields done at end", async () => {

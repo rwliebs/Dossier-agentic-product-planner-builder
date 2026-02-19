@@ -1,6 +1,7 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ImplementationCard } from "@/components/dossier/implementation-card";
+import { ACTION_BUTTONS } from "@/lib/constants/action-buttons";
 import type { MapCard } from "@/lib/types/ui";
 
 const card: MapCard = {
@@ -28,7 +29,7 @@ describe("ImplementationCard", () => {
     );
 
     expect(screen.getByText("Lead intake form")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /view details & edit/i }));
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(ACTION_BUTTONS.VIEW_DETAILS_EDIT, "i") }));
     expect(onExpand).toHaveBeenCalledWith("card-1");
   });
 });

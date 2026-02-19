@@ -66,6 +66,10 @@ export interface MapSnapshot {
     id: string;
     name: string;
     description: string | null;
+    customer_personas: string | null;
+    tech_stack: string | null;
+    deployment: string | null;
+    design_inspiration: string | null;
     repo_url: string | null;
     default_branch: string;
   };

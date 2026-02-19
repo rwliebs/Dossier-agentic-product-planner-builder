@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# When action button files are staged: sync tests, run e2e
+scripts/pre-commit-action-buttons.sh

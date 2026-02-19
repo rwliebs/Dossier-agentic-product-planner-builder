@@ -23,15 +23,21 @@ import { Input } from '@/components/ui/input';
 interface SettingsMenuProps {
   selectedProjectId: string;
   onSelectProjectId: (id: string) => void;
+  /** Called before creating a new project to ensure current project is saved. */
+  onSaveCurrentProject?: () => void | Promise<void>;
 }
+
+const DEFAULT_BLANK_PROJECT_NAME = 'New project';
 
 export function SettingsMenu({
   selectedProjectId,
   onSelectProjectId,
+  onSaveCurrentProject,
 }: SettingsMenuProps) {
   const { data: projects, loading, refetch } = useProjects();
   const [apiKeysOpen, setApiKeysOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [creatingBlank, setCreatingBlank] = useState(false);
 
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) return;
@@ -41,13 +47,51 @@ export function SettingsMenu({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newProjectName.trim() }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const msg = (err as { error?: string; message?: string }).error ?? (err as { message?: string }).message ?? 'Failed to create project';
+        const { toast } = await import('sonner');
+        toast.error(msg);
+        return;
+      }
       const project: Project = await res.json();
       onSelectProjectId(project.id);
       setNewProjectName('');
       refetch();
-    } catch {
-      // ignore
+      const { toast } = await import('sonner');
+      toast.success('Created new project');
+    } catch (e) {
+      const { toast } = await import('sonner');
+      toast.error(e instanceof Error ? e.message : 'Failed to create project');
+    }
+  };
+
+  const handleCreateBlankProject = async () => {
+    setCreatingBlank(true);
+    try {
+      await onSaveCurrentProject?.();
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: DEFAULT_BLANK_PROJECT_NAME }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const msg = (err as { error?: string; message?: string }).error ?? (err as { message?: string }).message ?? 'Failed to create project';
+        const { toast } = await import('sonner');
+        toast.error(msg);
+        return;
+      }
+      const project: Project = await res.json();
+      onSelectProjectId(project.id);
+      refetch();
+      const { toast } = await import('sonner');
+      toast.success('Created new project');
+    } catch (e) {
+      const { toast } = await import('sonner');
+      toast.error(e instanceof Error ? e.message : 'Failed to create project');
+    } finally {
+      setCreatingBlank(false);
     }
   };
 
@@ -86,6 +130,13 @@ export function SettingsMenu({
                 </DropdownMenuItem>
               ))
             )}
+            <DropdownMenuItem
+              onClick={handleCreateBlankProject}
+              disabled={creatingBlank}
+            >
+              <Plus className="h-3.5 w-3.5 mr-2" />
+              {creatingBlank ? 'Creating…' : 'Create new blank project'}
+            </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
                 <Plus className="h-3.5 w-3.5 mr-2" />

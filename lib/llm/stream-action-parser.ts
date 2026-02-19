@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from "uuid";
+import { v4 as uuidv4, validate as uuidValidate } from "uuid";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
 import { planningActionTypeSchema, planningActionSchema } from "@/lib/schemas/slice-a";
 
@@ -12,18 +12,35 @@ export type StreamParseResult =
  * Normalize a raw object into a PlanningAction.
  */
 function normalizeAction(obj: Record<string, unknown>): PlanningAction {
-  const id = typeof obj.id === "string" ? obj.id : uuidv4();
-  const targetRef = (obj.target_ref ?? obj.targetRef ?? {}) as Record<string, unknown>;
+  const rawId = typeof obj.id === "string" ? obj.id : undefined;
+  const id = rawId && uuidValidate(rawId) ? rawId : uuidv4();
+  let targetRef = (obj.target_ref ?? obj.targetRef ?? {}) as Record<string, unknown>;
+  const rawActionType = (obj.action_type ?? obj.action) as string;
+  const action_type = planningActionTypeSchema.safeParse(rawActionType).success
+    ? (rawActionType as PlanningAction["action_type"])
+    : "updateCard";
+
+  // Normalize createCard target_ref: LLMs sometimes use activity_id or put it in payload
+  if (action_type === "createCard" && !targetRef.workflow_activity_id) {
+    const rawPayload = (obj.payload ?? {}) as Record<string, unknown>;
+    const activityId =
+      targetRef.activity_id ??
+      targetRef.activityId ??
+      (targetRef as Record<string, unknown>).workflowActivityId ??
+      rawPayload.workflow_activity_id ??
+      rawPayload.activity_id ??
+      rawPayload.activityId;
+    if (typeof activityId === "string") {
+      targetRef = { ...targetRef, workflow_activity_id: activityId };
+    }
+  }
+
   const project_id =
     typeof obj.project_id === "string"
       ? obj.project_id
       : typeof targetRef.project_id === "string"
         ? targetRef.project_id
         : "";
-  const rawActionType = (obj.action_type ?? obj.action) as string;
-  const action_type = planningActionTypeSchema.safeParse(rawActionType).success
-    ? (rawActionType as PlanningAction["action_type"])
-    : "updateCard";
   const payload = (obj.payload ?? {}) as Record<string, unknown>;
 
   return {

@@ -118,6 +118,10 @@ function applyUpdateProject(
     ...state.project,
     name: payload.name ?? state.project.name,
     description: payload.description !== undefined ? payload.description : state.project.description,
+    customer_personas: payload.customer_personas !== undefined ? payload.customer_personas : state.project.customer_personas,
+    tech_stack: payload.tech_stack !== undefined ? payload.tech_stack : state.project.tech_stack,
+    deployment: payload.deployment !== undefined ? payload.deployment : state.project.deployment,
+    design_inspiration: payload.design_inspiration !== undefined ? payload.design_inspiration : state.project.design_inspiration,
   };
 
   return { success: true, newState: state };

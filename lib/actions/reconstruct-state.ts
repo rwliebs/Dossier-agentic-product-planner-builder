@@ -25,13 +25,27 @@ export interface ReconstructResult {
  * Uses payload.id when provided for create operations to ensure deterministic replay.
  */
 export function reconstructStateFromActions(
-  project: { id: string; name: string; description?: string | null; repo_url?: string | null; default_branch?: string },
+  project: {
+    id: string;
+    name: string;
+    description?: string | null;
+    customer_personas?: string | null;
+    tech_stack?: string | null;
+    deployment?: string | null;
+    design_inspiration?: string | null;
+    repo_url?: string | null;
+    default_branch?: string;
+  },
   actions: PlanningAction[]
 ): ReconstructResult {
   const state = createEmptyPlanningState({
     id: project.id,
     name: project.name,
     description: project.description ?? null,
+    customer_personas: project.customer_personas ?? null,
+    tech_stack: project.tech_stack ?? null,
+    deployment: project.deployment ?? null,
+    design_inspiration: project.design_inspiration ?? null,
     repo_url: project.repo_url ?? null,
     default_branch: project.default_branch ?? "main",
   });

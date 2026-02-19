@@ -33,14 +33,23 @@ export function ProjectSelector({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName.trim() }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const msg = (err as { error?: string; message?: string }).error ?? (err as { message?: string }).message ?? 'Failed to create project';
+        const { toast } = await import('sonner');
+        toast.error(msg);
+        return;
+      }
       const project: Project = await res.json();
       onSelectProjectId(project.id);
       setNewName('');
       setCreateOpen(false);
       refetch();
-    } catch {
-      // ignore
+      const { toast } = await import('sonner');
+      toast.success('Created new project');
+    } catch (e) {
+      const { toast } = await import('sonner');
+      toast.error(e instanceof Error ? e.message : 'Failed to create project');
     }
   };
 

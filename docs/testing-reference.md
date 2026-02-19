@@ -36,6 +36,7 @@ ttl_expires_on: null
 | `npm run test:coverage` | Coverage report (v8) |
 | `npm run test:planning` | Planning LLM tests (mock allowed) |
 | `npm run test:planning:e2e` | Planning E2E (trading card marketplace) |
+| `npm run test:e2e:project-to-cards` | Full flow: create project → idea → cards for 2+ workflows |
 | `npm run test:e2e:adaptive` | Adaptive E2E flows |
 | `npm run test:db` | DB adapter and migration tests |
 
@@ -58,7 +59,7 @@ __tests__/
 ├── orchestration/           # create-run, trigger-build, approval-gates, etc.
 ├── schemas/                 # slice-b, slice-c, core-planning
 ├── hooks/                   # use-submit-action, use-map-snapshot, etc.
-└── e2e/                     # adaptive-flows, trading-card-marketplace-planning
+└── e2e/                     # project-to-cards-flow, adaptive-flows, trading-card-marketplace-planning
 ```
 
 ---

@@ -182,6 +182,10 @@ async function applyUpdateProjectAction(
   const updates: Record<string, unknown> = {};
   if (action.payload.name !== undefined) updates.name = action.payload.name;
   if (action.payload.description !== undefined) updates.description = action.payload.description;
+  if (action.payload.customer_personas !== undefined) updates.customer_personas = action.payload.customer_personas;
+  if (action.payload.tech_stack !== undefined) updates.tech_stack = action.payload.tech_stack;
+  if (action.payload.deployment !== undefined) updates.deployment = action.payload.deployment;
+  if (action.payload.design_inspiration !== undefined) updates.design_inspiration = action.payload.design_inspiration;
 
   if (Object.keys(updates).length === 0) {
     return { applied: false, rejectionReason: "No fields to update" };

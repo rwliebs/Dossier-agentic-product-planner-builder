@@ -12,12 +12,16 @@ import { plannedFileActionSchema, plannedFileKindSchema } from "./slice-b";
  */
 
 // ============================================================================
-// updateProject: Update project name and/or description
+// updateProject: Update project name, description, customer personas, tech stack, deployment
 // ============================================================================
 
 export const updateProjectPayloadSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
+  customer_personas: z.string().nullable().optional(),
+  tech_stack: z.string().nullable().optional(),
+  deployment: z.string().nullable().optional(),
+  design_inspiration: z.string().nullable().optional(),
 });
 
 export const updateProjectTargetRefSchema = z.object({
@@ -43,6 +47,7 @@ export const createWorkflowTargetRefSchema = z.object({
 // ============================================================================
 
 export const createActivityPayloadSchema = z.object({
+  id: z.string().uuid().optional(), // When provided, createCard can reference this in target_ref.workflow_activity_id
   title: z.string().min(1),
   color: z
     .enum(["yellow", "blue", "purple", "green", "orange", "pink"])

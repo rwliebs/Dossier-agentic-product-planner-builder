@@ -57,12 +57,16 @@ export function validateActionSchema(action: PlanningAction): ValidationError[] 
     try {
       targetRefSchema.parse(action.target_ref);
     } catch (error: unknown) {
-      const err = error as { issues?: Array<{ message: string }> };
+      const err = error as { issues?: Array<{ message: string; path?: unknown[] }> };
+      const zodMsg = err.issues?.[0]?.message || "Unknown target_ref error";
+      const pathHint = err.issues?.[0]?.path?.length
+        ? ` (${(err.issues[0].path as string[]).join(".")})`
+        : "";
       errors.push({
         code: "invalid_schema",
-        message: `Action target_ref failed validation for type: ${action.action_type}`,
+        message: `Action target_ref failed validation for type: ${action.action_type}: ${zodMsg}${pathHint}`,
         details: {
-          reason: err.issues?.[0]?.message || "Unknown target_ref error",
+          reason: zodMsg,
         },
       });
     }

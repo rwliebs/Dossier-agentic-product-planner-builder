@@ -73,8 +73,17 @@ interface LeftSidebarProps {
   width?: number;
   /** Called when user accepts preview and actions are applied (map should refresh) */
   onPlanningApplied?: () => void;
-  /** Called when user edits the project name, description, or repo link. May return a Promise that resolves to true if the update succeeded. */
-  onProjectUpdate?: (updates: { name?: string; description?: string | null; repo_url?: string | null; default_branch?: string }) => void | Promise<boolean | void>;
+  /** Called when user edits the project name, description, context fields, or repo link. May return a Promise that resolves to true if the update succeeded. */
+  onProjectUpdate?: (updates: {
+    name?: string;
+    description?: string | null;
+    customer_personas?: string | null;
+    tech_stack?: string | null;
+    deployment?: string | null;
+    design_inspiration?: string | null;
+    repo_url?: string | null;
+    default_branch?: string;
+  }) => void | Promise<boolean | void>;
 }
 
 function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: FileNode; depth?: number; selectedFiles: string[]; onToggleFile: (path: string) => void }) {

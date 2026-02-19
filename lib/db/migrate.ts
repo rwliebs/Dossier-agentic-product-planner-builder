@@ -407,6 +407,20 @@ DROP TABLE IF EXISTS step;
 ALTER TABLE card DROP COLUMN step_id;
 `,
   },
+  {
+    name: "006_project_context_fields.sql",
+    sql: /* sql */ `
+ALTER TABLE project ADD COLUMN customer_personas TEXT;
+ALTER TABLE project ADD COLUMN tech_stack TEXT;
+ALTER TABLE project ADD COLUMN deployment TEXT;
+`,
+  },
+  {
+    name: "007_project_design_inspiration.sql",
+    sql: /* sql */ `
+ALTER TABLE project ADD COLUMN design_inspiration TEXT;
+`,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

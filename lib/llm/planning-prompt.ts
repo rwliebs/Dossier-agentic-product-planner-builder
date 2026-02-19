@@ -101,9 +101,10 @@ Each action has: { "id": "uuid", "project_id": "uuid", "action_type": string, "t
 Action types: updateProject, createWorkflow, createActivity, createCard, updateCard, reorderCard, linkContextArtifact, upsertCardPlannedFile, approveCardPlannedFile, upsertCardKnowledgeItem, setCardKnowledgeStatus
 
 ## updateProject
-Use this to set or update the project name and description as you learn about what the user is building. Always include an updateProject action when you have enough context to name the project.
+Use this to set or update project context as you learn about what the user is building. Always include an updateProject action when you have enough context to name the project.
 - target_ref: { "project_id": "<project_id>" }
-- payload: { "name": "Short Project Name", "description": "A concise description of what the project does and who it's for." }
+- payload: { "name": "Short Project Name", "description": "A concise description of what the project does and who it's for.", "customer_personas": "e.g. Buyers, Sellers, Admin", "tech_stack": "e.g. React, Node.js, PostgreSQL", "deployment": "e.g. Vercel, local dev, mobile app", "design_inspiration": "e.g. Notion, Linear, Stripe" }
+- Populate customer_personas, tech_stack, deployment, and design_inspiration when the user mentions target users, technologies, deployment targets, or design references.
 
 ## Example: First message — user says "I want to build a marketplace"
 \`\`\`json
@@ -120,7 +121,7 @@ Use this to set or update the project name and description as you learn about wh
   "type": "actions",
   "message": "Got it — a freelance design marketplace with project posting, bidding, and collaboration. Here's an initial structure:",
   "actions": [
-    {"id": "z0y1x2w3-...", "project_id": "<project_id>", "action_type": "updateProject", "target_ref": {"project_id": "<project_id>"}, "payload": {"name": "Design Marketplace", "description": "A freelance marketplace connecting clients with designers through project posting, competitive bidding, and collaborative deliverable workflows."}},
+    {"id": "z0y1x2w3-...", "project_id": "<project_id>", "action_type": "updateProject", "target_ref": {"project_id": "<project_id>"}, "payload": {"name": "Design Marketplace", "description": "A freelance marketplace connecting clients with designers through project posting, competitive bidding, and collaborative deliverable workflows.", "customer_personas": "Clients (post projects), Designers (bid and deliver)", "tech_stack": "React, Node.js, PostgreSQL", "deployment": "Web app, Vercel", "design_inspiration": "Dribbble, Behance"}},
     {"id": "a1b2c3d4-...", "project_id": "<project_id>", "action_type": "createWorkflow", "target_ref": {"project_id": "<project_id>"}, "payload": {"title": "Project Lifecycle", "description": "End-to-end flow from project creation to deliverable acceptance", "position": 0}}
   ]
 }
@@ -157,7 +158,7 @@ export function buildScaffoldSystemPrompt(): string {
 
 ## Your Task
 Given a user's product idea, generate ONLY:
-1. An updateProject action (REQUIRED when the map is empty — MUST be first) to set project name and description
+1. An updateProject action (REQUIRED when the map is empty — MUST be first) to set project name, description, customer_personas, tech_stack, and deployment
 2. createWorkflow actions for each major user workflow
 
 Do NOT generate createActivity or createCard actions. Those will be generated separately for each workflow.
@@ -167,7 +168,7 @@ Do NOT generate createActivity or createCard actions. Those will be generated se
 - Respond with type "clarification" and a helpful message guiding the user: e.g. they can use the button to populate workflows with activities and cards, or tell you what they want to change (e.g. add a workflow, rename one). Output: { "type": "clarification", "message": "...", "actions": [] }
 
 ## When the map is empty or has no workflows — updateProject is REQUIRED
-You MUST include exactly one updateProject action as the first action in the actions array. Use the user's idea to derive a short project name and a 1-2 sentence description.
+You MUST include exactly one updateProject action as the first action in the actions array. Use the user's idea to derive: a short project name, a 1-2 sentence description, customer personas (who are the users?), tech stack (frontend, backend, etc. when mentioned), and deployment (local, web, mobile, etc. when mentioned).
 
 ## When to ask clarifying questions
 - The user's message is very vague (e.g. "build me an app", "I want something cool")
@@ -190,7 +191,7 @@ Allowed action types: updateProject, createWorkflow only.
 
 ## updateProject
 - target_ref: { "project_id": "<project_id>" }
-- payload: { "name": "Short Name", "description": "Concise description" }
+- payload: { "name": "Short Name", "description": "Concise description", "customer_personas": "Target users (e.g. Buyers, Sellers)", "tech_stack": "Frontend, backend, DB (when known)", "deployment": "Local, web, mobile (when known)", "design_inspiration": "Design references (when mentioned)" }
 
 ## createWorkflow
 - target_ref: { "project_id": "<project_id>" }
@@ -203,7 +204,7 @@ Allowed action types: updateProject, createWorkflow only.
   "type": "actions",
   "message": "Creating structure for a Canadian MTG trading card marketplace.",
   "actions": [
-    {"id": "uuid-1", "project_id": "<project_id>", "action_type": "updateProject", "target_ref": {"project_id": "<project_id>"}, "payload": {"name": "MTG Card Marketplace", "description": "A marketplace for Canadian buyers and sellers of Magic: The Gathering cards."}},
+    {"id": "uuid-1", "project_id": "<project_id>", "action_type": "updateProject", "target_ref": {"project_id": "<project_id>"}, "payload": {"name": "MTG Card Marketplace", "description": "A marketplace for Canadian buyers and sellers of Magic: The Gathering cards.", "customer_personas": "Buyers, Sellers, Collectors", "tech_stack": "React, Node.js, PostgreSQL", "deployment": "Web app", "design_inspiration": null}},
     {"id": "uuid-2", "project_id": "<project_id>", "action_type": "createWorkflow", "target_ref": {"project_id": "<project_id>"}, "payload": {"title": "Browse & Search", "description": "Discover and search for cards", "position": 0}},
     {"id": "uuid-3", "project_id": "<project_id>", "action_type": "createWorkflow", "target_ref": {"project_id": "<project_id>"}, "payload": {"title": "Buying & Selling", "description": "List, purchase, and manage transactions", "position": 1}}
   ]
@@ -238,27 +239,45 @@ Given a workflow (title, description) and project context, generate createActivi
 Respond with a JSON object: { "type": "actions", "message": "optional brief summary", "actions": [...] }
 
 ## createActivity
-- target_ref: { "workflow_id": "<the workflow's id>" }
-- payload: { "title": "Activity Title", "color": "yellow"|"blue"|"purple"|"green"|"orange"|"pink", "position": 0 }
+- target_ref: { "workflow_id": "<the workflow's id from Workflow to Populate>" }
+- payload: { "id": "<new UUID>", "title": "Activity Title", "color": "yellow"|"blue"|"purple"|"green"|"orange"|"pink", "position": 0 }
+- **REQUIRED: include "id" in payload** — a new UUID for each activity. createCard will reference this id.
 - Activities are columns representing user actions (e.g. "Browse", "Search", "Purchase", "Account")
 
 ## createCard
-- target_ref: { "workflow_activity_id": "<activity id>" }
+- target_ref: { "workflow_activity_id": "<exact id from the createActivity payload this card belongs to>" }
 - payload: { "title": "Card Title", "description": "What to build", "status": "todo", "priority": 2, "position": 0 }
+- **REQUIRED: include "id" as a UUID for each card** (e.g. "c1d2e3f4-a5b6-7890-abcd-333333333333")
+- **REQUIRED: workflow_activity_id must be the id of an activity you created in a preceding createActivity action.**
 - Cards are implementable functionality tasks under each activity
 
 ## Guidelines
 - 3-6 activities per workflow
 - 3-8 cards per activity
 - Use status "todo", priority 1-3 (1=high)
-- Generate new UUIDs for new entities
-- Use workflow_id and workflow_activity_id from the provided context
-- **Critical: list actions in dependency order.** Output all createActivity first, then all createCard (so each card's workflow_activity_id already exists). This order is required for actions to be applied successfully.
+- Generate new UUIDs for activities (include in createActivity payload.id)
+- Use workflow_id from "Workflow to Populate" section
+- **Critical: list actions in dependency order.** Output all createActivity first (each with payload.id), then all createCard. Each createCard target_ref.workflow_activity_id must exactly match a createActivity payload.id from earlier in the same response.
+
+## Example (workflow_id from "Workflow to Populate"; use real UUIDs)
+\`\`\`json
+{
+  "type": "actions",
+  "message": "Created activities and cards.",
+  "actions": [
+    {"id":"a1b2c3d4-e5f6-7890-abcd-111111111111","action_type":"createActivity","target_ref":{"workflow_id":"<workflow_id>"},"payload":{"id":"a1b2c3d4-e5f6-7890-abcd-111111111111","title":"Browse","color":"blue","position":0}},
+    {"id":"a1b2c3d4-e5f6-7890-abcd-222222222222","action_type":"createActivity","target_ref":{"workflow_id":"<workflow_id>"},"payload":{"id":"a1b2c3d4-e5f6-7890-abcd-222222222222","title":"Search","color":"green","position":1}},
+    {"id":"c1d2e3f4-a5b6-7890-abcd-333333333333","action_type":"createCard","target_ref":{"workflow_activity_id":"a1b2c3d4-e5f6-7890-abcd-111111111111"},"payload":{"title":"View list","status":"todo","priority":1,"position":0}},
+    {"id":"d2e3f4a5-b6c7-8901-bcde-444444444444","action_type":"createCard","target_ref":{"workflow_activity_id":"a1b2c3d4-e5f6-7890-abcd-222222222222"},"payload":{"title":"Search by keyword","status":"todo","priority":1,"position":0}}
+  ]
+}
+\`\`\`
 
 ## Critical Constraints
 1. Only create entities for the specified workflow
-2. Reference existing workflow_id in all target_refs
-3. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+2. Reference workflow_id from "Workflow to Populate" in createActivity target_ref
+3. createCard workflow_activity_id must match a createActivity payload.id from the same response
+4. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
 }
 
 /**

@@ -119,7 +119,7 @@ export default function DossierPage() {
 
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
-  const [rightPanelTab, setRightPanelTab] = useState<'files' | 'terminal' | 'docs' | 'chat' | 'runs'>('files');
+  const [rightPanelTab, setRightPanelTab] = useState<'files' | 'terminal' | 'docs' | 'chat'>('files');
   const [selectedDoc, setSelectedDoc] = useState<ContextArtifact | null>(null);
   const [selectedFile, setSelectedFile] = useState<CodeFileForPanel | null>(null);
 
@@ -183,7 +183,7 @@ export default function DossierPage() {
     async (cardId: string) => {
       const result = await triggerBuild({ scope: 'card', card_id: cardId });
       if (result.runId) {
-        setRightPanelTab('runs');
+        setRightPanelTab('files');
         setRightPanelOpen(true);
         refetch();
       }

@@ -1,8 +1,10 @@
 # Dossier
 
-**The dashboard for orchestrating end-to-end builds with multiple agents.**
+**The human judgement and context control layer for production-grade AI coding.**
 
-Plan workflows from ideas. Set precise agent context per feature. Trigger multi-agent builds. Review, test, and ship iteratively.
+Closing the gap between vibe coding and production, Dossier help you build multiple features with multiple agents, in complex code - with full control and transparency.
+
+Start with an idea or plug in existing software. Map your users' real workflows. Dossier builds the right context in the right place, keeping agents focused in large code bases. Vector memory means agents learn and share learnings with every commit - agents become experts in your software over time.
 
 ## Quick Start
 

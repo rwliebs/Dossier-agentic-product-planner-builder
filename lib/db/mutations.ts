@@ -2,9 +2,11 @@
  * Deterministic action apply logic for planning mutations.
  * Validates and persists PlanningActions via DbAdapter.
  * Aligns with Dual LLM Strategy: PlanningAction as the only mutation contract.
+ * Entity IDs (workflow, activity, card, etc.) are stored as UUIDs; invalid values are replaced with a new UUID.
  */
 
 import type { DbAdapter } from "@/lib/db/adapter";
+import { validate as uuidValidate } from "uuid";
 import {
   getProject,
   getWorkflowsByProject,
@@ -18,6 +20,12 @@ import {
   getCardAssumptions,
   getCardQuestions,
 } from "./queries";
+
+/** Return a valid UUID: use value if it is a valid UUID, otherwise return a new UUID. Ensures DB always stores UUIDs for entity ids. */
+function ensureUuid(value: string | undefined): string {
+  if (typeof value === "string" && uuidValidate(value)) return value;
+  return crypto.randomUUID();
+}
 
 export interface ActionInput {
   id?: string;
@@ -214,7 +222,7 @@ async function applyCreateWorkflow(
     return { applied: false, rejectionReason: "Project not found" };
   }
 
-  const id = (action.payload.id as string) ?? crypto.randomUUID();
+  const id = ensureUuid(action.payload.id as string | undefined);
   const title = action.payload.title as string;
   const description = (action.payload.description as string) ?? null;
   const workflows = await getWorkflowsByProject(db, projectId);
@@ -253,7 +261,7 @@ async function applyCreateActivity(
     return { applied: false, rejectionReason: "Workflow not found" };
   }
 
-  const id = (action.payload.id as string) ?? crypto.randomUUID();
+  const id = ensureUuid(action.payload.id as string | undefined);
   const title = action.payload.title as string;
   const color = (action.payload.color as string) ?? null;
   const activities = await getActivitiesByWorkflow(db, workflowId);
@@ -301,7 +309,7 @@ async function applyCreateCard(
     return { applied: false, rejectionReason: "Workflow activity not found" };
   }
 
-  const id = (action.payload.id as string) ?? crypto.randomUUID();
+  const id = ensureUuid(action.payload.id as string | undefined);
   const title = action.payload.title as string;
   const description = (action.payload.description as string) ?? null;
   const status = (action.payload.status as string) ?? "todo";
@@ -516,7 +524,7 @@ async function applyUpsertCardPlannedFile(
     return { applied: false, rejectionReason: "Card not found or not in project" };
   }
 
-  const plannedFileId = (action.payload.planned_file_id as string) ?? crypto.randomUUID();
+  const plannedFileId = ensureUuid(action.payload.planned_file_id as string | undefined);
   const logicalFileName = action.payload.logical_file_name as string;
   const artifactKind = action.payload.artifact_kind as string;
   const fileAction = action.payload.action as string;
@@ -607,7 +615,7 @@ async function applyUpsertCardKnowledgeItem(
   const cardId = action.target_ref.card_id as string;
   const itemType = action.payload.item_type as string;
   const text = action.payload.text as string;
-  const itemId = (action.payload.knowledge_item_id as string) ?? crypto.randomUUID();
+  const itemId = ensureUuid(action.payload.knowledge_item_id as string | undefined);
   const evidenceSource = (action.payload.evidence_source as string) ?? null;
   const confidence = (action.payload.confidence as number) ?? null;
   const position = (action.payload.position as number) ?? 0;

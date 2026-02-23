@@ -4,7 +4,14 @@
  * Migrations are embedded as strings for standalone/Tauri compatibility.
  */
 
+import * as crypto from "node:crypto";
 import Database from "better-sqlite3";
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
 
 const MIGRATIONS: Array<{ name: string; sql: string }> = [
   {
@@ -453,6 +460,58 @@ CREATE INDEX IF NOT EXISTS idx_context_artifact_project_id ON context_artifact(p
   },
 ];
 
+/** One-time: replace non-UUID workflow, workflow_activity, and card ids with UUIDs so build API and DB stay in sync. */
+function runNormalizeEntityUuids(db: Database.Database): void {
+  const name = "009_normalize_entity_uuids";
+  const row = db.prepare("SELECT 1 FROM _migrations WHERE name = ?").get(name);
+  if (row) return;
+
+  db.pragma("foreign_keys = OFF");
+
+  try {
+    // 1. Workflows
+    const workflows = db.prepare("SELECT id FROM workflow").all() as Array<{ id: string }>;
+    for (const { id: oldId } of workflows) {
+      if (!isUuid(oldId)) {
+        const newId = crypto.randomUUID();
+        db.prepare("UPDATE workflow SET id = ? WHERE id = ?").run(newId, oldId);
+        db.prepare("UPDATE workflow_activity SET workflow_id = ? WHERE workflow_id = ?").run(newId, oldId);
+      }
+    }
+
+    // 2. Workflow activities
+    const activities = db.prepare("SELECT id FROM workflow_activity").all() as Array<{ id: string }>;
+    for (const { id: oldId } of activities) {
+      if (!isUuid(oldId)) {
+        const newId = crypto.randomUUID();
+        db.prepare("UPDATE workflow_activity SET id = ? WHERE id = ?").run(newId, oldId);
+        db.prepare("UPDATE card SET workflow_activity_id = ? WHERE workflow_activity_id = ?").run(newId, oldId);
+      }
+    }
+
+    // 3. Cards and all card_id references
+    const cards = db.prepare("SELECT id FROM card").all() as Array<{ id: string }>;
+    for (const { id: oldId } of cards) {
+      if (!isUuid(oldId)) {
+        const newId = crypto.randomUUID();
+        db.prepare("UPDATE card SET id = ? WHERE id = ?").run(newId, oldId);
+        db.prepare("UPDATE card_context_artifact SET card_id = ? WHERE card_id = ?").run(newId, oldId);
+        db.prepare("UPDATE card_requirement SET card_id = ? WHERE card_id = ?").run(newId, oldId);
+        db.prepare("UPDATE card_known_fact SET card_id = ? WHERE card_id = ?").run(newId, oldId);
+        db.prepare("UPDATE card_assumption SET card_id = ? WHERE card_id = ?").run(newId, oldId);
+        db.prepare("UPDATE card_question SET card_id = ? WHERE card_id = ?").run(newId, oldId);
+        db.prepare("UPDATE card_planned_file SET card_id = ? WHERE card_id = ?").run(newId, oldId);
+        db.prepare("UPDATE orchestration_run SET card_id = ? WHERE card_id = ?").run(newId, oldId);
+        db.prepare("UPDATE card_assignment SET card_id = ? WHERE card_id = ?").run(newId, oldId);
+      }
+    }
+
+    db.prepare("INSERT INTO _migrations (name) VALUES (?)").run(name);
+  } finally {
+    db.pragma("foreign_keys = ON");
+  }
+}
+
 export function runMigrations(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
@@ -470,4 +529,6 @@ export function runMigrations(db: Database.Database): void {
     db.exec(migration.sql);
     db.prepare("INSERT INTO _migrations (name) VALUES (?)").run(migration.name);
   }
+
+  runNormalizeEntityUuids(db);
 }

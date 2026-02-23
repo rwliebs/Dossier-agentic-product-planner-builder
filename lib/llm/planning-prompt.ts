@@ -243,7 +243,7 @@ ${skills}
 - **Avoid**: Feature creep, technical-only workflows, overly large cards.
 
 ## Your Task
-Given a workflow (title, description) and project context, generate createActivity and createCard actions for that workflow ONLY.
+Given a workflow (title, description) and project context, generate createActivity, createCard, and upsertCardKnowledgeItem (requirement) actions for that workflow ONLY.
 
 ## Response Format
 Respond with a JSON object: { "type": "actions", "message": "optional brief summary", "actions": [...] }
@@ -339,7 +339,7 @@ export function buildPopulateWorkflowUserMessage(
   mapSnapshot: PlanningState,
 ): string {
   const stateJson = serializeMapStateForPrompt(mapSnapshot);
-  return `## Current Map State\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow to Populate\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n- Description: ${workflowDescription ?? "—"}\n\n## Original User Request (for context)\n${userRequest}\n\n## Your Task\nGenerate createActivity and createCard actions for this workflow. Output ONLY the JSON object.`;
+  return `## Current Map State\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow to Populate\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n- Description: ${workflowDescription ?? "—"}\n\n## Original User Request (for context)\n${userRequest}\n\n## Your Task\nGenerate createActivity, createCard, and upsertCardKnowledgeItem (requirement) actions for this workflow. Output ONLY the JSON object.`;
 }
 
 /**

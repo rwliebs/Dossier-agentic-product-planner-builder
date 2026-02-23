@@ -43,6 +43,16 @@ function normalizeAction(obj: Record<string, unknown>): PlanningAction {
         : "";
   const payload = (obj.payload ?? {}) as Record<string, unknown>;
 
+  // Ensure create* entity IDs are UUIDs so DB and downstream actions (e.g. upsertCardKnowledgeItem) use the same id
+  if (
+    action_type === "createWorkflow" ||
+    action_type === "createActivity" ||
+    action_type === "createCard"
+  ) {
+    const rawPayloadId = typeof payload.id === "string" ? payload.id : undefined;
+    payload.id = rawPayloadId && uuidValidate(rawPayloadId) ? rawPayloadId : uuidv4();
+  }
+
   return {
     id,
     project_id,

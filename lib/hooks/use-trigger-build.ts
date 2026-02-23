@@ -49,12 +49,18 @@ export function useTriggerBuild(
         );
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
+          const details = data.details as Record<string, string[]> | undefined;
+          const parts = details
+            ? Object.entries(details).flatMap(([k, v]) =>
+                Array.isArray(v) ? v.map((m) => (k === "body" ? m : `${k}: ${m}`)) : []
+              )
+            : [];
           const msg =
-            data.validation ?? data.message ?? "Failed to trigger build";
-          setError(Array.isArray(msg) ? msg.join(", ") : String(msg));
-          return {
-            error: Array.isArray(msg) ? msg.join(", ") : String(msg),
-          };
+            parts.length > 0
+              ? parts.join("; ")
+              : data.message ?? "Failed to trigger build";
+          setError(msg);
+          return { error: msg };
         }
         return { runId: data.runId };
       } catch {

@@ -61,7 +61,8 @@ export async function ingestMemoryUnit(
 
   try {
     await rv.insert({ id: memoryUnitId, vector: vec });
-  } catch {
+  } catch (err) {
+    console.warn("[ingestion] RuVector insert failed:", err instanceof Error ? err.message : String(err));
     return null;
   }
 

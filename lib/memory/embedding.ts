@@ -6,6 +6,10 @@
  * @see REMAINING_WORK_PLAN.md §4 M4
  */
 
+import { createRequire } from "node:module";
+import * as fs from "node:fs";
+import * as path from "node:path";
+
 const DEFAULT_DIMENSIONS = 384;
 const DEFAULT_MODEL = "all-MiniLM-L6-v2";
 
@@ -53,17 +57,12 @@ let _loadPromise: Promise<Embedder | null> | null = null;
  * ruvector-onnx-embeddings-wasm declares "type":"module" but the generated
  * WASM JS glue uses CJS globals (__dirname, require, module.exports).
  * We copy the file to .cjs and load via createRequire so Node treats it as CJS.
+ * Uses createRequire(import.meta.url) so this works in ESM (Vitest) and Node.
  */
 function loadWasmModuleCjs(): Record<string, unknown> | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { createRequire } = require("module");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const path = require("path");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const fs = require("fs");
-
-    const pkgDir = path.dirname(require.resolve("ruvector-onnx-embeddings-wasm"));
+    const req = createRequire(import.meta.url);
+    const pkgDir = path.dirname(req.resolve("ruvector-onnx-embeddings-wasm"));
     const src = path.join(pkgDir, "ruvector_onnx_embeddings_wasm.js");
     const cjsCopy = path.join(pkgDir, "ruvector_onnx_embeddings_wasm.cjs");
     if (!fs.existsSync(cjsCopy)) {

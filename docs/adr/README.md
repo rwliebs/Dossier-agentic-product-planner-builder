@@ -22,3 +22,4 @@ This directory stores Architecture Decision Records (ADRs) for Dossier.
 - [0006 - Build Orchestration via Claude-Flow](./0006-claude-flow-execution-plane.md) (Superseded by 0008)
 - [0007 - Production Release Gate Requires Auth and RLS](./0007-release-gate-auth-rls-required.md)
 - [0008 - Build Orchestration via Agentic-Flow](./0008-agentic-flow-execution-plane.md)
+- [0009 - Planning Non-Streaming](./0009-planning-non-streaming.md)

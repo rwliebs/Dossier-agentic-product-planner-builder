@@ -412,41 +412,21 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
         setPopulateProgress({ current: i + 1, total });
 
         try {
-          const res = await fetch(`/api/projects/${projectId}/chat/stream`, {
+          const res = await fetch(`/api/projects/${projectId}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: populateOriginalMessage || 'Populate this workflow with activities and cards', mode: 'populate', workflow_id: wfId }),
+            body: JSON.stringify({
+              message: populateOriginalMessage || 'Populate this workflow with activities and cards',
+              mode: 'populate',
+              workflow_id: wfId,
+            }),
           });
-
+          const data = (await res.json()) as { status?: string; message?: string; applied?: number };
           if (!res.ok) {
-            addMessage('agent', `Failed to populate workflow ${i + 1}/${total}.`);
+            addMessage('agent', data.message ?? `Failed to populate workflow ${i + 1}/${total}.`);
             continue;
           }
-
-          const reader = res.body?.getReader();
-          const decoder = new TextDecoder();
-          if (!reader) continue;
-
-          let buffer = '';
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const blocks = buffer.split(/\n\n+/);
-            buffer = blocks.pop() ?? '';
-
-            for (const block of blocks) {
-              let eventType = '';
-              let dataStr = '';
-              for (const line of block.split('\n')) {
-                if (line.startsWith('event: ')) eventType = line.slice(7).trim();
-                if (line.startsWith('data: ')) dataStr = line.slice(6);
-              }
-              if (eventType === 'action') {
-                throttledPlanningApplied();
-              }
-            }
-          }
+          throttledPlanningApplied();
         } catch {
           addMessage('agent', `Error populating workflow ${i + 1}/${total}.`);
         }

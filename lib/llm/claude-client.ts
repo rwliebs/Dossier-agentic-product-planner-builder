@@ -97,29 +97,38 @@ export async function claudePlanningRequest(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const createParams = {
+      model,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages,
+      stream: false as const,
+      // Prompt caching: cache system + prefix for 5m; repeat requests reuse cache (lower cost/latency).
+      cache_control: { type: "ephemeral" },
+    };
     const message = await client.messages.create(
-      {
-        model,
-        max_tokens: maxTokens,
-        system: systemPrompt,
-        messages,
-      },
+      createParams as Parameters<typeof client.messages.create>[0],
       { signal: controller.signal },
     );
 
     clearTimeout(timeoutId);
 
-    const text = extractTextFromContent(message.content);
-    const usage = message.usage;
+    const text = extractTextFromContent((message as { content: Array<{ type: string; text?: string }> }).content);
+    const msg = message as {
+      usage?: { input_tokens?: number; output_tokens?: number };
+      stop_reason?: string | null;
+      model: string;
+    };
+    const usage = msg.usage;
 
     return {
       text,
-      stopReason: message.stop_reason ?? null,
+      stopReason: msg.stop_reason ?? null,
       usage: {
         inputTokens: usage?.input_tokens ?? 0,
         outputTokens: usage?.output_tokens ?? 0,
       },
-      model: message.model,
+      model: msg.model,
     };
   } catch (error) {
     clearTimeout(timeoutId);
@@ -185,7 +194,9 @@ export async function claudeStreamingRequest(
       max_tokens: maxTokens,
       system: input.systemPrompt,
       messages: [{ role: "user", content: input.userMessage }],
-    },
+      // Prompt caching: cache system + prefix for 5m; repeat requests reuse cache.
+      cache_control: { type: "ephemeral" },
+    } as Parameters<typeof client.messages.stream>[0],
     { signal: controller.signal },
   );
 

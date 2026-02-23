@@ -10,7 +10,11 @@ import {
   buildPlanningUserMessage,
   buildScaffoldSystemPrompt,
   buildScaffoldUserMessage,
+  buildPopulateWorkflowPrompt,
+  buildPopulateWorkflowUserMessage,
 } from "@/lib/llm/planning-prompt";
+import { runLlmSubStep } from "@/lib/llm/run-llm-substep";
+import { runFinalizeMultiStep } from "@/lib/llm/run-finalize-multistep";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
 import { json } from "@/lib/api/response-helpers";
 import { PLANNING_LLM } from "@/lib/feature-flags";
@@ -22,6 +26,8 @@ export interface ChatResponse {
   message?: string;
   applied: number;
   workflow_ids_created: string[];
+  workflow_id?: string;
+  artifacts_created?: number;
   errors?: Array<{ action_type: string; reason: string }>;
 }
 
@@ -68,7 +74,7 @@ export async function POST(
     return json({ status: "error", message: "Invalid request body", details }, 400);
   }
 
-  const { message, mock_response } = parsed.data;
+  const { message, mock_response, mode, workflow_id } = parsed.data;
 
   let db;
   try {
@@ -80,6 +86,72 @@ export async function POST(
   const state = await fetchMapSnapshot(db, projectId);
   if (!state) {
     return json({ status: "error", message: "Project not found" }, 404);
+  }
+
+  const noopEmit = () => {};
+
+  if (mode === "finalize") {
+    try {
+      const artifactsCreated = await runFinalizeMultiStep({
+        db,
+        projectId,
+        state,
+        emit: noopEmit,
+        mockResponse: mock_response,
+      });
+      return json({
+        status: "success",
+        responseType: "actions" as const,
+        message: `Created ${artifactsCreated} context artifact(s).`,
+        applied: artifactsCreated,
+        workflow_ids_created: [],
+        artifacts_created: artifactsCreated,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Finalize failed";
+      console.error("[chat] Finalize error:", msg);
+      return json({ status: "error", message: msg }, 502);
+    }
+  }
+
+  if (mode === "populate" && workflow_id) {
+    const workflow = Array.from(state.workflows.values()).find((w) => w.id === workflow_id);
+    if (!workflow) {
+      return json({ status: "error", message: "Workflow not found" }, 404);
+    }
+    try {
+      const result = await runLlmSubStep({
+        db,
+        projectId,
+        systemPrompt: buildPopulateWorkflowPrompt(),
+        userMessage: buildPopulateWorkflowUserMessage(
+          workflow_id,
+          workflow.title,
+          workflow.description,
+          message,
+          state,
+        ),
+        state,
+        emit: noopEmit,
+        actionFilter: (a: PlanningAction) =>
+          a.action_type === "createActivity" ||
+          a.action_type === "createCard" ||
+          a.action_type === "upsertCardKnowledgeItem",
+        mockResponse: mock_response,
+      });
+      return json({
+        status: "success",
+        responseType: "actions" as const,
+        message: result.actionCount > 0 ? `Added ${result.actionCount} activity/card action(s).` : "No actions generated.",
+        applied: result.actionCount,
+        workflow_ids_created: [],
+        workflow_id,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Populate failed";
+      console.error("[chat] Populate error:", msg);
+      return json({ status: "error", message: msg }, 502);
+    }
   }
 
   const hasStructure = state.workflows.size >= 1;

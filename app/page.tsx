@@ -214,54 +214,25 @@ export default function DossierPage() {
         if (workflowDescription) parts.push(`Workflow: ${workflowDescription}`);
         if (snapshot?.project?.description) parts.push(`Project: ${snapshot.project.description}`);
         const message = parts.join('. ');
-        const res = await fetch(`/api/projects/${projectId}/chat/stream`, {
+        const res = await fetch(`/api/projects/${projectId}/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message, mode: 'populate', workflow_id: workflowId }),
         });
+        const data = (await res.json()) as {
+          status?: string;
+          message?: string;
+          applied?: number;
+          error?: string;
+        };
         if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          const msg = (err as { error?: string; message?: string }).error ?? (err as { message?: string }).message ?? `Populate failed (${res.status})`;
+          const msg = data.message ?? data.error ?? `Populate failed (${res.status})`;
           const { toast } = await import('sonner');
           toast.error(msg);
           setPopulatingWorkflowId(null);
           return;
         }
-        const reader = res.body?.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let streamError: string | null = null;
-        let actionCount = 0;
-        if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const blocks = buffer.split(/\n\n+/);
-            buffer = blocks.pop() ?? '';
-            for (const block of blocks) {
-              let eventType = '';
-              let dataStr = '';
-              for (const line of block.split('\n')) {
-                if (line.startsWith('event: ')) eventType = line.slice(7).trim();
-                if (line.startsWith('data: ')) dataStr = line.slice(6);
-              }
-              if (eventType === 'error' && dataStr) {
-                try {
-                  const data = JSON.parse(dataStr) as { reason?: string };
-                  streamError = data.reason ?? 'Populate failed';
-                } catch {
-                  streamError = 'Populate failed';
-                }
-              }
-              if (eventType === 'action') actionCount++;
-            }
-          }
-        }
-        if (streamError) {
-          const { toast } = await import('sonner');
-          toast.error(streamError);
-        } else if (actionCount === 0) {
+        if ((data.applied ?? 0) === 0) {
           const { toast } = await import('sonner');
           toast.warning('No activities or cards were generated. Try again or add more context in the Agent chat.');
         }
@@ -287,69 +258,32 @@ export default function DossierPage() {
     async () => {
       if (!projectId) return;
       setFinalizingProject(true);
-      setFinalizeProgress('Starting finalization…');
+      setFinalizeProgress('Finalizing…');
       try {
-        const res = await fetch(`/api/projects/${projectId}/chat/stream`, {
+        const res = await fetch(`/api/projects/${projectId}/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: 'Finalize project', mode: 'finalize' }),
         });
+        const data = (await res.json()) as {
+          status?: string;
+          message?: string;
+          artifacts_created?: number;
+          error?: string;
+        };
         if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          const msg = (err as { message?: string }).message ?? (err as { error?: string }).error ?? `Finalize failed (${res.status})`;
+          const msg = data.message ?? data.error ?? `Finalize failed (${res.status})`;
           const { toast } = await import('sonner');
           toast.error(msg);
           return;
         }
-        const reader = res.body?.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let actionCount = 0;
-        let streamError = '';
-        if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const blocks = buffer.split(/\n\n+/);
-            buffer = blocks.pop() ?? '';
-            for (const block of blocks) {
-              let eventType = '';
-              let dataStr = '';
-              for (const line of block.split('\n')) {
-                if (line.startsWith('event: ')) eventType = line.slice(7).trim();
-                if (line.startsWith('data: ')) dataStr = line.slice(6);
-              }
-              if (eventType === 'finalize_progress' && dataStr) {
-                try {
-                  const d = JSON.parse(dataStr) as { label?: string; step_index?: number; total_steps?: number };
-                  const stepLabel = d.total_steps
-                    ? `(${(d.step_index ?? 0) + 1}/${d.total_steps}) ${d.label ?? ''}`
-                    : d.label ?? '';
-                  setFinalizeProgress(stepLabel);
-                } catch { /* ignore */ }
-              }
-              if (eventType === 'error' && dataStr) {
-                try {
-                  const d = JSON.parse(dataStr);
-                  streamError = (d as { reason?: string }).reason ?? 'Finalize failed';
-                } catch {
-                  streamError = 'Finalize failed';
-                }
-              }
-              if (eventType === 'action') actionCount++;
-            }
-          }
-        }
-        if (streamError) {
-          const { toast } = await import('sonner');
-          toast.error(streamError);
-        } else if (actionCount === 0) {
+        const count = data.artifacts_created ?? 0;
+        if (count === 0) {
           const { toast } = await import('sonner');
           toast.warning('No context documents were generated.');
         } else {
           const { toast } = await import('sonner');
-          toast.success(`Finalized: ${actionCount} context documents created`);
+          toast.success(`Finalized: ${count} context documents created`);
         }
         refetch();
       } catch (err) {
@@ -392,6 +326,7 @@ export default function DossierPage() {
         let buffer = '';
         let streamError = '';
         let testGenerated = false;
+        let contextDocsGenerated = 0;
         if (reader) {
           while (true) {
             const { done, value } = await reader.read();
@@ -417,8 +352,9 @@ export default function DossierPage() {
               }
               if (eventType === 'phase_complete' && dataStr) {
                 try {
-                  const d = JSON.parse(dataStr) as { test_generated?: boolean };
+                  const d = JSON.parse(dataStr) as { test_generated?: boolean; context_docs_generated?: number };
                   testGenerated = d.test_generated ?? false;
+                  contextDocsGenerated = d.context_docs_generated ?? 0;
                 } catch { /* ignore */ }
               }
               if (eventType === 'error' && dataStr) {
@@ -439,9 +375,12 @@ export default function DossierPage() {
           const { toast } = await import('sonner');
           const parts = ['Card finalized'];
           if (testGenerated) parts.push('e2e test generated');
+          if (contextDocsGenerated > 0) parts.push(`${contextDocsGenerated} context doc(s) generated`);
           toast.success(parts.join(' — '));
         }
         refetch();
+        refetchCardContextArtifacts();
+        refetchCardPlannedFiles();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Finalize failed';
         const { toast } = await import('sonner');
@@ -451,7 +390,7 @@ export default function DossierPage() {
         setCardFinalizeProgress('');
       }
     },
-    [projectId, refetch]
+    [projectId, refetch, refetchCardContextArtifacts, refetchCardPlannedFiles]
   );
 
   const handleUpdateCardDescription = useCallback(

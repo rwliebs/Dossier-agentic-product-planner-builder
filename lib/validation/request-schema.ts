@@ -132,16 +132,27 @@ export const approvePlannedFileSchema = z.object({
   status: z.literal("approved"),
 });
 
-// Chat request
-export const chatRequestSchema = z.object({
-  message: z.string().min(1, "Message is required").transform((s) => s.trim()),
-  conversationHistory: z.array(z.object({
-    role: z.enum(["user", "agent"]),
-    content: z.string(),
-  })).optional().default([]),
-  /** Test-only: mock LLM response. Only used when PLANNING_MOCK_ALLOWED=1 */
-  mock_response: z.string().optional(),
-});
+// Chat request (non-streaming; supports scaffold, populate, finalize per ADR 0009)
+export const chatRequestSchema = z
+  .object({
+    message: z.string().min(1, "Message is required").transform((s) => s.trim()),
+    conversationHistory: z
+      .array(
+        z.object({
+          role: z.enum(["user", "agent"]),
+          content: z.string(),
+        })
+      )
+      .optional()
+      .default([]),
+    mode: z.enum(["scaffold", "populate", "finalize"]).optional(),
+    workflow_id: z.string().uuid().optional(),
+    /** Test-only: mock LLM response. Only used when PLANNING_MOCK_ALLOWED=1 */
+    mock_response: z.string().optional(),
+  })
+  .refine((d) => d.mode !== "populate" || d.workflow_id != null, {
+    message: "workflow_id is required when mode is populate",
+  });
 
 // Chat stream request (scaffold or populate mode)
 export const chatStreamRequestSchema = z.object({

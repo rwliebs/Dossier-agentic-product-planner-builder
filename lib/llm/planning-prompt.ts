@@ -1,5 +1,6 @@
 import type { PlanningState } from "@/lib/schemas/planning-state";
 import type { ContextArtifact } from "@/lib/schemas/slice-b";
+import { getPlanningSkills } from "@/lib/llm/skills";
 
 /**
  * Serialize PlanningState to JSON for LLM context.
@@ -29,7 +30,10 @@ export function serializeMapStateForPrompt(state: PlanningState): string {
  * Includes role, constraints, conversation strategy, and few-shot examples.
  */
 export function buildPlanningSystemPrompt(): string {
+  const skills = getPlanningSkills();
   return `You are a planning assistant that helps users structure product ideas into user story maps. You work with workflows, activities (columns), and cards.
+
+${skills}
 
 ## Story Map Concepts
 - **Workflow**: A high-level outcome the user is trying to achieve.
@@ -147,7 +151,10 @@ Return ONLY a valid JSON object with the shape described above. No markdown, no 
  * No activities, steps, or cards — those are populated in a separate phase.
  */
 export function buildScaffoldSystemPrompt(): string {
+  const skills = getPlanningSkills();
   return `You are a planning assistant that creates high-level workflow structure for product ideas.
+
+${skills}
 
 ## Story Map Concepts
 - **Workflow**: A high-level outcome the user is trying to achieve.
@@ -223,7 +230,10 @@ Allowed action types: updateProject, createWorkflow only.
  * Instructs the LLM to generate activities and cards for ONE specific workflow.
  */
 export function buildPopulateWorkflowPrompt(): string {
+  const skills = getPlanningSkills();
   return `You are a planning assistant that populates a workflow with activities (columns) and cards.
+
+${skills}
 
 ## Story Map Concepts
 - **Workflow**: A high-level outcome the user is trying to achieve.
@@ -247,9 +257,15 @@ Respond with a JSON object: { "type": "actions", "message": "optional brief summ
 ## createCard
 - target_ref: { "workflow_activity_id": "<exact id from the createActivity payload this card belongs to>" }
 - payload: { "title": "Card Title", "description": "What to build", "status": "todo", "priority": 2, "position": 0 }
-- **REQUIRED: include "id" as a UUID for each card** (e.g. "c1d2e3f4-a5b6-7890-abcd-333333333333")
+- **REQUIRED: include "id" as a UUID for each card** (e.g. "c1d2e3f4-a5b6-7890-abcd-333333333333") — use payload.id or the action's top-level "id" so requirements can reference this card.
 - **REQUIRED: workflow_activity_id must be the id of an activity you created in a preceding createActivity action.**
 - Cards are implementable functionality tasks under each activity
+
+## upsertCardKnowledgeItem (requirements)
+- **REQUIRED for each card:** After all createCard actions, emit 1–3 upsertCardKnowledgeItem actions per card to add concrete requirements.
+- target_ref: { "card_id": "<the card's id — same as the createCard action id or its payload.id>" }
+- payload: { "item_type": "requirement", "text": "Concrete requirement statement (e.g. User can filter by category)", "position": 0 }
+- Use position 0, 1, 2, ... per card. Each requirement should be testable and derived from the card title/description.
 
 ## Guidelines
 - 3-6 activities per workflow
@@ -257,18 +273,21 @@ Respond with a JSON object: { "type": "actions", "message": "optional brief summ
 - Use status "todo", priority 1-3 (1=high)
 - Generate new UUIDs for activities (include in createActivity payload.id)
 - Use workflow_id from "Workflow to Populate" section
-- **Critical: list actions in dependency order.** Output all createActivity first (each with payload.id), then all createCard. Each createCard target_ref.workflow_activity_id must exactly match a createActivity payload.id from earlier in the same response.
+- **Critical: list actions in dependency order.** Output: (1) all createActivity (each with payload.id), (2) all createCard (each with id in payload or action id), (3) all upsertCardKnowledgeItem with item_type "requirement" — use each card's id as target_ref.card_id.
 
 ## Example (workflow_id from "Workflow to Populate"; use real UUIDs)
 \`\`\`json
 {
   "type": "actions",
-  "message": "Created activities and cards.",
+  "message": "Created activities and cards with requirements.",
   "actions": [
     {"id":"a1b2c3d4-e5f6-7890-abcd-111111111111","action_type":"createActivity","target_ref":{"workflow_id":"<workflow_id>"},"payload":{"id":"a1b2c3d4-e5f6-7890-abcd-111111111111","title":"Browse","color":"blue","position":0}},
     {"id":"a1b2c3d4-e5f6-7890-abcd-222222222222","action_type":"createActivity","target_ref":{"workflow_id":"<workflow_id>"},"payload":{"id":"a1b2c3d4-e5f6-7890-abcd-222222222222","title":"Search","color":"green","position":1}},
-    {"id":"c1d2e3f4-a5b6-7890-abcd-333333333333","action_type":"createCard","target_ref":{"workflow_activity_id":"a1b2c3d4-e5f6-7890-abcd-111111111111"},"payload":{"title":"View list","status":"todo","priority":1,"position":0}},
-    {"id":"d2e3f4a5-b6c7-8901-bcde-444444444444","action_type":"createCard","target_ref":{"workflow_activity_id":"a1b2c3d4-e5f6-7890-abcd-222222222222"},"payload":{"title":"Search by keyword","status":"todo","priority":1,"position":0}}
+    {"id":"c1d2e3f4-a5b6-7890-abcd-333333333333","action_type":"createCard","target_ref":{"workflow_activity_id":"a1b2c3d4-e5f6-7890-abcd-111111111111"},"payload":{"id":"c1d2e3f4-a5b6-7890-abcd-333333333333","title":"View list","description":"Display paginated list of items","status":"todo","priority":1,"position":0}},
+    {"id":"d2e3f4a5-b6c7-8901-bcde-444444444444","action_type":"createCard","target_ref":{"workflow_activity_id":"a1b2c3d4-e5f6-7890-abcd-222222222222"},"payload":{"id":"d2e3f4a5-b6c7-8901-bcde-444444444444","title":"Search by keyword","description":"Full-text search","status":"todo","priority":1,"position":0}},
+    {"id":"r1-111","action_type":"upsertCardKnowledgeItem","target_ref":{"card_id":"c1d2e3f4-a5b6-7890-abcd-333333333333"},"payload":{"item_type":"requirement","text":"User sees a paginated list of items","position":0}},
+    {"id":"r2-111","action_type":"upsertCardKnowledgeItem","target_ref":{"card_id":"c1d2e3f4-a5b6-7890-abcd-333333333333"},"payload":{"item_type":"requirement","text":"User can change page size or go to next/previous page","position":1}},
+    {"id":"r1-222","action_type":"upsertCardKnowledgeItem","target_ref":{"card_id":"d2e3f4a5-b6c7-8901-bcde-444444444444"},"payload":{"item_type":"requirement","text":"User can enter a search query and see matching results","position":0}}
   ]
 }
 \`\`\`
@@ -277,7 +296,8 @@ Respond with a JSON object: { "type": "actions", "message": "optional brief summ
 1. Only create entities for the specified workflow
 2. Reference workflow_id from "Workflow to Populate" in createActivity target_ref
 3. createCard workflow_activity_id must match a createActivity payload.id from the same response
-4. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+4. For each createCard, emit at least one upsertCardKnowledgeItem with item_type "requirement" and target_ref.card_id equal to that card's id
+5. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
 }
 
 /**
@@ -491,55 +511,47 @@ The actions array must contain exactly ONE createContextArtifact action.
 }
 
 /**
- * Build the system prompt for per-card e2e test generation (finalize sub-step).
- * Generates a createContextArtifact with type "test" for a single card.
+ * Build the system prompt for per-card finalization (finalize sub-step).
+ * Generates (1) one e2e test artifact and (2) optionally card-specific context docs (e.g. external API summary).
  */
 export function buildFinalizeTestsSystemPrompt(): string {
-  return `You are a test generation assistant that produces e2e acceptance tests for a single software feature card.
+  return `You are a finalization assistant that prepares a software feature card for build. You produce:
+1. **Required**: ONE createContextArtifact with type "test" — a Playwright e2e test file for this card.
+2. **When appropriate**: One or more createContextArtifact with type "doc" — card-specific context documents that the build agent will need (e.g. external API summary, integration notes). Create these when the card involves an external API, third-party service, or integration so the build agent has the right context.
 
-## Your Task
-Given a card with its requirements, planned files, and project context, generate ONE createContextArtifact action containing a Playwright e2e test file for this card.
+## When to add card-specific context documents
+- The card's requirements or description mention an **external API** (e.g. Stripe, Twilio, SendGrid) → add a short doc summarizing that API: auth, main endpoints or operations, and anything relevant to this card.
+- The card involves a **third-party service or SDK** → add a doc with key concepts, config, or usage notes.
+- The card involves **integration** with another system (webhook, OAuth, etc.) → add a doc describing the integration contract or flow.
+- Do **not** add extra docs when the card is purely internal (UI, CRUD, in-app logic with no external dependencies).
 
-## Test Guidelines
+## E2E test (required)
 - **Outcome-based**: each test validates that a requirement is realized as user-visible behavior
 - **One test case per requirement**: clear 1:1 mapping from requirement text to test
 - **Framework**: Playwright with vitest (import { test, expect } from '@playwright/test')
 - **Self-contained**: each test file can run independently
-- **Descriptive names**: test names read as acceptance criteria ("user can reset password via email link")
-- **Selectors**: use data-testid attributes and semantic roles, not CSS classes
-- **No implementation assumptions**: test observable outcomes (page content, navigation, API responses), not internal state
+- **Name format**: "__tests__/e2e/<card-slug>.test.ts"
+- **Payload**: type "test", and include "card_id": "<card_id>" so it is linked to the card
 
-## Test Template
-\`\`\`
-import { test, expect } from '@playwright/test';
+## Card-specific context doc (optional, when applicable)
+- **type**: "doc"
+- **name**: e.g. "docs/card-<card-slug>-<api-name>.md" or "context/<card-slug>-integration.md"
+- **title**: e.g. "<External API Name> — summary for this card"
+- **content**: Markdown summarizing the API/service: auth, main endpoints or operations, env/config, and what this card needs. Keep it focused and build-agent useful.
+- **card_id**: include in payload so the doc is linked to this card
 
-test.describe('<Card Title>', () => {
-  test('<requirement as test name>', async ({ page }) => {
-    // Arrange: navigate and set up
-    // Act: perform the user action
-    // Assert: verify the expected outcome
-  });
-  // ... one test per requirement
-});
-\`\`\`
-
-## createContextArtifact Action Schema
+## createContextArtifact action schema (for each action)
 - action_type: "createContextArtifact"
 - target_ref: { "project_id": "<project_id>" }
-- payload: { "name": "<test file path>", "type": "test", "title": "<Card Title> E2E Tests", "content": "<full test code>", "card_id": "<card_id>" }
+- payload: { "name": "<path>", "type": "test" | "doc", "title": "<title>", "content": "<content>", "card_id": "<card_id>" }
 
-## Response Format
+## Response format
 Respond with a JSON object: { "type": "actions", "message": "optional brief summary", "actions": [...] }
-
-The actions array should contain exactly ONE createContextArtifact action for this card.
-
-## Critical Constraints
-1. Each test file must be syntactically valid TypeScript/Playwright
-2. Test content must be specific to THIS card's requirements — not generic boilerplate
-3. Use the card_id from the provided card data
-4. Generate a new UUID for the createContextArtifact action id
-5. Name format: "__tests__/e2e/<card-slug>.test.ts"
-6. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+- The actions array must contain exactly **one** createContextArtifact with type "test" for the e2e test.
+- It may contain **zero or more** createContextArtifact with type "doc" for card-specific context (add when the card involves external API/integration).
+- Every action must include "card_id": "<card_id>" in the payload so artifacts appear on the card in the UI.
+- Generate a new UUID for each action id.
+- Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
 }
 
 /**
@@ -584,7 +596,7 @@ export function buildFinalizeTestsUserMessage(
   const cardJson = JSON.stringify(card, null, 2);
   const projectJson = JSON.stringify(projectSummary, null, 2);
 
-  return `## Project Context\n\`\`\`json\n${projectJson}\n\`\`\`\n\n## Card to Test\n\`\`\`json\n${cardJson}\n\`\`\`\n\n## Your Task\nGenerate one createContextArtifact action containing a Playwright e2e test file for this card.\nWrite one test case per requirement. Use project_id "${projectSummary.id}" in all target_ref fields.\n\nOutput ONLY the JSON object.`;
+  return `## Project Context\n\`\`\`json\n${projectJson}\n\`\`\`\n\n## Card to Finalize\n\`\`\`json\n${cardJson}\n\`\`\`\n\n## Your Task\n1. **Required**: Generate one createContextArtifact (type "test") containing a Playwright e2e test file for this card. Write one test case per requirement.\n2. **If applicable**: If this card involves an external API, third-party service, or integration, generate one or more createContextArtifact (type "doc") with a short, focused summary (auth, endpoints, config) so the build agent can implement the feature. Link every artifact to this card with "card_id": "${card.id}".\n\nUse project_id "${projectSummary.id}" in target_ref for all actions. Include "card_id": "${card.id}" in every payload so artifacts appear on the card in the UI.\n\nOutput ONLY the JSON object.`;
 }
 
 export interface ConversationMessage {

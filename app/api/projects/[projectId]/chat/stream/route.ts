@@ -129,7 +129,7 @@ export async function POST(
           userMessage = buildPopulateWorkflowUserMessage(
             workflow_id,
             workflow.title,
-            workflow.description,
+            workflow.description ?? null,
             message,
             state,
           );

@@ -9,6 +9,7 @@ import {
   getCardAssignment,
   getOrchestrationRun,
   getAgentExecutionsByAssignment,
+  getCardAssignmentsByRun,
 } from "@/lib/db/queries/orchestration";
 import { logEvent } from "./event-logger";
 import { executeRequiredChecks } from "./execute-checks";
@@ -258,6 +259,26 @@ export async function processWebhook(
           projectId,
           workflowId: (run as { workflow_id?: string }).workflow_id ?? null,
           learnings: payload.learnings ?? [],
+        });
+      }
+
+      // Close run when all assignments are terminal so trigger-build lock is released
+      const assignments = await getCardAssignmentsByRun(db, runId);
+      const terminalStatuses = ["completed", "failed", "blocked"];
+      const allTerminal =
+        assignments.length > 0 &&
+        assignments.every((a) =>
+          terminalStatuses.includes((a as { status?: string }).status ?? "")
+        );
+      if (allTerminal) {
+        const runStatus = assignments.every(
+          (a) => (a as { status?: string }).status === "completed"
+        )
+          ? "completed"
+          : "failed";
+        await db.updateOrchestrationRun(runId, {
+          status: runStatus,
+          ended_at: new Date().toISOString(),
         });
       }
       break;

@@ -18,6 +18,11 @@ import {
   consumeSSE,
 } from "./helpers";
 
+type StreamAction = {
+  action_type?: string;
+  payload?: Record<string, unknown>;
+};
+
 describe("trading card marketplace planning", () => {
   it("scaffold + populate produces workflows, cards, and updated project description", async () => {
     if (!canRunLLMTests()) {
@@ -64,7 +69,7 @@ describe("trading card marketplace planning", () => {
     const scaffoldActions = scaffoldEvents
       .filter((e) => e.event === "action")
       .map((e) => (e.data as { action?: unknown }).action)
-      .filter(Boolean);
+      .filter(Boolean) as StreamAction[];
 
     if (scaffoldActions.length === 0) {
       const phaseComplete = scaffoldEvents.find(
@@ -87,25 +92,25 @@ describe("trading card marketplace planning", () => {
     }
 
     const updateProjectActions = scaffoldActions.filter(
-      (a: { action_type?: string }) => a?.action_type === "updateProject"
+      (a) => a.action_type === "updateProject"
     );
     const createWorkflowActions = scaffoldActions.filter(
-      (a: { action_type?: string }) => a?.action_type === "createWorkflow"
+      (a) => a.action_type === "createWorkflow"
     );
 
-    const actionTypes = scaffoldActions.map(
-      (a: { action_type?: string }) => a?.action_type
-    );
+    const actionTypes = scaffoldActions.map((a) => a.action_type);
     expect(
       createWorkflowActions.length,
       `should create multiple workflows. Got action types: ${JSON.stringify(actionTypes)}`
     ).toBeGreaterThanOrEqual(2);
 
     if (updateProjectActions.length >= 1) {
-      const updatePayload = updateProjectActions[0]?.payload as {
+      const updatePayload = updateProjectActions[0]?.payload as
+        | {
         name?: string;
         description?: string;
-      };
+      }
+        | undefined;
       expect(updatePayload?.description).toBeTruthy();
       expect(
         String(updatePayload?.description ?? "").toLowerCase()

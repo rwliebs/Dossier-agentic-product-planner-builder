@@ -33,6 +33,7 @@ vi.mock("@/lib/orchestration/agentic-flow-client", async (importOriginal) => {
 vi.mock("@/lib/db/queries/orchestration", () => ({
   getCardAssignment: vi.fn(),
   getOrchestrationRun: vi.fn(),
+  getCardAssignmentsByRun: vi.fn().mockResolvedValue([]),
   updateCardAssignmentStatus: vi.fn(),
   getAgentExecutionsByAssignment: vi.fn(),
   getRunChecksByRun: vi.fn().mockResolvedValue([]),
@@ -112,6 +113,32 @@ describe("Webhook processing", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("execution_completed closes run when all assignments terminal (releases build lock)", async () => {
+    const mockUpdateOrchestrationRun = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(orchestrationQueries.getCardAssignmentsByRun).mockResolvedValue([
+      { id: assignmentId, run_id: runId, status: "completed" },
+    ] as never);
+    const mockDb = createMockDbAdapter({
+      updateOrchestrationRun: mockUpdateOrchestrationRun,
+    });
+
+    const result = await processWebhook(mockDb, {
+      event_type: "execution_completed",
+      assignment_id: assignmentId,
+      run_id: runId,
+      summary: "Done",
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockUpdateOrchestrationRun).toHaveBeenCalledWith(
+      runId,
+      expect.objectContaining({
+        status: "completed",
+        ended_at: expect.any(String),
+      })
+    );
   });
 
   it("execution_failed updates run status", async () => {

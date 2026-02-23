@@ -19,7 +19,8 @@ export type EventType =
   | "execution_started"
   | "commit_created"
   | "execution_completed"
-  | "execution_failed";
+  | "execution_failed"
+  | "execution_blocked";
 
 export interface LogEventInput {
   project_id: string;

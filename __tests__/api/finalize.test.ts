@@ -8,6 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
 
 const projectId = "11111111-1111-1111-1111-111111111111";
@@ -112,7 +113,7 @@ describe("Card finalize API", () => {
     const { GET } = await import(
       "@/app/api/projects/[projectId]/cards/[cardId]/finalize/route"
     );
-    const req = new Request(
+    const req = new NextRequest(
       `http://localhost/api/projects/${projectId}/cards/${cardId}/finalize`
     );
     const res = await GET(req, {
@@ -136,7 +137,7 @@ describe("Card finalize API", () => {
     const { POST } = await import(
       "@/app/api/projects/[projectId]/cards/[cardId]/finalize/route"
     );
-    const req = new Request(
+    const req = new NextRequest(
       `http://localhost/api/projects/${projectId}/cards/${cardId}/finalize`,
       { method: "POST" }
     );
@@ -172,7 +173,7 @@ describe("Card finalize API", () => {
     const { POST } = await import(
       "@/app/api/projects/[projectId]/cards/[cardId]/finalize/route"
     );
-    const req = new Request(
+    const req = new NextRequest(
       `http://localhost/api/projects/${projectId}/cards/${cardId}/finalize`,
       { method: "POST" }
     );
@@ -192,7 +193,7 @@ describe("Card finalize API", () => {
     const { POST } = await import(
       "@/app/api/projects/[projectId]/cards/[cardId]/finalize/route"
     );
-    const req = new Request(
+    const req = new NextRequest(
       `http://localhost/api/projects/${projectId}/cards/${cardId}/finalize`,
       { method: "POST" }
     );
@@ -227,7 +228,7 @@ describe("Card finalize API", () => {
     const { POST } = await import(
       "@/app/api/projects/[projectId]/cards/[cardId]/finalize/route"
     );
-    const req = new Request(
+    const req = new NextRequest(
       `http://localhost/api/projects/${projectId}/cards/${cardId}/finalize`,
       { method: "POST" }
     );
@@ -245,7 +246,7 @@ describe("Card finalize API", () => {
     const { GET } = await import(
       "@/app/api/projects/[projectId]/cards/[cardId]/finalize/route"
     );
-    const req = new Request(
+    const req = new NextRequest(
       `http://localhost/api/projects/${projectId}/cards/${cardId}/finalize`
     );
     const res = await GET(req, {
@@ -261,7 +262,7 @@ describe("Card finalize API", () => {
     const { POST } = await import(
       "@/app/api/projects/[projectId]/cards/[cardId]/finalize/route"
     );
-    const req = new Request(
+    const req = new NextRequest(
       `http://localhost/api/projects/${projectId}/cards/${cardId}/finalize`,
       { method: "POST" }
     );

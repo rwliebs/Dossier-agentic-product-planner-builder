@@ -156,7 +156,7 @@ class MockTaskGenerator {
           name,
           type,
           title: title || undefined,
-          content: content || undefined,
+          content: content || "",
         });
       }
     }

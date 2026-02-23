@@ -157,7 +157,7 @@ describe("reconstructStateFromActions", () => {
         payload: { id: activityId, title: "Planning", position: 0 },
         validation_status: "accepted" as const,
       },
-    ] as PlanningAction[];
+    ] as unknown as PlanningAction[];
 
     const result = reconstructStateFromActions(project, actions);
     expect(result.success).toBe(true);
@@ -182,7 +182,7 @@ describe("reconstructStateFromActions", () => {
         payload: { id: workflowId, title: "Core", position: 0 },
         validation_status: "rejected" as const,
       },
-    ] as PlanningAction[];
+    ] as unknown as PlanningAction[];
 
     const result = reconstructStateFromActions(project, actions);
     expect(result.success).toBe(true);

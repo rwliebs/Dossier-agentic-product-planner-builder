@@ -9,6 +9,11 @@ import { NextRequest } from "next/server";
 import { POST } from "@/app/api/projects/[projectId]/chat/stream/route";
 import { getDb } from "@/lib/db";
 
+type StreamAction = {
+  action_type?: string;
+  payload?: Record<string, unknown>;
+};
+
 const PROMPT =
   "I want to build a trading card marketplace for canadian buyers and sellers of magic the gathering cards";
 
@@ -149,7 +154,7 @@ describe("chat/stream with mock", () => {
     const actions = events
       .filter((e) => e.event === "action")
       .map((e) => (e.data as { action?: unknown }).action)
-      .filter(Boolean);
+      .filter(Boolean) as StreamAction[];
 
     if (actions.length === 0) {
       const eventTypes = events.map((e) => e.event);
@@ -160,17 +165,13 @@ describe("chat/stream with mock", () => {
       );
     }
 
-    const updateProject = actions.filter(
-      (a: { action_type?: string }) => a?.action_type === "updateProject",
-    );
-    const createWorkflow = actions.filter(
-      (a: { action_type?: string }) => a?.action_type === "createWorkflow",
-    );
+    const updateProject = actions.filter((a) => a.action_type === "updateProject");
+    const createWorkflow = actions.filter((a) => a.action_type === "createWorkflow");
 
     expect(createWorkflow.length, "should create at least 2 workflows").toBeGreaterThanOrEqual(2);
     // updateProject may fail if project table lacks description column in test DB
     if (updateProject.length >= 1) {
-      const payload = updateProject[0]?.payload as { description?: string };
+      const payload = updateProject[0]?.payload as { description?: string } | undefined;
       expect(String(payload?.description ?? "").toLowerCase()).toMatch(
         /marketplace|trading|card|canadian|magic/i,
       );
@@ -253,14 +254,10 @@ describe("chat/stream with mock", () => {
     const actions = events
       .filter((e) => e.event === "action")
       .map((e) => (e.data as { action?: unknown }).action)
-      .filter(Boolean);
+      .filter(Boolean) as StreamAction[];
 
-    const createActivity = actions.filter(
-      (a: { action_type?: string }) => a?.action_type === "createActivity",
-    );
-    const createCard = actions.filter(
-      (a: { action_type?: string }) => a?.action_type === "createCard",
-    );
+    const createActivity = actions.filter((a) => a.action_type === "createActivity");
+    const createCard = actions.filter((a) => a.action_type === "createCard");
     const errors = events.filter((e) => e.event === "error");
 
     if (createCard.length === 0 && errors.length > 0) {

@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
 
 const mockListRuns = vi.fn().mockResolvedValue([]);
@@ -25,7 +26,7 @@ describe("Orchestration API contracts", () => {
     const { GET } = await import(
       "@/app/api/projects/[projectId]/orchestration/runs/route"
     );
-    const req = new Request("http://localhost/api/projects/proj-123/orchestration/runs");
+    const req = new NextRequest("http://localhost/api/projects/proj-123/orchestration/runs");
     const res = await GET(req, {
       params: Promise.resolve({ projectId: "proj-123" }),
     });
@@ -40,7 +41,7 @@ describe("Orchestration API contracts", () => {
     const { POST } = await import(
       "@/app/api/projects/[projectId]/orchestration/runs/route"
     );
-    const req = new Request(
+    const req = new NextRequest(
       "http://localhost/api/projects/proj-123/orchestration/runs",
       {
         method: "POST",

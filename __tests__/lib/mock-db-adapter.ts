@@ -105,7 +105,7 @@ export function createMockDbAdapter(overrides?: Partial<Record<keyof DbAdapter, 
 
   if (overrides) {
     for (const [k, v] of Object.entries(overrides)) {
-      (base as Record<string, unknown>)[k] = v;
+      (base as unknown as Record<string, unknown>)[k] = v;
     }
   }
   return base;

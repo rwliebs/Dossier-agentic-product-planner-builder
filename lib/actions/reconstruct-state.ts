@@ -91,6 +91,11 @@ export async function reconstructStateFromDb(
 ): Promise<ReconstructResult | null> {
   const project = await getProject(db, projectId);
   if (!project) return null;
+  const projectIdValue = (project as { id?: unknown }).id;
+  const projectName = (project as { name?: unknown }).name;
+  if (typeof projectIdValue !== "string" || typeof projectName !== "string") {
+    return null;
+  }
 
   const allActions = await getPlanningActionsByProject(db, projectId, 500);
   const accepted = allActions
@@ -101,7 +106,47 @@ export async function reconstructStateFromDb(
         new Date((b as { created_at?: string }).created_at ?? 0).getTime()
     ) as PlanningAction[];
 
-  return reconstructStateFromActions(project, accepted);
+  return reconstructStateFromActions(
+    {
+      id: projectIdValue,
+      name: projectName,
+      description:
+        typeof (project as { description?: unknown }).description === "string" ||
+        (project as { description?: unknown }).description === null
+          ? ((project as { description?: string | null }).description ?? null)
+          : null,
+      customer_personas:
+        typeof (project as { customer_personas?: unknown }).customer_personas === "string" ||
+        (project as { customer_personas?: unknown }).customer_personas === null
+          ? ((project as { customer_personas?: string | null }).customer_personas ?? null)
+          : null,
+      tech_stack:
+        typeof (project as { tech_stack?: unknown }).tech_stack === "string" ||
+        (project as { tech_stack?: unknown }).tech_stack === null
+          ? ((project as { tech_stack?: string | null }).tech_stack ?? null)
+          : null,
+      deployment:
+        typeof (project as { deployment?: unknown }).deployment === "string" ||
+        (project as { deployment?: unknown }).deployment === null
+          ? ((project as { deployment?: string | null }).deployment ?? null)
+          : null,
+      design_inspiration:
+        typeof (project as { design_inspiration?: unknown }).design_inspiration === "string" ||
+        (project as { design_inspiration?: unknown }).design_inspiration === null
+          ? ((project as { design_inspiration?: string | null }).design_inspiration ?? null)
+          : null,
+      repo_url:
+        typeof (project as { repo_url?: unknown }).repo_url === "string" ||
+        (project as { repo_url?: unknown }).repo_url === null
+          ? ((project as { repo_url?: string | null }).repo_url ?? null)
+          : null,
+      default_branch:
+        typeof (project as { default_branch?: unknown }).default_branch === "string"
+          ? (project as { default_branch?: string }).default_branch
+          : "main",
+    },
+    accepted
+  );
 }
 
 export interface DriftReport {

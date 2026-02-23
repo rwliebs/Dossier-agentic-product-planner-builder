@@ -6,7 +6,7 @@ import {
 } from "@/lib/actions/preview-action";
 import {
   createEmptyPlanningState,
-  cardExists,
+  type PlanningState,
 } from "@/lib/schemas/planning-state";
 import type { Project, PlanningAction } from "@/lib/schemas/slice-a";
 
@@ -17,7 +17,7 @@ describe("Action Application (Mutations)", () => {
   const cardId = "55555555-5555-4555-8555-555555555555";
 
   let project: Project;
-  let initialState;
+  let initialState: PlanningState;
 
   beforeEach(() => {
     project = {

@@ -461,7 +461,7 @@ CREATE INDEX IF NOT EXISTS idx_context_artifact_project_id ON context_artifact(p
 ];
 
 /** One-time: replace non-UUID workflow, workflow_activity, and card ids with UUIDs so build API and DB stay in sync. */
-function runNormalizeEntityUuids(db: Database.Database): void {
+function runNormalizeEntityUuids(db: any): void {
   const name = "009_normalize_entity_uuids";
   const row = db.prepare("SELECT 1 FROM _migrations WHERE name = ?").get(name);
   if (row) return;
@@ -512,7 +512,7 @@ function runNormalizeEntityUuids(db: Database.Database): void {
   }
 }
 
-export function runMigrations(db: Database.Database): void {
+export function runMigrations(db: any): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
       name TEXT PRIMARY KEY,

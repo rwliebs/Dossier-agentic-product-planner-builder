@@ -5,6 +5,7 @@
 
 import type { DbAdapter } from "@/lib/db/adapter";
 import { createOrchestrationRunInputSchema } from "@/lib/schemas/slice-c";
+import type { SystemPolicyProfile } from "@/lib/schemas/slice-c";
 import { getSystemPolicyProfileByProject } from "@/lib/db/queries/orchestration";
 import {
   validateRunInputAgainstPolicy,
@@ -78,7 +79,7 @@ export async function createRun(
     // Validate run input against policy
     const inputValidation = validateRunInputAgainstPolicy(
       input.run_input_snapshot,
-      policy
+      policy as SystemPolicyProfile
     );
     if (!inputValidation.valid) {
       return {

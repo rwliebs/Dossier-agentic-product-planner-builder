@@ -138,6 +138,7 @@ export function WorkflowBlock({
     customer_personas?: string | null;
     tech_stack?: string | null;
     deployment?: string | null;
+    design_inspiration?: string | null;
   };
   const [editingField, setEditingField] = useState<ProjectContextField | null>(null);
   const [draftValue, setDraftValue] = useState('');

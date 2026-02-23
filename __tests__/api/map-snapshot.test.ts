@@ -3,6 +3,8 @@
  * Requires dev server and DB with at least one project.
  */
 
+export {};
+
 const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 
 async function isServerAvailable(): Promise<boolean> {

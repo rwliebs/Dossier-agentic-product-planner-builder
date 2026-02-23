@@ -3,6 +3,8 @@
  * Requires dev server and DB (SQLite or Postgres).
  */
 
+export {};
+
 const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 
 function canRunIntegrationTests(): boolean {

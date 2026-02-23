@@ -1,28 +1,28 @@
 /**
  * Agentic-flow execution plane client.
  *
- * Real client imports agentic-flow's `claudeAgent` function and `getAgent` loader,
- * which wraps @anthropic-ai/claude-agent-sdk `query()` with:
- *   - Agent definitions from .claude/agents/ (system prompts, hooks, capabilities)
- *   - Multi-provider routing (Anthropic, Gemini, OpenRouter, ONNX)
- *   - Retry/resilience via withRetry()
- *   - MCP server orchestration (optional)
+ * Uses @anthropic-ai/claude-agent-sdk `query()` directly with agentic-flow's
+ * `getAgent()` for agent definitions (system prompts). We call the SDK directly
+ * (instead of agentic-flow's `claudeAgent()` wrapper) to pass the native `cwd`
+ * option so the agent executes in the target repository clone, not the Dossier
+ * project root.
  *
- * IMPORTANT: We do NOT use the agentic-flow CLI (`npx agentic-flow --agent ...`)
- * because the CLI path uses `claudeAgentDirect` which only calls
- * `messages.create()` — a plain text completion with NO tool execution.
- * The programmatic `claudeAgent()` function uses the SDK `query()` which provides
- * real filesystem tools: Write, Edit, Bash, Read, Glob, Grep.
+ * Dossier disables all MCP servers and uses Anthropic only, so the wrapper adds
+ * little value. Direct SDK usage gives us concurrent-safe CWD and access to
+ * options like persistSession: false for ephemeral builds.
  *
  * @see REMAINING_WORK_PLAN.md §5 O10
  * @see docs/adr/0008-agentic-flow-execution-plane.md
+ * @see docs/investigations/investigation-build-only-readme.md
  */
 
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { query } from "@anthropic-ai/claude-agent-sdk";
 import { readConfigFile } from "@/lib/config/data-dir";
 import { buildTaskFromPayload } from "./build-task";
+import type { WebhookEventType } from "./process-webhook";
 
 export interface PlannedFileDetail {
   logical_file_name: string;
@@ -122,58 +122,101 @@ function getAgenticFlowDistRoot(): string {
   );
 }
 
-/**
- * Lazily imports agentic-flow's `claudeAgent` function and `getAgent` loader.
- *
- * `claudeAgent` wraps @anthropic-ai/claude-agent-sdk `query()` with:
- *   - Agent system prompts from .claude/agents/ definitions
- *   - permissionMode: 'bypassPermissions'
- *   - allowedTools: Write, Edit, Bash, Read, Glob, Grep, WebFetch, WebSearch, etc.
- *   - Multi-provider routing and retry logic
- *
- * We disable external MCP servers to avoid unnecessary npx spawns.
- */
-async function importAgenticFlow(): Promise<{
-  claudeAgent: (
-    agent: { name: string; description: string; systemPrompt: string },
-    input: string,
-    onStream?: (chunk: string) => void,
-    modelOverride?: string
-  ) => Promise<{ output: string; agent: string }>;
-  getAgent: (name: string) => {
-    name: string;
-    description: string;
-    systemPrompt: string;
-  } | undefined;
-}> {
-  process.env.ENABLE_CLAUDE_FLOW_MCP = "false";
-  process.env.ENABLE_FLOW_NEXUS_MCP = "false";
-  process.env.ENABLE_AGENTIC_PAYMENTS_MCP = "false";
-  process.env.ENABLE_CLAUDE_FLOW_SDK = "false";
+/** Agent definition from agentic-flow's registry */
+interface AgentDefinition {
+  name: string;
+  description: string;
+  systemPrompt: string;
+}
 
+/**
+ * Lazily imports agentic-flow's `getAgent` loader for agent definitions.
+ * We use the SDK `query()` directly (not claudeAgent) to pass native `cwd`.
+ */
+async function loadAgentLoader(): Promise<{
+  getAgent: (name: string) => AgentDefinition | undefined;
+}> {
   const distRoot = getAgenticFlowDistRoot();
-  const agentMod = await import(
-    /* webpackIgnore: true */
-    "file://" + path.join(distRoot, "agents", "claudeAgent.js")
-  );
   const loaderMod = await import(
     /* webpackIgnore: true */
     "file://" + path.join(distRoot, "utils", "agentLoader.js")
   );
+  return { getAgent: loaderMod.getAgent };
+}
 
-  return {
-    claudeAgent: agentMod.claudeAgent,
-    getAgent: loaderMod.getAgent,
-  };
+/** Retry helper: 2 retries with exponential backoff */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 2
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastErr;
 }
 
 /**
- * Real client — uses agentic-flow's `claudeAgent()` function (programmatic API).
- *
- * This imports agentic-flow's agent loader to get the "coder" agent definition
- * (system prompt, capabilities, hooks), then calls `claudeAgent()` which internally
- * uses @anthropic-ai/claude-agent-sdk `query()` with real filesystem tools:
- *   Write, Edit, Read, Bash, Glob, Grep, WebFetch, WebSearch
+ * Runs SDK query and collects assistant text output from the stream.
+ */
+async function runQueryAndCollectOutput(
+  taskDescription: string,
+  options: {
+    systemPrompt: string;
+    cwd?: string;
+    onStream?: (chunk: string) => void;
+  }
+): Promise<string> {
+  const result = query({
+    prompt: taskDescription,
+    options: {
+      systemPrompt: options.systemPrompt,
+      model: process.env.COMPLETION_MODEL || "claude-sonnet-4-5-20250929",
+      permissionMode: "bypassPermissions",
+      allowDangerouslySkipPermissions: true,
+      allowedTools: [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Glob",
+        "Grep",
+        "WebFetch",
+        "WebSearch",
+      ],
+      cwd: options.cwd,
+      persistSession: false,
+    },
+  });
+
+  let output = "";
+  for await (const msg of result) {
+    const m = msg as { type?: string; message?: { content?: Array<{ type?: string; text?: string }> } };
+    if (m.type === "assistant" && m.message?.content) {
+      const chunk =
+        m.message.content
+          ?.map((c) => (c.type === "text" ? c.text : ""))
+          .join("") || "";
+      output += chunk;
+      if (options.onStream && chunk) {
+        options.onStream(chunk);
+      }
+    }
+  }
+  return output;
+}
+
+/**
+ * Real client — calls SDK `query()` directly with `cwd` from payload.worktree_path.
+ * Uses agentic-flow's getAgent() for agent definitions only.
  *
  * Dispatch fires off the agent asynchronously; status/cancel use the
  * AbortController and execution registry to track progress.
@@ -193,9 +236,9 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
         };
       }
 
-      let agenticFlow: Awaited<ReturnType<typeof importAgenticFlow>>;
+      let loader: Awaited<ReturnType<typeof loadAgentLoader>>;
       try {
-        agenticFlow = await importAgenticFlow();
+        loader = await loadAgentLoader();
       } catch (err) {
         return {
           success: false,
@@ -205,7 +248,7 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
         };
       }
 
-      const agent = agenticFlow.getAgent(DEFAULT_AGENT);
+      const agent = loader.getAgent(DEFAULT_AGENT);
       if (!agent) {
         return {
           success: false,
@@ -222,22 +265,24 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
       executionRegistry.set(executionId, entry);
 
       const runExecution = async () => {
-        let eventType: string;
+        let eventType: WebhookEventType;
         let summary: string;
         let errorMsg: string | undefined;
 
         try {
-          const result = await agenticFlow.claudeAgent(
-            agent,
-            taskDescription,
-            (chunk: string) => {
-              if (abortController.signal.aborted) return;
-            }
+          const output = await withRetry(() =>
+            runQueryAndCollectOutput(taskDescription, {
+              systemPrompt: agent.systemPrompt,
+              cwd: payload.worktree_path || undefined,
+              onStream: (chunk: string) => {
+                if (abortController.signal.aborted) return;
+              },
+            })
           );
 
           entry.status = "completed";
           entry.endedAt = new Date().toISOString();
-          entry.summary = result.output.substring(0, 500);
+          entry.summary = output.substring(0, 500);
           eventType = "execution_completed";
           summary = entry.summary;
         } catch (err) {

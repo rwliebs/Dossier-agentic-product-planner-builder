@@ -35,8 +35,10 @@ export interface ChatResponse {
  * POST /api/projects/[projectId]/chat
  *
  * Unified planning chat endpoint.
- * - Empty map (no workflows) → scaffold prompt (updateProject + createWorkflow only)
- * - Map has structure → full planning prompt (all action types)
+ * - mode=finalize → run finalize multi-step (context artifacts).
+ * - mode=populate + workflow_id → add activities/cards to one workflow.
+ * - mode=scaffold → always scaffold prompt (updateProject + createWorkflow only); only those actions are applied.
+ * - No mode or other → empty map → scaffold prompt; map has structure → full planning prompt (all action types).
  *
  * Actions are validated and applied directly to the DB.
  */
@@ -154,13 +156,16 @@ export async function POST(
     }
   }
 
-  const hasStructure = state.workflows.size >= 1;
   const linkedArtifacts = getLinkedArtifactsForPrompt(state, 5);
+  const hasStructure = state.workflows.size >= 1;
 
   let systemPrompt: string;
   let userMessage: string;
 
-  if (hasStructure) {
+  if (mode === "scaffold") {
+    systemPrompt = buildScaffoldSystemPrompt();
+    userMessage = buildScaffoldUserMessage(message, state, linkedArtifacts);
+  } else if (hasStructure) {
     systemPrompt = buildPlanningSystemPrompt();
     userMessage = buildPlanningUserMessage(message, state, linkedArtifacts);
   } else {
@@ -248,12 +253,18 @@ export async function POST(
     );
   }
 
+  // When mode is scaffold, only apply updateProject and createWorkflow (ignore any other types from LLM)
+  const scaffoldOnly = mode === "scaffold";
+  const toApply = scaffoldOnly
+    ? valid.filter((a) => a.action_type === "updateProject" || a.action_type === "createWorkflow")
+    : valid;
+
   // --- Apply ---
   let applied = 0;
   const workflowIdsCreated: string[] = [];
 
-  if (valid.length > 0) {
-    const applyResult = await pipelineApply(db, projectId, valid);
+  if (toApply.length > 0) {
+    const applyResult = await pipelineApply(db, projectId, toApply);
     if (applyResult.failedAt !== undefined) {
       console.error("[chat] pipelineApply failed at index", applyResult.failedAt, applyResult.rejectionReason);
     }

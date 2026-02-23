@@ -32,6 +32,8 @@ export interface TriggerBuildResult {
   assignmentIds?: string[];
   error?: string;
   validationErrors?: string[];
+  outcomeType?: "success" | "error" | "decision_required";
+  message?: string;
 }
 
 /**
@@ -69,12 +71,19 @@ export async function triggerBuild(
       success: false,
       error: "Build in progress",
       validationErrors: ["A build is already running for this project. Wait for it to complete."],
+      outcomeType: "error",
+      message: "A build is already running for this project. Wait for it to complete.",
     };
   }
 
   const project = await getProject(db, input.project_id);
   if (!project) {
-    return { success: false, error: "Project not found" };
+    return {
+      success: false,
+      error: "Project not found",
+      outcomeType: "error",
+      message: "Project not found.",
+    };
   }
 
   const repoUrl = (project as { repo_url?: string }).repo_url;
@@ -88,6 +97,8 @@ export async function triggerBuild(
       validationErrors: [
         "Connect a GitHub repository in the project settings before triggering a build.",
       ],
+      outcomeType: "error",
+      message: "No repository connected. Connect a GitHub repository in project settings.",
     };
   }
 
@@ -102,6 +113,8 @@ export async function triggerBuild(
     return {
       success: false,
       validationErrors: ["No cards in scope"],
+      outcomeType: "error",
+      message: "No cards in scope for this build.",
     };
   }
 
@@ -123,6 +136,40 @@ export async function triggerBuild(
           ? [`Cards not finalized: ${cardsWithoutFinalized.join(", ")}`]
           : [`${cardsWithoutFinalized.length} cards not finalized`]),
       ],
+      outcomeType: "decision_required",
+      message:
+        cardsWithoutFinalized.length <= 3
+          ? `Finalize required before build. Cards: ${cardsWithoutFinalized.join(", ")}`
+          : `Finalize required before build for ${cardsWithoutFinalized.length} cards.`,
+    };
+  }
+
+  // Require at least one approved planned file per card so the agent gets concrete file intents (avoids README-only builds)
+  const cardsWithoutApprovedFiles: string[] = [];
+  for (const cardId of cardIds) {
+    const plannedFiles = await getCardPlannedFiles(db, cardId);
+    const approved = plannedFiles.filter(
+      (f) => (f as { status?: string }).status === "approved"
+    );
+    if (approved.length === 0) {
+      cardsWithoutApprovedFiles.push(cardId);
+    }
+  }
+  if (cardsWithoutApprovedFiles.length > 0) {
+    return {
+      success: false,
+      error: "Card(s) missing approved code files",
+      validationErrors: [
+        "Build requires at least one approved code file per card. In each card's 'Code Files to Create/Edit' section, add a file path and approve it, then trigger build.",
+        ...(cardsWithoutApprovedFiles.length <= 3
+          ? [`Cards without approved files: ${cardsWithoutApprovedFiles.join(", ")}`]
+          : [`${cardsWithoutApprovedFiles.length} cards without approved files`]),
+      ],
+      outcomeType: "decision_required",
+      message:
+        cardsWithoutApprovedFiles.length <= 3
+          ? `Decision required: approve planned code files first. Cards: ${cardsWithoutApprovedFiles.join(", ")}`
+          : `Decision required: approve planned code files for ${cardsWithoutApprovedFiles.length} cards first.`,
     };
   }
 
@@ -135,6 +182,8 @@ export async function triggerBuild(
         success: false,
         error: cloneResult.error,
         validationErrors: [cloneResult.error ?? "Repo clone failed"],
+        outcomeType: "error",
+        message: cloneResult.error ?? "Repository clone failed.",
       };
     }
     clonePath = cloneResult.clonePath ?? null;
@@ -164,6 +213,8 @@ export async function triggerBuild(
       success: false,
       error: runResult.error,
       validationErrors: runResult.validationErrors,
+      outcomeType: "error",
+      message: runResult.error ?? "Failed to initialize build run.",
     };
   }
 
@@ -178,6 +229,7 @@ export async function triggerBuild(
   });
 
   const assignmentIds: string[] = [];
+  const assignmentErrors: string[] = [];
 
   const DEFAULT_ALLOWED_PATHS = ["src", "app", "lib", "components"];
 
@@ -210,6 +262,8 @@ export async function triggerBuild(
           success: false,
           error: branchResult.error,
           validationErrors: [branchResult.error ?? "Create branch failed"],
+          outcomeType: "error",
+          message: branchResult.error ?? "Failed to create feature branch.",
         };
       }
       worktreePath = clonePath;
@@ -231,33 +285,72 @@ export async function triggerBuild(
     });
 
     if (!assignResult.success) {
-      console.warn(
-        `Failed to create assignment for card ${cardId}:`,
-        assignResult.error
+      assignmentErrors.push(
+        `Card ${cardId}: failed to create assignment (${assignResult.error ?? "unknown error"})`
       );
+      await db.updateCard(cardId, { build_state: "failed" });
       continue;
     }
 
     if (assignResult.assignmentId) {
-      assignmentIds.push(assignResult.assignmentId);
-
       const dispatchResult = await dispatchAssignment(db, {
         assignment_id: assignResult.assignmentId,
         actor: input.initiated_by,
       });
 
       if (!dispatchResult.success) {
-        console.warn(
-          `Failed to dispatch assignment ${assignResult.assignmentId}:`,
-          dispatchResult.error
+        assignmentErrors.push(
+          `Card ${cardId}: dispatch failed (${dispatchResult.error ?? "unknown error"})`
         );
+        await db.updateCard(cardId, { build_state: "failed" });
+        await db.updateCardAssignment(assignResult.assignmentId, { status: "failed" });
+      } else {
+        assignmentIds.push(assignResult.assignmentId);
       }
     }
+  }
+
+  if (assignmentErrors.length > 0) {
+    const uniqueErrors = Array.from(new Set(assignmentErrors));
+    const message = `Build could not start for all cards: ${uniqueErrors.join("; ")}`;
+    if (assignmentIds.length === 0) {
+      await db.updateOrchestrationRun(runId, {
+        status: "failed",
+        ended_at: new Date().toISOString(),
+      });
+    }
+    return {
+      success: false,
+      runId,
+      assignmentIds,
+      error: "Build dispatch failed",
+      validationErrors: uniqueErrors,
+      outcomeType: "error",
+      message,
+    };
+  }
+
+  // No agent was actually dispatched (e.g. createAssignment returned no id, or all dispatches failed without pushing)
+  if (assignmentIds.length === 0) {
+    await db.updateOrchestrationRun(runId, {
+      status: "failed",
+      ended_at: new Date().toISOString(),
+    });
+    return {
+      success: false,
+      runId,
+      assignmentIds: [],
+      error: "No agent was dispatched",
+      outcomeType: "error",
+      message: "Build could not start — no agent was dispatched.",
+    };
   }
 
   return {
     success: true,
     runId,
     assignmentIds,
+    outcomeType: "success",
+    message: `Build started for ${assignmentIds.length} assignment${assignmentIds.length === 1 ? "" : "s"}.`,
   };
 }

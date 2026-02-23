@@ -182,13 +182,15 @@ export default function DossierPage() {
       try {
         const result = await triggerBuild({ scope: 'card', card_id: cardId });
         const { toast } = await import('sonner');
-        if (result.runId) {
-          toast.success('Build started — agent is working');
+        if (result.outcomeType === 'decision_required') {
+          toast.warning(result.message ?? result.error ?? 'Decision required before build can continue');
+        } else if (result.runId && result.outcomeType === 'success') {
+          toast.success(result.message ?? 'Build started — agent is working');
           setRightPanelTab('files');
           setRightPanelOpen(true);
           refetch();
-        } else if (result.error) {
-          toast.error(result.error);
+        } else {
+          toast.error(result.message ?? result.error ?? 'Failed to trigger build');
         }
       } finally {
         setBuildingCardId(null);
@@ -253,6 +255,68 @@ export default function DossierPage() {
   const [finalizingCardId, setFinalizingCardId] = useState<string | null>(null);
   const [buildingCardId, setBuildingCardId] = useState<string | null>(null);
   const [cardFinalizeProgress, setCardFinalizeProgress] = useState('');
+  const previousBuildStatesRef = useRef<Map<string, string | null>>(new Map());
+
+  const hasActiveBuilds = snapshot?.workflows.some((wf) =>
+    wf.activities.some((activity) =>
+      activity.cards.some((card) =>
+        card.build_state === 'queued' || card.build_state === 'running' || card.build_state === 'blocked'
+      )
+    )
+  ) ?? false;
+
+  useEffect(() => {
+    if (!projectId || !hasActiveBuilds) return;
+    const intervalId = window.setInterval(() => {
+      refetch();
+    }, 2000);
+    return () => window.clearInterval(intervalId);
+  }, [projectId, hasActiveBuilds, refetch]);
+
+  useEffect(() => {
+    if (!snapshot) return;
+    const nextStates = new Map<string, string | null>();
+    const transitionMessages: Array<{ type: 'success' | 'error' | 'decision_required'; text: string }> = [];
+
+    for (const workflow of snapshot.workflows) {
+      for (const activity of workflow.activities) {
+        for (const card of activity.cards) {
+          const prev = previousBuildStatesRef.current.get(card.id) ?? null;
+          const next = card.build_state ?? null;
+          nextStates.set(card.id, next);
+
+          if (prev === next) continue;
+          if (next === 'completed' && prev && prev !== 'completed') {
+            transitionMessages.push({
+              type: 'success',
+              text: `"${card.title}" build completed.`,
+            });
+          } else if (next === 'failed' && prev && prev !== 'failed') {
+            transitionMessages.push({
+              type: 'error',
+              text: `"${card.title}" build failed. Open the card for details.`,
+            });
+          } else if (next === 'blocked' && prev && prev !== 'blocked') {
+            transitionMessages.push({
+              type: 'decision_required',
+              text: `"${card.title}" needs a decision. Open the card questions and provide guidance.`,
+            });
+          }
+        }
+      }
+    }
+
+    previousBuildStatesRef.current = nextStates;
+    if (transitionMessages.length === 0) return;
+
+    void import('sonner').then(({ toast }) => {
+      for (const msg of transitionMessages) {
+        if (msg.type === 'success') toast.success(msg.text);
+        else if (msg.type === 'decision_required') toast.warning(msg.text);
+        else toast.error(msg.text);
+      }
+    });
+  }, [snapshot]);
 
   const handleFinalizeProject = useCallback(
     async () => {

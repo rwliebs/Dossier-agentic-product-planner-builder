@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { MapSnapshot } from "@/lib/types/ui";
 
 export interface UseMapSnapshotResult {
@@ -14,6 +14,8 @@ export function useMapSnapshot(projectId: string | undefined): UseMapSnapshotRes
   const [data, setData] = useState<MapSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
   const refetch = useCallback(async () => {
     if (!projectId) {
@@ -21,7 +23,9 @@ export function useMapSnapshot(projectId: string | undefined): UseMapSnapshotRes
       setError(null);
       return;
     }
-    setLoading(true);
+    // Only show loading on initial load; background refetches (e.g. polling) keep existing data visible
+    const isInitialLoad = dataRef.current === null;
+    if (isInitialLoad) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/map`);
@@ -36,7 +40,7 @@ export function useMapSnapshot(projectId: string | undefined): UseMapSnapshotRes
       setError("Failed to load map");
       setData(null);
     } finally {
-      setLoading(false);
+      if (isInitialLoad) setLoading(false);
     }
   }, [projectId]);
 

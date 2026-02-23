@@ -256,6 +256,7 @@ export default function DossierPage() {
   const [buildingCardId, setBuildingCardId] = useState<string | null>(null);
   const [cardFinalizeProgress, setCardFinalizeProgress] = useState('');
   const previousBuildStatesRef = useRef<Map<string, string | null>>(new Map());
+  const previousCardsFingerprintRef = useRef<string | null>(null);
 
   const hasActiveBuilds = snapshot?.workflows.some((wf) =>
     wf.activities.some((activity) =>
@@ -317,6 +318,43 @@ export default function DossierPage() {
       }
     });
   }, [snapshot]);
+
+  // When snapshot changes and any card's data has changed, prompt user to refresh
+  useEffect(() => {
+    if (!snapshot) return;
+    const fingerprint = JSON.stringify(
+      snapshot.workflows.flatMap((wf) =>
+        wf.activities.flatMap((a) =>
+          a.cards.map((c) => ({
+            id: c.id,
+            build_state: c.build_state,
+            quick_answer: c.quick_answer,
+            finalized_at: c.finalized_at,
+            last_built_at: c.last_built_at,
+          }))
+        )
+      )
+    );
+    const prev = previousCardsFingerprintRef.current;
+    previousCardsFingerprintRef.current = fingerprint;
+    if (prev !== null && prev !== fingerprint) {
+      void import('sonner').then(({ toast }) => {
+        toast.info('Map has been updated', {
+          action: {
+            label: 'Refresh',
+            onClick: () => {
+              refetch();
+              if (expandedCardId) {
+                refetchCardKnowledge();
+                refetchCardPlannedFiles();
+                refetchCardContextArtifacts();
+              }
+            },
+          },
+        });
+      });
+    }
+  }, [snapshot, expandedCardId, refetch, refetchCardKnowledge, refetchCardPlannedFiles, refetchCardContextArtifacts]);
 
   const handleFinalizeProject = useCallback(
     async () => {

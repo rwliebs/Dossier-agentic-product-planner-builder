@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
 import { triggerBuild } from "@/lib/orchestration/trigger-build";
-import { json, validationError, notFoundError, internalError } from "@/lib/api/response-helpers";
+import { json, internalError, validationError } from "@/lib/api/response-helpers";
 import { BUILD_ORCHESTRATOR } from "@/lib/feature-flags";
 import { triggerBuildRequestSchema } from "@/lib/validation/request-schema";
 
@@ -42,21 +42,40 @@ export async function POST(
     });
 
     if (!result.success) {
+      const outcomeType = result.outcomeType ?? "error";
+      const message = result.message ?? result.error ?? "Build failed";
+      const details = result.validationErrors && result.validationErrors.length > 0
+        ? { validation: result.validationErrors }
+        : undefined;
+
       if (result.error?.includes("not found")) {
-        return notFoundError(result.error);
+        return json(
+          {
+            error: "not_found",
+            message,
+            details,
+            outcome_type: outcomeType,
+          },
+          404
+        );
       }
-      if (result.validationErrors && result.validationErrors.length > 0) {
-        return validationError(result.error ?? "Build failed", {
-          validation: result.validationErrors,
-        });
-      }
-      return validationError(result.error ?? "Build failed");
+      return json(
+        {
+          error: "validation_failed",
+          message,
+          details,
+          outcome_type: outcomeType,
+        },
+        400
+      );
     }
 
     return json(
       {
         runId: result.runId,
         assignmentIds: result.assignmentIds,
+        message: result.message ?? "Build started",
+        outcome_type: result.outcomeType ?? "success",
       },
       202
     );

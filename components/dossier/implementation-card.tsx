@@ -154,6 +154,8 @@ export function ImplementationCard({
   const status = (CARD_STATUS.includes(card.status as CardStatusType) ? card.status : 'todo') as CardStatusType;
   const config = statusConfig[status];
   const sortedArtifacts = [...contextArtifacts].sort((a, b) => a.name.localeCompare(b.name));
+  const e2eTestArtifacts = sortedArtifacts.filter((a) => (a as { type?: string }).type === 'test');
+  const contextDocArtifacts = sortedArtifacts.filter((a) => (a as { type?: string }).type !== 'test');
   const quickAnswer = quickAnswerProp ?? editedQuickAnswer;
 
   const getActionButtonText = () =>
@@ -285,6 +287,55 @@ export function ImplementationCard({
           {sortedArtifacts.length > 2 && <span className="text-[10px] text-gray-500">+{sortedArtifacts.length - 2}</span>}
         </div>
 
+        {card.build_state === 'blocked' && (
+          <div className="mt-2 rounded border border-amber-300 bg-amber-50 p-2">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-amber-800 mb-1">
+              Decision required
+            </p>
+            {isEditingQuickAnswer ? (
+              <div className="space-y-2">
+                <textarea
+                  value={editedQuickAnswer}
+                  onChange={(e) => setEditedQuickAnswer(e.target.value)}
+                  className="w-full text-xs p-2 bg-white border border-amber-300 rounded text-gray-900"
+                  placeholder="Provide clarification so the agent can continue..."
+                  rows={2}
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveQuickAnswer}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-green-600 text-white rounded hover:bg-green-700"
+                  >
+                    <Check className="h-3 w-3" /> Save answer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelQuickAnswer}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                  >
+                    <X className="h-3 w-3" /> Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="group/blocked-answer flex items-start gap-2">
+                <p className="text-xs text-amber-900/90 flex-1 leading-relaxed">
+                  {quickAnswer || 'Agent is waiting for your decision. Add a short answer or instruction.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingQuickAnswer(true)}
+                  className="opacity-0 group-hover/blocked-answer:opacity-100 transition-opacity p-1 hover:bg-amber-100 rounded"
+                  title="Provide clarification"
+                >
+                  <Edit2 className="h-3 w-3 text-amber-700" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {status === 'questions' && quickAnswer && (
           <div className="mt-2 pt-2 border-t border-yellow-200">
             <p className="text-xs text-gray-600 leading-relaxed italic">{quickAnswer}</p>
@@ -301,7 +352,7 @@ export function ImplementationCard({
               <ChevronDown className="h-4 w-4" /> {ACTION_BUTTONS.VIEW_DETAILS_EDIT}
             </button>
           )}
-          {onFinalizeCard && !(card as Record<string, unknown>).finalized_at && (
+          {onFinalizeCard && !card.finalized_at && (
             <div className="space-y-1">
               <button
                 type="button"
@@ -322,7 +373,7 @@ export function ImplementationCard({
               )}
             </div>
           )}
-          {(card as Record<string, unknown>).finalized_at && (
+          {card.finalized_at && (
             <div className="flex items-center gap-2 px-2 py-1.5 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 font-mono">
               <Check className="h-3 w-3" />
               Finalized
@@ -334,7 +385,7 @@ export function ImplementationCard({
             onClick={(e) => {
               e.stopPropagation();
               const action = status === 'active' ? 'monitor' : status === 'review' ? 'test' : 'build';
-              if (action === 'build' && onBuildCard && (card as Record<string, unknown>).finalized_at) {
+              if (action === 'build' && onBuildCard && card.finalized_at) {
                 onBuildCard(card.id);
               } else {
                 onAction(card.id, action);
@@ -435,11 +486,28 @@ export function ImplementationCard({
               )}
             </div>
 
-            <div>
-              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Context Documents</h5>
-              {sortedArtifacts.length > 0 ? (
+            {e2eTestArtifacts.length > 0 && (
+              <div>
+                <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>E2E tests</h5>
                 <div className="space-y-1">
-                  {sortedArtifacts.map((doc) => (
+                  {e2eTestArtifacts.map((doc) => (
+                    <button
+                      key={doc.id}
+                      type="button"
+                      onClick={() => onSelectDoc?.(doc)}
+                      className="block w-full text-left text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:border-gray-400 transition-colors text-gray-700 font-mono"
+                    >
+                      {doc.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div>
+              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Context documents</h5>
+              {contextDocArtifacts.length > 0 ? (
+                <div className="space-y-1">
+                  {contextDocArtifacts.map((doc) => (
                     <button
                       key={doc.id}
                       type="button"

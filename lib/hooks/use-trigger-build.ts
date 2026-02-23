@@ -11,7 +11,12 @@ export interface TriggerBuildInput {
 export interface UseTriggerBuildResult {
   triggerBuild: (
     input: TriggerBuildInput
-  ) => Promise<{ runId?: string; error?: string }>;
+  ) => Promise<{
+    runId?: string;
+    error?: string;
+    message?: string;
+    outcomeType?: "success" | "error" | "decision_required";
+  }>;
   loading: boolean;
   error: string | null;
 }
@@ -25,9 +30,14 @@ export function useTriggerBuild(
   const triggerBuild = useCallback(
     async (
       input: TriggerBuildInput
-    ): Promise<{ runId?: string; error?: string }> => {
+    ): Promise<{
+      runId?: string;
+      error?: string;
+      message?: string;
+      outcomeType?: "success" | "error" | "decision_required";
+    }> => {
       if (!projectId) {
-        return { error: "No project selected" };
+        return { error: "No project selected", outcomeType: "error" };
       }
       setLoading(true);
       setError(null);
@@ -60,12 +70,31 @@ export function useTriggerBuild(
               ? parts.join("; ")
               : data.message ?? "Failed to trigger build";
           setError(msg);
-          return { error: msg };
+          return {
+            error: msg,
+            message: data.message ?? msg,
+            outcomeType:
+              data.outcome_type === "decision_required"
+                ? "decision_required"
+                : "error",
+          };
         }
-        return { runId: data.runId };
+        return {
+          runId: data.runId,
+          message: data.message ?? "Build started",
+          outcomeType:
+            data.outcome_type === "decision_required"
+              ? "decision_required"
+              : data.outcome_type === "error"
+                ? "error"
+                : "success",
+        };
       } catch {
         setError("Failed to trigger build");
-        return { error: "Failed to trigger build" };
+        return {
+          error: "Failed to trigger build",
+          outcomeType: "error",
+        };
       } finally {
         setLoading(false);
       }

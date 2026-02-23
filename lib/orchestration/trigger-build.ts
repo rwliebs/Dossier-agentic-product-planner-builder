@@ -144,34 +144,8 @@ export async function triggerBuild(
     };
   }
 
-  // Require at least one approved planned file per card so the agent gets concrete file intents (avoids README-only builds)
-  const cardsWithoutApprovedFiles: string[] = [];
-  for (const cardId of cardIds) {
-    const plannedFiles = await getCardPlannedFiles(db, cardId);
-    const approved = plannedFiles.filter(
-      (f) => (f as { status?: string }).status === "approved"
-    );
-    if (approved.length === 0) {
-      cardsWithoutApprovedFiles.push(cardId);
-    }
-  }
-  if (cardsWithoutApprovedFiles.length > 0) {
-    return {
-      success: false,
-      error: "Card(s) missing approved code files",
-      validationErrors: [
-        "Build requires at least one approved code file per card. In each card's 'Code Files to Create/Edit' section, add a file path and approve it, then trigger build.",
-        ...(cardsWithoutApprovedFiles.length <= 3
-          ? [`Cards without approved files: ${cardsWithoutApprovedFiles.join(", ")}`]
-          : [`${cardsWithoutApprovedFiles.length} cards without approved files`]),
-      ],
-      outcomeType: "decision_required",
-      message:
-        cardsWithoutApprovedFiles.length <= 3
-          ? `Decision required: approve planned code files first. Cards: ${cardsWithoutApprovedFiles.join(", ")}`
-          : `Decision required: approve planned code files for ${cardsWithoutApprovedFiles.length} cards first.`,
-    };
-  }
+  // Planned code files are optional. Clicking Build is user approval.
+  // When no approved files exist, allowed_paths defaults to ["src", "app", "lib", "components"].
 
   // Clone repo for single-card builds (MVP); multi-card requires worktrees (deferred)
   let clonePath: string | null = null;

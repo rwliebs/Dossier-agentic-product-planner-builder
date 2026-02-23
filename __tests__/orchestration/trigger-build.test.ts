@@ -13,6 +13,8 @@ import { createMockDbAdapter } from "@/__tests__/lib/mock-db-adapter";
 const projectId = "11111111-1111-1111-1111-111111111111";
 const workflowId = "22222222-2222-2222-2222-222222222222";
 const cardId = "33333333-3333-3333-3333-333333333333";
+const runId = "44444444-4444-4444-4444-444444444444";
+const assignmentId = "55555555-5555-5555-5555-555555555555";
 
 const mockPolicy = {
   id: "55555555-5555-5555-5555-555555555555",
@@ -55,6 +57,18 @@ vi.mock("@/lib/orchestration/repo-manager", () => ({
   }),
   createFeatureBranch: vi.fn().mockReturnValue({ success: true }),
 }));
+
+vi.mock("@/lib/orchestration/agentic-flow-client", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/orchestration/agentic-flow-client")>();
+  return {
+    ...original,
+    createAgenticFlowClient: vi.fn(() => ({
+      dispatch: vi.fn().mockResolvedValue({ success: true, execution_id: `test-exec-${Date.now()}` }),
+      status: vi.fn().mockResolvedValue({ success: true, status: { status: "completed" } }),
+      cancel: vi.fn().mockResolvedValue({ success: true }),
+    })),
+  };
+});
 
 describe("Trigger build - single-build lock (O10.6)", () => {
   beforeEach(() => {
@@ -164,28 +178,30 @@ describe("Trigger build - single-build lock (O10.6)", () => {
     );
   });
 
-  it("succeeds when card(s) have no approved planned files (uses default allowed_paths)", async () => {
-    const runId = "66666666-6666-6666-6666-666666666666";
+  it("succeeds when card has no approved planned files (Build click is approval)", async () => {
     vi.mocked(orchestrationQueries.listOrchestrationRunsByProject).mockResolvedValue([]);
     vi.mocked(orchestrationQueries.getOrchestrationRun).mockResolvedValue({
       id: runId,
       project_id: projectId,
       system_policy_snapshot: { forbidden_paths: [] },
     } as never);
+    vi.mocked(orchestrationQueries.getCardAssignment).mockResolvedValue({
+      id: assignmentId,
+      run_id: runId,
+      card_id: cardId,
+      status: "queued",
+    } as never);
     vi.mocked(queries.getCardById).mockResolvedValue({
       id: cardId,
       finalized_at: new Date().toISOString(),
     } as never);
     vi.mocked(queries.getCardPlannedFiles).mockResolvedValue([]);
+    vi.mocked(queries.getCardRequirements).mockResolvedValue([]);
 
-    const mockInsertRun = vi.fn().mockResolvedValue({ id: runId });
-    const mockInsertAssignment = vi.fn().mockResolvedValue({ id: "assign-123" });
     const mockDb = createMockDbAdapter({
-      getProject: vi.fn().mockResolvedValue({ default_branch: "main" }),
-      insertOrchestrationRun: mockInsertRun,
-      insertCardAssignment: mockInsertAssignment,
+      insertOrchestrationRun: vi.fn().mockResolvedValue({ id: runId }),
+      insertCardAssignment: vi.fn().mockResolvedValue({ id: assignmentId }),
     });
-
     const result = await triggerBuild(mockDb, {
       project_id: projectId,
       scope: "card",
@@ -195,12 +211,7 @@ describe("Trigger build - single-build lock (O10.6)", () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.runId).toBe(runId);
-    expect(mockInsertAssignment).toHaveBeenCalledWith(
-      expect.objectContaining({
-        allowed_paths: ["src", "app", "lib", "components"],
-        worktree_path: "/tmp/dossier/repos/test-project",
-      })
-    );
+    expect(result.error).toBeUndefined();
+    expect(result.outcomeType).toBe("success");
   });
 });

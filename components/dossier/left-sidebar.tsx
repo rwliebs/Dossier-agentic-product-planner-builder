@@ -73,6 +73,8 @@ interface LeftSidebarProps {
   width?: number;
   /** Called when user accepts preview and actions are applied (map should refresh) */
   onPlanningApplied?: () => void;
+  /** Called when planning state changes (thinking or populating) so parent can show global indicators */
+  onPlanningStateChange?: (isPlanning: boolean) => void;
   /** Called when user edits the project name, description, context fields, or repo link. May return a Promise that resolves to true if the update succeeded. */
   onProjectUpdate?: (updates: {
     name?: string;
@@ -112,7 +114,7 @@ function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: 
   );
 }
 
-export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, onPlanningApplied, onProjectUpdate }: LeftSidebarProps) {
+export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, onPlanningApplied, onPlanningStateChange, onProjectUpdate }: LeftSidebarProps) {
   const { data: projectFiles } = useProjectFiles(projectId);
   const contextFileTree = projectFiles && projectFiles.length > 0 ? projectFiles : [];
 
@@ -221,6 +223,10 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
       setExpandedSections(prev => (prev.has('chat') ? prev : new Set([...prev, 'chat'])));
     }
   }, [isThinking, isPopulating]);
+
+  useEffect(() => {
+    onPlanningStateChange?.(isThinking || isPopulating);
+  }, [isThinking, isPopulating, onPlanningStateChange]);
 
   const commitName = useCallback(() => {
     setEditingName(false);
@@ -499,9 +505,12 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
           variant="ghost"
           size="sm"
           onClick={() => onToggle(false)}
-          className="h-8 w-8 p-0"
+          className="h-8 w-8 p-0 relative"
         >
           <ChevronUp className="h-4 w-4" />
+          {(isThinking || isPopulating) && (
+            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary animate-pulse" aria-hidden />
+          )}
         </Button>
       </div>
     );
@@ -583,8 +592,15 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
           className="w-full flex items-center justify-between p-4 hover:bg-secondary transition-colors shrink-0"
         >
           <div className="flex items-center gap-2">
-            <Bot className="h-3.5 w-3.5" />
+            <Bot className={`h-3.5 w-3.5 ${(isThinking || isPopulating) ? 'animate-pulse' : ''}`} />
             <span className="text-xs uppercase tracking-wider font-mono font-bold">Agent</span>
+            {(isThinking || isPopulating) && (
+              <span className="text-[10px] text-muted-foreground font-normal normal-case tracking-normal">
+                {isPopulating && populateProgress
+                  ? `Populating ${populateProgress.current}/${populateProgress.total}…`
+                  : 'Creating map…'}
+              </span>
+            )}
           </div>
           {expandedSections.has('chat') ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
         </button>

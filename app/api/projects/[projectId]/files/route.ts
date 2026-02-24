@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/queries/orchestration";
 import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
 import {
+  getRepoFileTree,
   getRepoFileTreeWithStatus,
   getFileContent,
   getWorkingFileContent,
@@ -68,49 +69,87 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { searchParams } = new URL(request.url);
     const source = searchParams.get("source") ?? "planned";
+    const cardId = searchParams.get("cardId") ?? null;
 
     if (source === "repo") {
       const runs = await listOrchestrationRunsByProject(db, projectId, {
-        limit: 5,
+        limit: 20,
       });
-      const run = runs.find(
+      const runWithWorktree = runs.find(
         (r) => (r as { worktree_root?: string }).worktree_root
       );
-      if (!run) {
+      if (!runWithWorktree) {
         return json(
           { error: "No build with repository available. Trigger a build first." },
           404
         );
       }
-      const runRow = run as {
+      const defaultRun = runWithWorktree as {
         worktree_root: string;
         base_branch: string;
         id: string;
       };
-      const assignments = await getCardAssignmentsByRun(db, runRow.id);
-      const assignment = assignments.find(
-        (a) => (a as { worktree_path?: string }).worktree_path
-      ) as { feature_branch: string; worktree_path?: string | null } | undefined;
-      if (!assignment) {
-        return json(
-          { error: "No assignment with worktree. Trigger a build first." },
-          404
-        );
+
+      let assignment: { feature_branch: string; worktree_path?: string | null } | null = null;
+      let effectiveRun = defaultRun;
+
+      if (cardId) {
+        for (const run of runs) {
+          const wt = (run as { worktree_root?: string }).worktree_root;
+          if (!wt) continue;
+          const assignments = await getCardAssignmentsByRun(db, (run as { id: string }).id);
+          const found = assignments.find(
+            (a) =>
+              (a as { card_id: string }).card_id === cardId &&
+              (a as { worktree_path?: string }).worktree_path
+          ) as { feature_branch: string; worktree_path?: string | null } | undefined;
+          if (found) {
+            assignment = found;
+            effectiveRun = run as { worktree_root: string; base_branch: string; id: string };
+            break;
+          }
+        }
+      } else {
+        for (const run of runs) {
+          const wt = (run as { worktree_root?: string }).worktree_root;
+          if (!wt) continue;
+          const assignments = await getCardAssignmentsByRun(db, (run as { id: string }).id);
+          const hasCompleted = assignments.some(
+            (a) =>
+              (a as { status?: string }).status === "completed" &&
+              (a as { worktree_path?: string }).worktree_path
+          );
+          if (hasCompleted) {
+            effectiveRun = run as { worktree_root: string; base_branch: string; id: string };
+            break;
+          }
+        }
       }
-      const repoPath = assignment.worktree_path ?? runRow.worktree_root;
+
+      const useMainBranch = !assignment;
+      const effectiveBranch = useMainBranch
+        ? effectiveRun.base_branch
+        : assignment!.feature_branch;
+      const repoPath = assignment?.worktree_path ?? effectiveRun.worktree_root;
 
       const filePath = searchParams.get("path");
       const wantContent = searchParams.get("content") === "1";
       const wantDiff = searchParams.get("diff") === "1";
 
       if (wantContent && filePath) {
-        const workingContent = getWorkingFileContent(repoPath, filePath);
-        if (workingContent.success) {
-          return new Response(workingContent.content ?? "", {
-            headers: { "Content-Type": "text/plain; charset=utf-8" },
-          });
+        if (!useMainBranch) {
+          const workingContent = getWorkingFileContent(repoPath, filePath);
+          if (workingContent.success) {
+            return new Response(workingContent.content ?? "", {
+              headers: { "Content-Type": "text/plain; charset=utf-8" },
+            });
+          }
         }
-        const contentResult = getFileContent(repoPath, assignment.feature_branch, filePath);
+        const contentResult = getFileContent(
+          repoPath,
+          effectiveBranch,
+          filePath
+        );
         if (!contentResult.success) {
           return json(
             { error: contentResult.error ?? "Failed to read file" },
@@ -123,10 +162,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
 
       if (wantDiff && filePath) {
+        if (useMainBranch) {
+          return new Response("", {
+            headers: { "Content-Type": "text/x-diff; charset=utf-8" },
+          });
+        }
         const diffResult = getFileDiff(
           repoPath,
-          runRow.base_branch,
-          assignment.feature_branch,
+          effectiveRun.base_branch,
+          effectiveBranch,
           filePath
         );
         if (!diffResult.success) {
@@ -140,16 +184,47 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         });
       }
 
-      let result = getWorkingTreeFileTreeWithStatus(
-        repoPath,
-        assignment.feature_branch,
-        runRow.base_branch
-      );
-      if (!result.success) {
+      if (useMainBranch) {
+        const result = getRepoFileTree(repoPath, effectiveRun.base_branch);
+        if (!result.success) {
+          return json(
+            { error: result.error ?? "Failed to read repository files" },
+            500
+          );
+        }
+        return json(result.tree ?? []);
+      }
+
+      let result: { success: boolean; tree?: FileNode[]; error?: string };
+      let useWorkingTree = false;
+      try {
+        const { execSync } = await import("node:child_process");
+        const currentBranch = execSync("git rev-parse --abbrev-ref HEAD", {
+          cwd: repoPath,
+          encoding: "utf-8",
+        }).trim();
+        useWorkingTree = currentBranch === effectiveBranch;
+      } catch {
+        useWorkingTree = false;
+      }
+      if (useWorkingTree) {
+        result = getWorkingTreeFileTreeWithStatus(
+          repoPath,
+          effectiveBranch,
+          effectiveRun.base_branch
+        );
+      } else {
         result = getRepoFileTreeWithStatus(
           repoPath,
-          assignment.feature_branch,
-          runRow.base_branch
+          effectiveBranch,
+          effectiveRun.base_branch
+        );
+      }
+      if (!result.success && useWorkingTree) {
+        result = getRepoFileTreeWithStatus(
+          repoPath,
+          effectiveBranch,
+          effectiveRun.base_branch
         );
       }
       if (!result.success) {

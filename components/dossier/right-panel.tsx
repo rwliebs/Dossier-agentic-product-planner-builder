@@ -40,6 +40,12 @@ interface RightPanelProps {
   docsList?: ContextArtifact[];
   /** Called when user selects a doc from the list; pass null to clear selection */
   onSelectDoc?: (doc: ContextArtifact | null) => void;
+  /** When set, files tab shows this card's feature branch; null = main */
+  filesBranchCardId?: string | null;
+  /** Called when user switches branch context (null = main) */
+  onFilesBranchChange?: (cardId: string | null) => void;
+  /** Card title when filesBranchCardId is set (for display) */
+  filesBranchCardTitle?: string;
 }
 
 function StatusIndicator({ status }: { status?: FileNode["status"] }) {
@@ -128,6 +134,9 @@ export function RightPanel({
   width,
   docsList = [],
   onSelectDoc,
+  filesBranchCardId = null,
+  onFilesBranchChange,
+  filesBranchCardTitle,
 }: RightPanelProps) {
   const filesSource: ProjectFilesSource = "repo";
   const [selectedRepoFilePath, setSelectedRepoFilePath] = useState<string | null>(null);
@@ -139,7 +148,7 @@ export function RightPanel({
     loading: filesLoading,
     error: filesError,
     fetchFileContent,
-  } = useProjectFiles(projectId, filesSource);
+  } = useProjectFiles(projectId, filesSource, filesBranchCardId ?? undefined);
 
   const fileTree = projectFiles && projectFiles.length > 0 ? projectFiles : [];
 
@@ -197,10 +206,22 @@ export function RightPanel({
       <div className="flex-1 overflow-hidden">
         {activeTab === "files" && (
           <div className="h-full flex flex-col overflow-hidden">
-            <div className="px-3 py-2 border-b border-border flex items-center gap-2">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                <GitBranch className="h-3 w-3" />
-                <span>feature</span>
+            <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground min-w-0">
+                <GitBranch className="h-3 w-3 flex-shrink-0" />
+                {filesBranchCardId ? (
+                  <span className="truncate flex items-center gap-1.5">
+                    <span>feature</span>
+                    {filesBranchCardTitle && (
+                      <>
+                        <span className="text-foreground/40">•</span>
+                        <span className="text-foreground truncate">{filesBranchCardTitle}</span>
+                      </>
+                    )}
+                  </span>
+                ) : (
+                  <span>main</span>
+                )}
                 {filesLoading && projectId && (
                   <>
                     <span className="text-foreground/40">•</span>
@@ -208,6 +229,16 @@ export function RightPanel({
                   </>
                 )}
               </div>
+              {filesBranchCardId && onFilesBranchChange && (
+                <button
+                  type="button"
+                  onClick={() => onFilesBranchChange(null)}
+                  className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground flex-shrink-0"
+                  aria-label="Switch to main branch"
+                >
+                  Show main
+                </button>
+              )}
             </div>
             {filesError && (
               <div className="px-3 py-2 text-xs text-destructive">

@@ -118,9 +118,11 @@ export default function DossierPage() {
   const availableFilePaths = projectFilesTree ? flattenFilePaths(projectFilesTree) : [];
 
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [isPlanning, setIsPlanning] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [rightPanelTab, setRightPanelTab] = useState<'files' | 'docs' | 'chat'>('files');
   const [selectedDoc, setSelectedDoc] = useState<ContextArtifact | null>(null);
+  const [filesBranchCardId, setFilesBranchCardId] = useState<string | null>(null);
 
   const LEFT_WIDTH_KEY = 'dossier_left_sidebar_width';
   const RIGHT_WIDTH_KEY = 'dossier_right_panel_width';
@@ -181,6 +183,7 @@ export default function DossierPage() {
           toast.warning(result.message ?? result.error ?? 'Decision required before build can continue');
         } else if (result.runId && result.outcomeType === 'success') {
           toast.success(result.message ?? 'Build started — agent is working');
+          setFilesBranchCardId(cardId);
           setRightPanelTab('files');
           setRightPanelOpen(true);
           refetch();
@@ -202,6 +205,7 @@ export default function DossierPage() {
         const { toast } = await import('sonner');
         if (result.outcomeType === 'success') {
           toast.success(result.message ?? 'Build resumed — agent is working');
+          setFilesBranchCardId(cardId);
           setRightPanelTab('files');
           setRightPanelOpen(true);
           refetch();
@@ -215,6 +219,12 @@ export default function DossierPage() {
     [resumeBlocked, refetch]
   );
 
+  const handleShowCardFiles = useCallback((cardId: string) => {
+    setFilesBranchCardId(cardId);
+    setRightPanelTab('files');
+    setRightPanelOpen(true);
+  }, []);
+
   const handleCardAction = useCallback(
     (cardId: string, action: string) => {
       if (action === 'build') {
@@ -222,6 +232,7 @@ export default function DossierPage() {
         return;
       }
       if (action === 'monitor' || action === 'test') {
+        setFilesBranchCardId(cardId);
         setRightPanelTab('files');
         setRightPanelOpen(true);
       } else if (action === 'reply') {
@@ -894,6 +905,7 @@ export default function DossierPage() {
             setAgentStatus(hasContent ? 'reviewing' : 'building');
             refetch();
           }}
+          onPlanningStateChange={setIsPlanning}
           onProjectUpdate={handleProjectUpdate}
         />
         </ChatErrorBoundary>
@@ -911,21 +923,30 @@ export default function DossierPage() {
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center max-w-md px-6">
                 <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-secondary mb-6">
-                  <Sparkles className="h-8 w-8 text-muted-foreground" />
+                  <Sparkles className={`h-8 w-8 text-muted-foreground ${isPlanning ? 'animate-pulse' : ''}`} />
                 </div>
-                <h2 className="text-xl font-semibold text-foreground mb-3">Describe your idea</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-3">
+                  {isPlanning ? 'Creating your map' : 'Describe your idea'}
+                </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Use the Agent chat in the left panel to describe what you want to build.
-                  The planning agent will generate workflows, activities, and cards for your implementation map.
+                  {isPlanning
+                    ? 'The planning agent is structuring your idea into workflows, activities, and cards.'
+                    : 'Use the Agent chat in the left panel to describe what you want to build. The planning agent will generate workflows, activities, and cards for your implementation map.'}
                 </p>
                 <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                  <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
-                  <span>Waiting for your input...</span>
+                  <div className={`h-2 w-2 rounded-full ${isPlanning ? 'bg-primary animate-pulse' : 'bg-yellow-500 animate-pulse'}`} />
+                  <span>{isPlanning ? 'Creating your map…' : 'Waiting for your input…'}</span>
                 </div>
               </div>
             </div>
           ) : (
             <>
+              {isPlanning && (
+                <div className="flex-shrink-0 flex items-center justify-center gap-2 py-2 px-3 bg-primary/10 border-b border-grid-line text-xs text-muted-foreground">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                  <span>Updating map…</span>
+                </div>
+              )}
               <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-auto scrollbar-map">
                 {mapLoading && <MapSkeleton />}
                 {!mapLoading && mapError && (
@@ -959,6 +980,7 @@ export default function DossierPage() {
                     onApprovePlannedFile={handleApprovePlannedFile}
                     onBuildCard={handleBuildCard}
                     onResumeBlockedCard={handleResumeBlockedCard}
+                    onShowCardFiles={handleShowCardFiles}
                     buildingCardId={buildingCardId}
                     onFinalizeCard={handleFinalizeCard}
                     finalizingCardId={finalizingCardId}
@@ -1007,6 +1029,15 @@ export default function DossierPage() {
               projectId={appMode === 'active' ? projectId : undefined}
               width={rightWidth}
               docsList={projectArtifacts ?? []}
+              filesBranchCardId={filesBranchCardId}
+              onFilesBranchChange={setFilesBranchCardId}
+              filesBranchCardTitle={
+                filesBranchCardId && snapshot
+                  ? snapshot.workflows
+                      .flatMap((wf) => wf.activities.flatMap((a) => a.cards))
+                      .find((c) => c.id === filesBranchCardId)?.title
+                  : undefined
+              }
               onSelectDoc={async (doc) => {
                 if (!doc) {
                   setSelectedDoc(null);

@@ -21,6 +21,7 @@ export interface ActivityColumnProps {
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
   onResumeBlockedCard?: (cardId: string) => void;
+  onShowCardFiles?: (cardId: string) => void;
   buildingCardId?: string | null;
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
@@ -49,6 +50,7 @@ export function ActivityColumn({
   onApprovePlannedFile,
   onBuildCard,
   onResumeBlockedCard,
+  onShowCardFiles,
   buildingCardId,
   onFinalizeCard,
   finalizingCardId,
@@ -101,6 +103,7 @@ export function ActivityColumn({
               onApprovePlannedFile={onApprovePlannedFile}
               onBuildCard={onBuildCard}
               onResumeBlockedCard={onResumeBlockedCard}
+              onShowCardFiles={onShowCardFiles}
               buildingCardId={buildingCardId}
               onFinalizeCard={onFinalizeCard}
               finalizingCardId={finalizingCardId}

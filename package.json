@@ -32,6 +32,7 @@
     "demo:mock-tasks": "tsx examples/run-mock-task-demo.ts",
     "generate:mock-task": "tsx examples/generate-mock-task.ts",
     "validate:payload": "tsx examples/validate-mock-payload.ts",
+    "commit-all-to-branches": "tsx scripts/commit-all-to-branches.ts",
     "start": "next start",
     "dossier": "node bin/dossier.mjs",
     "prepare": "husky"

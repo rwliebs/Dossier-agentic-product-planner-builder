@@ -46,6 +46,8 @@ interface ImplementationCardProps {
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
   onResumeBlockedCard?: (cardId: string) => void;
+  /** When provided, shows a Review button that opens the files pane with this card's feature branch */
+  onShowCardFiles?: (cardId: string) => void;
   buildingCardId?: string | null;
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
@@ -128,6 +130,7 @@ export function ImplementationCard({
   onApprovePlannedFile,
   onBuildCard,
   onResumeBlockedCard,
+  onShowCardFiles,
   buildingCardId,
   onFinalizeCard,
   finalizingCardId,
@@ -529,14 +532,28 @@ export function ImplementationCard({
               Finalized
             </div>
           )}
-          <button
-            type="button"
-            disabled={unifiedState.disabled}
-            onClick={handleUnifiedAction}
-            className={`w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold text-white rounded transition-colors ${unifiedState.buttonClass}`}
-          >
-            {unifiedState.label}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={unifiedState.disabled}
+              onClick={handleUnifiedAction}
+              className={`flex-1 px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold text-white rounded transition-colors ${unifiedState.buttonClass}`}
+            >
+              {unifiedState.label}
+            </button>
+            {onShowCardFiles && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShowCardFiles(card.id);
+                }}
+                className="px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-medium text-muted-foreground hover:text-foreground border border-border rounded hover:bg-accent/50 transition-colors"
+              >
+                {ACTION_BUTTONS.REVIEW_FILES}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

@@ -1,26 +1,51 @@
 import { NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
+import { promisify } from 'util';
+import { exec } from 'child_process';
+
+const execAsync = promisify(exec);
+
+const VIEW_PORT_START = 3001;
+const VIEW_PORT_END = 3010;
+
+async function findFreePort(): Promise<number | null> {
+  for (let port = VIEW_PORT_START; port <= VIEW_PORT_END; port++) {
+    try {
+      await execAsync(`lsof -ti :${port}`, { encoding: 'utf8' });
+      // lsof returned output = port in use
+    } catch {
+      // lsof exited non-zero = port free
+      return port;
+    }
+  }
+  return null;
+}
 
 /**
  * POST /api/dev/restart-and-open
  *
- * Kills the dev server on port 3000, restarts it, and opens the browser.
- * Spawns a detached child process so the API can respond before the server is killed.
+ * Starts a second dev server and opens it in a new browser tab.
+ * Tries ports 3001, 3002, ... until a free port is found.
+ * Does not kill or restart the primary server on 3000.
+ * Spawns a detached child process so the API can respond immediately.
  * Dev-only: intended for local development workflow.
  */
 export async function POST() {
   const root = path.resolve(process.cwd());
-  const port = 3000;
-  const url = `http://localhost:${port}`;
+  const port = await findFreePort();
 
-  // Script: wait for API response, kill server, restart (detached), wait for ready, open browser
+  if (port === null) {
+    return NextResponse.json(
+      { error: `No free port in ${VIEW_PORT_START}-${VIEW_PORT_END}. All view ports are in use.` },
+      { status: 503 }
+    );
+  }
+
   const script = [
-    `sleep 2`,
-    `lsof -ti :${port} | xargs kill -9 2>/dev/null || true`,
-    `cd "${root}" && nohup npm run dev > /tmp/dossier-dev.log 2>&1 &`,
+    `cd "${root}" && PORT=${port} nohup npm run dev > /tmp/dossier-view-${port}.log 2>&1 &`,
     `sleep 10`,
-    `(command -v open >/dev/null 2>&1 && open "${url}") || (command -v xdg-open >/dev/null 2>&1 && xdg-open "${url}") || true`,
+    `(command -v open >/dev/null 2>&1 && open "http://localhost:${port}") || (command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:${port}") || true`,
   ].join(' && ');
 
   const child = spawn('bash', ['-c', script], {
@@ -32,6 +57,6 @@ export async function POST() {
 
   return NextResponse.json({
     ok: true,
-    message: 'Restarting server and opening browser. Page will load in ~10 seconds.',
+    message: `Starting second server on port ${port} and opening new tab. Page will load in ~10 seconds.`,
   });
 }

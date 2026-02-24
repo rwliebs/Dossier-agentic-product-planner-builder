@@ -160,14 +160,14 @@ export function WorkflowBlock({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const { toast } = await import('sonner');
-        toast.error((data as { error?: string }).error ?? 'Failed to restart server');
+        toast.error((data as { error?: string }).error ?? 'Failed to start server');
         return;
       }
       const { toast } = await import('sonner');
-      toast.success('Restarting server and opening browser…');
+      toast.success('Starting second server and opening new tab…');
     } catch (e) {
       const { toast } = await import('sonner');
-      toast.error(e instanceof Error ? e.message : 'Failed to restart server');
+      toast.error(e instanceof Error ? e.message : 'Failed to start server');
     } finally {
       setViewOnServerLoading(false);
     }

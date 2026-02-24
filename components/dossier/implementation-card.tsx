@@ -45,6 +45,7 @@ interface ImplementationCardProps {
   availableFilePaths?: string[];
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
+  onResumeBlockedCard?: (cardId: string) => void;
   buildingCardId?: string | null;
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
@@ -126,6 +127,7 @@ export function ImplementationCard({
   availableFilePaths = [],
   onApprovePlannedFile,
   onBuildCard,
+  onResumeBlockedCard,
   buildingCardId,
   onFinalizeCard,
   finalizingCardId,
@@ -395,9 +397,16 @@ export function ImplementationCard({
           )}
           <button
             type="button"
-            disabled={buildingCardId === card.id || card.build_state === 'blocked'}
+            disabled={
+              buildingCardId === card.id ||
+              (card.build_state === 'blocked' && !onResumeBlockedCard)
+            }
             onClick={(e) => {
               e.stopPropagation();
+              if (card.build_state === 'blocked' && onResumeBlockedCard) {
+                onResumeBlockedCard(card.id);
+                return;
+              }
               const action = status === 'active' ? 'monitor' : status === 'review' ? 'test' : 'build';
               if (action === 'build' && onBuildCard && card.finalized_at) {
                 onBuildCard(card.id);
@@ -408,12 +417,20 @@ export function ImplementationCard({
             className={`w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold text-white rounded transition-colors ${
               buildingCardId === card.id
                 ? 'bg-amber-500 cursor-not-allowed animate-pulse'
-                : card.build_state === 'blocked'
-                  ? 'bg-amber-400 cursor-not-allowed opacity-60'
-                  : config.button
+                : card.build_state === 'blocked' && onResumeBlockedCard
+                  ? 'bg-amber-600 hover:bg-amber-700'
+                  : card.build_state === 'blocked'
+                    ? 'bg-amber-400 cursor-not-allowed opacity-60'
+                    : config.button
             }`}
           >
-            {buildingCardId === card.id ? 'Building…' : card.build_state === 'blocked' ? 'Blocked' : getActionButtonText()}
+            {buildingCardId === card.id
+              ? 'Building…'
+              : card.build_state === 'blocked' && onResumeBlockedCard
+                ? 'Resume build'
+                : card.build_state === 'blocked'
+                  ? 'Blocked'
+                  : getActionButtonText()}
           </button>
         </div>
       </div>
@@ -635,87 +652,6 @@ export function ImplementationCard({
               )}
             </div>
 
-            {(card.build_state != null || card.last_built_at != null) && (
-            <>
-            <div>
-              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Known Facts</h5>
-              {facts.length > 0 ? (
-                <ul className="space-y-1">
-                  {facts.map((fact) => (
-                    <li key={fact.id} className="text-xs text-gray-600 flex items-center gap-2 flex-wrap">
-                      • {fact.text}
-                      {fact.evidence_source && <span className="text-[10px]">({fact.evidence_source})</span>}
-                      <KnowledgeBadge status={fact.status} />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">None — populated by execution agent</p>
-              )}
-            </div>
-
-            <div>
-              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Assumptions</h5>
-              {assumptions.length > 0 ? (
-                <ul className="space-y-1">
-                  {assumptions.map((a) => (
-                    <li key={a.id} className="text-xs text-gray-600 flex items-center gap-2 flex-wrap">
-                      • {a.text}
-                      <KnowledgeBadge status={a.status} />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">None — populated by execution agent</p>
-              )}
-            </div>
-
-            <div className={card.build_state === 'blocked' ? 'rounded border-2 border-amber-400 bg-amber-50/50 p-2 -m-0.5' : ''}>
-              <h5 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700 mb-2">Questions</h5>
-              {questions.length > 0 ? (
-                <ul className="space-y-1 mb-3">
-                  {questions.map((q) => (
-                    <li key={q.id} className="text-xs text-gray-600 flex items-center gap-2 flex-wrap">
-                      • {q.text}
-                      <KnowledgeBadge status={q.status} />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-muted-foreground italic mb-3">None — populated by execution agent</p>
-              )}
-              <div className="border-t border-yellow-200 pt-2">
-                {isEditingQuickAnswer ? (
-                  <div className="space-y-2">
-                    <textarea
-                      value={editedQuickAnswer}
-                      onChange={(e) => setEditedQuickAnswer(e.target.value)}
-                      className="w-full text-xs p-2 bg-white border border-gray-300 rounded text-gray-900"
-                      placeholder="Provide an answer or clarification..."
-                      rows={2}
-                    />
-                    <div className="flex gap-2">
-                      <button type="button" onClick={handleSaveQuickAnswer} className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-green-600 text-white rounded hover:bg-green-700">
-                        <Check className="h-3 w-3" /> Save
-                      </button>
-                      <button type="button" onClick={handleCancelQuickAnswer} className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
-                        <X className="h-3 w-3" /> Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="group/answer flex items-start gap-2">
-                    <p className="text-xs text-gray-600 flex-1 leading-relaxed">{quickAnswer || 'Awaiting response...'}</p>
-                    <button type="button" onClick={() => setIsEditingQuickAnswer(true)} className="opacity-0 group-hover/answer:opacity-100 transition-opacity p-1 hover:bg-black/5 rounded">
-                      <Edit2 className="h-3 w-3 text-gray-400" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            </>
-            )}
             </>
             )}
 

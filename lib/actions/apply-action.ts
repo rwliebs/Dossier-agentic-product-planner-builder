@@ -6,6 +6,7 @@ import {
   cardExists,
   getMaxPosition,
   getActivityCards,
+  getWorkflowActivities,
 } from "@/lib/schemas/planning-state";
 import type {
   UpdateProjectPayload,
@@ -256,6 +257,91 @@ function applyReorderCard(
     position: payload.new_position,
   });
 
+  return { success: true, newState: state };
+}
+
+function removeCardFromState(state: PlanningState, cardId: string): void {
+  state.cards.delete(cardId);
+  state.cardContextLinks.delete(cardId);
+  state.cardRequirements.delete(cardId);
+  state.cardFacts.delete(cardId);
+  state.cardAssumptions.delete(cardId);
+  state.cardQuestions.delete(cardId);
+  state.cardPlannedFiles.delete(cardId);
+}
+
+function applyDeleteCard(
+  action: PlanningAction,
+  state: PlanningState,
+): MutationResult {
+  const target_ref = action.target_ref as { card_id: string };
+  const card = state.cards.get(target_ref.card_id);
+
+  if (!card) {
+    return {
+      success: false,
+      error: {
+        code: "constraint_violation",
+        message: `Card ${target_ref.card_id} not found`,
+      },
+    };
+  }
+
+  removeCardFromState(state, target_ref.card_id);
+  return { success: true, newState: state };
+}
+
+function applyDeleteActivity(
+  action: PlanningAction,
+  state: PlanningState,
+): MutationResult {
+  const target_ref = action.target_ref as { workflow_activity_id: string };
+  const activity = state.activities.get(target_ref.workflow_activity_id);
+
+  if (!activity) {
+    return {
+      success: false,
+      error: {
+        code: "constraint_violation",
+        message: `Activity ${target_ref.workflow_activity_id} not found`,
+      },
+    };
+  }
+
+  const cardIds = getActivityCards(state, target_ref.workflow_activity_id).map((c) => c.id);
+  for (const cardId of cardIds) {
+    removeCardFromState(state, cardId);
+  }
+  state.activities.delete(target_ref.workflow_activity_id);
+  return { success: true, newState: state };
+}
+
+function applyDeleteWorkflow(
+  action: PlanningAction,
+  state: PlanningState,
+): MutationResult {
+  const target_ref = action.target_ref as { workflow_id: string };
+  const workflow = state.workflows.get(target_ref.workflow_id);
+
+  if (!workflow) {
+    return {
+      success: false,
+      error: {
+        code: "constraint_violation",
+        message: `Workflow ${target_ref.workflow_id} not found`,
+      },
+    };
+  }
+
+  const activityIds = getWorkflowActivities(state, target_ref.workflow_id).map((a) => a.id);
+  for (const activityId of activityIds) {
+    const cardIds = getActivityCards(state, activityId).map((c) => c.id);
+    for (const cardId of cardIds) {
+      removeCardFromState(state, cardId);
+    }
+    state.activities.delete(activityId);
+  }
+  state.workflows.delete(target_ref.workflow_id);
   return { success: true, newState: state };
 }
 

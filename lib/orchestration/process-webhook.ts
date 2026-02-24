@@ -332,9 +332,10 @@ export async function processWebhook(
         });
       }
 
-      // Close run when all assignments are terminal so trigger-build lock is released
+      // Close run when all assignments are terminal so trigger-build lock is released.
+      // "blocked" is NOT terminal: blocked assignments wait for user input and can resume.
       const assignments = await getCardAssignmentsByRun(db, runId);
-      const terminalStatuses = ["completed", "failed", "blocked"];
+      const terminalStatuses = ["completed", "failed"];
       const allTerminal =
         assignments.length > 0 &&
         assignments.every((a) =>

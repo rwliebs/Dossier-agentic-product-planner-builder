@@ -211,6 +211,27 @@ describe("Webhook processing", () => {
     );
   });
 
+  it("execution_completed does NOT close run when any assignment is blocked (keeps run open for user input)", async () => {
+    const mockUpdateOrchestrationRun = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(orchestrationQueries.getCardAssignmentsByRun).mockResolvedValue([
+      { id: assignmentId, run_id: runId, status: "completed" },
+      { id: "other-assignment-id", run_id: runId, status: "blocked" },
+    ] as never);
+    const mockDb = createMockDbAdapter({
+      updateOrchestrationRun: mockUpdateOrchestrationRun,
+    });
+
+    const result = await processWebhook(mockDb, {
+      event_type: "execution_completed",
+      assignment_id: assignmentId,
+      run_id: runId,
+      summary: "Done",
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockUpdateOrchestrationRun).not.toHaveBeenCalled();
+  });
+
   it("execution_failed updates run status", async () => {
     const mockDb = createMockDbAdapter();
 

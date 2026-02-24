@@ -926,7 +926,7 @@ export default function DossierPage() {
             </div>
           ) : (
             <>
-              <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-auto">
+              <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-auto scrollbar-map">
                 {mapLoading && <MapSkeleton />}
                 {!mapLoading && mapError && (
                   <div className="flex flex-col items-center justify-center py-16 gap-2">

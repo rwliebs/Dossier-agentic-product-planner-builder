@@ -318,7 +318,7 @@ export function WorkflowBlock({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="min-w-max overflow-x-auto">
         {viewMode === 'functionality' ? (
           <StoryMapCanvas
             workflows={snapshot.workflows}

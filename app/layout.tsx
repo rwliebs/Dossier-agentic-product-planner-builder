@@ -6,9 +6,9 @@ import { Toaster } from 'sonner'
 import { ErrorBoundary } from '@/components/error-boundary'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
-const _inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "900"] });
+const geist = Geist({ subsets: ["latin"] });
+const geistMono = Geist_Mono({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "900"] });
 
 export const metadata: Metadata = {
   title: 'Dossier — AI-Native Product Building Platform',
@@ -40,7 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`font-sans antialiased`}>
+      <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
         <ErrorBoundary title="Something went wrong">
           {children}
         </ErrorBoundary>

@@ -15,6 +15,9 @@ import {
 } from "@/lib/llm/planning-prompt";
 import { runLlmSubStep } from "@/lib/llm/run-llm-substep";
 import { runFinalizeMultiStep } from "@/lib/llm/run-finalize-multistep";
+import { getArtifactsByProject, getProject } from "@/lib/db/queries";
+import { parseRootFoldersFromArchitecturalSummary } from "@/lib/orchestration/parse-root-folders";
+import { ensureClone, createRootFoldersInRepo } from "@/lib/orchestration/repo-manager";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
 import { getWorkflowActivities } from "@/lib/schemas/planning-state";
 import { json } from "@/lib/api/response-helpers";
@@ -104,6 +107,35 @@ export async function POST(
         emit: noopEmit,
         mockResponse: mock_response,
       });
+
+      const artifacts = await getArtifactsByProject(db, projectId);
+      const archSummary = artifacts.find(
+        (a: Record<string, unknown>) => (a.name as string) === "architectural-summary"
+      );
+      const content = (archSummary as { content?: string } | undefined)?.content ?? "";
+      const rootFolders = parseRootFoldersFromArchitecturalSummary(content);
+
+      const project = await getProject(db, projectId);
+      const repoUrl = (project as { repo_url?: string })?.repo_url;
+      const baseBranch = (project as { default_branch?: string })?.default_branch ?? "main";
+      if (repoUrl && !repoUrl.includes("placeholder") && rootFolders.length > 0) {
+        const cloneResult = ensureClone(projectId, repoUrl, null, baseBranch);
+        if (cloneResult.success && cloneResult.clonePath) {
+          const folderResult = createRootFoldersInRepo(
+            cloneResult.clonePath,
+            rootFolders,
+            baseBranch
+          );
+          if (!folderResult.success) {
+            console.warn("[chat] Root folder creation failed:", folderResult.error);
+          }
+        }
+      } else if (!repoUrl || repoUrl.includes("placeholder")) {
+        console.warn("[chat] No repo connected; skipping root folder creation");
+      }
+
+      const now = new Date().toISOString();
+      await db.updateProject(projectId, { finalized_at: now });
       return json({
         status: "success",
         responseType: "actions" as const,

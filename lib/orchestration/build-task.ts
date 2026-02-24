@@ -186,12 +186,16 @@ ${worktreeSection}`);
   if (plannedFilesDetail.length > 0) {
     sections.push(`## Planned files (with intent)`);
     for (const pf of plannedFilesDetail) {
-      let line = `- \`${pf.logical_file_name}\` (${pf.action}, ${pf.artifact_kind}): ${pf.intent_summary}`;
+      const isFolder = pf.logical_file_name.endsWith("/") || !/\.[a-z0-9]+$/i.test(pf.logical_file_name);
+      const scopeHint = isFolder
+        ? " (folder scope: create or edit files under this path)"
+        : "";
+      let line = `- \`${pf.logical_file_name}\` (${pf.action}, ${pf.artifact_kind})${scopeHint}: ${pf.intent_summary}`;
       if (pf.contract_notes) line += `\n  Contract: ${pf.contract_notes}`;
       if (pf.module_hint) line += `\n  Module hint: ${pf.module_hint}`;
       sections.push(line);
     }
-    sections.push(`Only modify files within the allowed paths above.`);
+    sections.push(`Only modify files within the allowed paths above. Paths ending with / or without file extensions are folder scopes — create or edit files under that path.`);
   } else if (allowedPaths.length > 0) {
     sections.push(`## Planned files
 Create or edit files under these allowed paths:

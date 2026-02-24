@@ -117,7 +117,7 @@ describe("ImplementationCard", () => {
     expect(onAction).not.toHaveBeenCalled();
   });
 
-  it("Finalize button shown when unfinalized todo and onFinalizeCard provided", () => {
+  it("Finalize button shown when unfinalized todo and onFinalizeCard and projectFinalized provided", () => {
     const onFinalizeCard = vi.fn();
     const unfinalizedCard: MapCard = {
       ...baseCard,
@@ -132,12 +132,37 @@ describe("ImplementationCard", () => {
         onExpand={() => {}}
         onAction={() => {}}
         onFinalizeCard={onFinalizeCard}
+        projectFinalized={true}
         onUpdateDescription={() => {}}
       />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: new RegExp(ACTION_BUTTONS.FINALIZE_CARD, "i") }));
     expect(onFinalizeCard).toHaveBeenCalledWith("card-1");
+  });
+
+  it("Finalize button hidden when projectFinalized is false", () => {
+    const onFinalizeCard = vi.fn();
+    const unfinalizedCard: MapCard = {
+      ...baseCard,
+      status: "todo",
+      finalized_at: null,
+    };
+
+    render(
+      <ImplementationCard
+        card={unfinalizedCard}
+        isExpanded={false}
+        onExpand={() => {}}
+        onAction={() => {}}
+        onFinalizeCard={onFinalizeCard}
+        projectFinalized={false}
+        onUpdateDescription={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: new RegExp(ACTION_BUTTONS.FINALIZE_CARD, "i") })).not.toBeInTheDocument();
+    expect(onFinalizeCard).not.toHaveBeenCalled();
   });
 
   it("Merge feature button calls onAction('merge') for completed build", () => {

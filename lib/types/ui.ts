@@ -74,6 +74,7 @@ export interface MapSnapshot {
     design_inspiration: string | null;
     repo_url: string | null;
     default_branch: string;
+    finalized_at?: string | null;
   };
   workflows: MapWorkflow[];
 }

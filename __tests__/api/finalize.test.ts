@@ -3,8 +3,9 @@
  * Covers GET (assemble package) and POST (confirm finalization) per Workflow E.
  *
  * Product outcomes (user-workflows-reference.md):
- * - Build trigger requires finalized_at; planned files optional
- * - POST finalize validates requirements; planned files optional
+ * - Project must be finalized before cards can be finalized
+ * - Build trigger requires finalized_at and approved planned files/folders
+ * - POST finalize validates: project finalized, requirements, approved planned files/folders
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -15,6 +16,10 @@ const projectId = "11111111-1111-1111-1111-111111111111";
 const cardId = "22222222-2222-2222-2222-222222222222";
 
 const mockDb = createMockDbAdapter({
+  getProject: vi.fn().mockResolvedValue({
+    id: projectId,
+    finalized_at: "2026-01-01T00:00:00.000Z",
+  }),
   verifyCardInProject: vi.fn().mockResolvedValue(true),
   getCardById: vi.fn().mockResolvedValue({
     id: cardId,
@@ -96,6 +101,10 @@ function parseSSE(text: string): Array<{ event: string; data: unknown }> {
 describe("Card finalize API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(mockDb.getProject).mockResolvedValue({
+      id: projectId,
+      finalized_at: "2026-01-01T00:00:00.000Z",
+    } as never);
     vi.mocked(mockDb.verifyCardInProject).mockResolvedValue(true);
     vi.mocked(mockDb.getCardById).mockResolvedValue({
       id: cardId,
@@ -192,7 +201,7 @@ describe("Card finalize API", () => {
     expect(mockDb.updateCard).not.toHaveBeenCalled();
   });
 
-  it("POST sets finalized_at when card has requirements but no planned files", async () => {
+  it("POST returns 400 when card has requirements but no approved planned files", async () => {
     vi.mocked(mockDb.getCardPlannedFiles).mockResolvedValue([]);
 
     const { POST } = await import(
@@ -206,21 +215,33 @@ describe("Card finalize API", () => {
       params: Promise.resolve({ projectId, cardId }),
     });
 
-    expect(res.status).toBe(200);
-    expect(res.headers.get("Content-Type")).toBe("text/event-stream");
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toMatch(/planned file|planned folder/i);
+    expect(mockDb.updateCard).not.toHaveBeenCalled();
+  });
 
-    const text = await res.text();
-    const events = parseSSE(text);
+  it("POST returns 400 when project is not finalized", async () => {
+    vi.mocked(mockDb.getProject).mockResolvedValue({
+      id: projectId,
+      finalized_at: null,
+    } as never);
 
-    const phaseComplete = events.find((e) => e.event === "phase_complete");
-    expect(phaseComplete).toBeDefined();
-    const pcData = phaseComplete!.data as Record<string, unknown>;
-    expect(pcData.finalized_at).toBeDefined();
-
-    expect(mockDb.updateCard).toHaveBeenCalledWith(
-      cardId,
-      expect.objectContaining({ finalized_at: expect.any(String) })
+    const { POST } = await import(
+      "@/app/api/projects/[projectId]/cards/[cardId]/finalize/route"
     );
+    const req = new NextRequest(
+      `http://localhost/api/projects/${projectId}/cards/${cardId}/finalize`,
+      { method: "POST" }
+    );
+    const res = await POST(req, {
+      params: Promise.resolve({ projectId, cardId }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toMatch(/project must be finalized/i);
+    expect(mockDb.updateCard).not.toHaveBeenCalled();
   });
 
   it("POST returns 400 when card is already finalized", async () => {

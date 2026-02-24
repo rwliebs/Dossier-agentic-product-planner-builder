@@ -29,6 +29,7 @@ export interface StoryMapCanvasProps {
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
   cardFinalizeProgress?: string;
+  projectFinalized?: boolean;
   onSelectDoc?: (doc: ContextArtifact) => void;
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
   getCardKnowledgeLoading?: (cardId: string) => boolean;
@@ -66,6 +67,7 @@ export function StoryMapCanvas({
   onFinalizeCard,
   finalizingCardId,
   cardFinalizeProgress,
+  projectFinalized,
   onSelectDoc,
   getCardKnowledge,
   getCardKnowledgeLoading,
@@ -218,6 +220,7 @@ export function StoryMapCanvas({
                         onFinalizeCard={onFinalizeCard}
                         finalizingCardId={finalizingCardId}
                         cardFinalizeProgress={cardFinalizeProgress}
+                        projectFinalized={projectFinalized}
                         onSelectDoc={onSelectDoc}
                         getCardKnowledge={getCardKnowledge as ActivityColumnProps['getCardKnowledge']}
                         getCardKnowledgeLoading={getCardKnowledgeLoading}

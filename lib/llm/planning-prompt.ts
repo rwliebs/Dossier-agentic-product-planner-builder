@@ -123,6 +123,12 @@ Use this to set or update project context as you learn about what the user is bu
 - payload: { "item_type": "requirement", "text": "Concrete requirement (e.g. User can filter by category)", "position": 0 }
 - Emit 1-3 per card after createCard actions.
 
+## upsertCardPlannedFile
+- target_ref: { "card_id": "<the card's id>" }
+- payload: { "logical_file_name": "path/to/file or folder/", "artifact_kind": "component"|"endpoint"|"page"|"hook"|"lib"|"schema"|"service", "action": "create"|"edit", "intent_summary": "What this file/folder is for" }
+- For new builds, you may use a folder path (e.g. components/auth/, app/dashboard/) when the exact filenames are not yet known. Use action "create" and intent_summary to describe what files belong there (e.g. "Authentication UI components: LoginForm, RegisterForm"). The execution agent will create files under that path.
+- Cards require at least one approved planned file or folder before finalization.
+
 ## Example: First message — user says "I want to build a marketplace"
 \`\`\`json
 {
@@ -463,7 +469,13 @@ export const FINALIZE_DOC_SPECS: FinalizeDocSpec[] = [
 - Service topology (frontend, backend, database, external services)
 - Key architectural patterns (state management, routing, data fetching)
 - Deployment model
-- Derived from: project tech_stack, deployment, design_inspiration, and the planned file intents across cards`,
+- Derived from: project tech_stack, deployment, design_inspiration, and the planned file intents across cards
+
+## Root folder structure (REQUIRED)
+You MUST include a "## Root folder structure" section with a bullet list of root-level folder paths for the repo (e.g. app/, components/, lib/, src/). Derive from tech_stack (e.g. Next.js → app/, components/, lib/; React+Vite → src/, components/). Use one path per line, e.g.:
+- app/
+- components/
+- lib/`,
   },
   {
     name: "data-contracts",

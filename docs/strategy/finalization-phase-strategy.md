@@ -59,7 +59,7 @@ Each project document gets its own LLM call with a focused prompt. The five cate
 
 | Document | Artifact Type | Content |
 |----------|--------------|---------|
-| Architectural Summary | `doc` | Tech stack, service topology, key patterns, deployment model |
+| Architectural Summary | `doc` | Tech stack, service topology, key patterns, deployment model; MUST include "## Root folder structure" with bullet list of paths (e.g. app/, components/, lib/) |
 | Data Contracts | `spec` | Schemas, API contracts, shared interfaces, data flow |
 | Domain Summaries | `doc` | Bounded contexts, domain models, entity relationships, glossary |
 | User Workflow Summaries | `doc` | Per-workflow: user outcomes, activity flow, card dependencies, cross-workflow connections |
@@ -120,6 +120,8 @@ This action:
 ### Phase Complete Event
 
 After all finalize actions are applied:
+- `project.finalized_at` is set (project is now finalized; cards can be finalized).
+- If repo is connected, root folders from the architectural summary are created in the repo.
 
 ```
 event: phase_complete
@@ -134,10 +136,10 @@ After project-wide finalization, each card needs a "last mile" preparation step 
 
 ### Trigger
 
-User clicks "Finalize" on an individual card in the UI. Only available when the card has:
-- At least one requirement (draft or approved).
-- Project-wide finalization has completed (project-level context docs exist).
-- Planned files are optional — agent infers from requirements when absent.
+User clicks "Finalize" on an individual card in the UI. Only available when:
+- Project-wide finalization has completed (project.finalized_at set; project-level context docs exist).
+- The card has at least one requirement (draft or approved).
+- The card has at least one approved planned file or folder (required; agent may propose folder paths for new builds).
 
 ### API Endpoint
 
@@ -164,7 +166,7 @@ POST /api/projects/[projectId]/cards/[cardId]/finalize
 ALTER TABLE cards ADD COLUMN finalized_at timestamptz;
 ```
 
-A card with `finalized_at IS NOT NULL` is build-ready. Build trigger validation checks this; planned files are optional (agent uses default allowed_paths when none specified).
+A card with `finalized_at IS NOT NULL` is build-ready. Build trigger validation checks this and requires approved planned files or folders (no default fallback).
 
 ## Decision-Making Principles
 
@@ -236,7 +238,7 @@ A card with `finalized_at IS NOT NULL` is build-ready. Build trigger validation 
 ### Step 5: Card Finalize Endpoint
 - `POST /api/projects/[projectId]/cards/[cardId]/finalize` — assemble context package.
 - `POST /api/projects/[projectId]/cards/[cardId]/finalize/confirm` — set finalized_at.
-- Validation: require requirements; planned files optional.
+- Validation: require project finalized; require requirements; require at least one approved planned file or folder.
 
 ### Step 6: Frontend
 - "Finalize Project" button (triggers phase 4).
@@ -253,7 +255,7 @@ A card with `finalized_at IS NOT NULL` is build-ready. Build trigger validation 
 - Project-wide finalization produces 5 context documents covering architecture, data contracts, domains, workflows, and design system.
 - Each card with requirements gets an e2e test file with one test per requirement.
 - Users can review and edit all finalization outputs before confirming.
-- Confirmed cards are build-ready (finalized_at set; planned files optional).
+- Confirmed cards are build-ready (finalized_at set; approved planned files/folders required).
 - Build trigger rejects cards without finalized_at.
 
 ## AI Development Timeline

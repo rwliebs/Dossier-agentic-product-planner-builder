@@ -9,6 +9,7 @@ import {
   getCardRequirements,
   getCardPlannedFiles,
   getCardById,
+  getProject,
 } from "@/lib/db/queries";
 import { fetchMapSnapshot } from "@/lib/db/map-snapshot";
 import {
@@ -150,9 +151,25 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     return validationError("Card is already finalized");
   }
 
+  const project = await getProject(db, projectId);
+  const projectFinalizedAt = (project as { finalized_at?: string | null })?.finalized_at;
+  if (!projectFinalizedAt) {
+    return validationError("Project must be finalized before cards can be finalized");
+  }
+
   const requirements = await getCardRequirements(db, cardId);
   if (requirements.length === 0) {
     return validationError("Card must have at least one requirement before finalization");
+  }
+
+  const plannedFiles = await getCardPlannedFiles(db, cardId);
+  const approved = plannedFiles.filter(
+    (f) => (f as { status?: string }).status === "approved"
+  );
+  if (approved.length === 0) {
+    return validationError(
+      "Card must have at least one approved planned file or folder before finalization. Add planned files/folders via chat and approve them."
+    );
   }
 
   if (!PLANNING_LLM) {

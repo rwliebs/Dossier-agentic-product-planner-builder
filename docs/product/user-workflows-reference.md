@@ -21,7 +21,8 @@ ttl_expires_on: null
 
 ### Invariants
 - INVARIANT: Map structure is Workflow → Activity → Step → Card; all mutations via PlanningAction
-- INVARIANT: Build cannot trigger without finalized cards (planned files are optional; agent infers from requirements when absent)
+- INVARIANT: Build cannot trigger without finalized cards (planned files or folders are required; user must approve at least one per card before finalization. For new builds, the agent may propose folder paths (e.g. components/auth/) where files should go.)
+- INVARIANT: Project must be finalized before cards can be finalized
 - INVARIANT: Build cannot trigger without card.finalized_at set (card finalization confirmed)
 - INVARIANT: Knowledge items (requirements, facts, assumptions, questions) are used when they exist; no approval step
 
@@ -87,8 +88,8 @@ Workflows for building software from scratch in Dossier.
 | Step | Actor | Action |
 |------|-------|--------|
 | 1 | Agent | Proposes requirements, planned files, knowledge items; user can add or edit any directly |
-| 2 | User | Reviews and approves agent-proposed planned files per card (optional; agent infers from requirements when absent) |
-| 3 | User | Clicks **Finalize** on each card (validates requirements; sets finalized_at) |
+| 2 | User | Reviews and approves agent-proposed planned files or folders per card (required; agent may propose folder paths for new builds) |
+| 3 | User | Clicks **Finalize** on each card (validates requirements and approved planned files/folders; sets finalized_at) |
 | 4 | User | Clicks **Build** on a card (or Build All for workflow) |
 | 5 | System | Validates: card has finalized_at; rejects with toast if not |
 | 6 | System | Clones repo, creates feature branch per card build, runs agents, executes checks |

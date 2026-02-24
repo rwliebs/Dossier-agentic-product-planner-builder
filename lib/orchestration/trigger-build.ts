@@ -130,8 +130,33 @@ export async function triggerBuild(
     };
   }
 
-  // Planned code files are optional. Clicking Build is user approval.
-  // When no approved files exist, allowed_paths defaults to ["src", "app", "lib", "components"].
+  const cardsWithoutApprovedFiles: string[] = [];
+  for (const cardId of cardIds) {
+    const plannedFiles = await getCardPlannedFiles(db, cardId);
+    const approved = plannedFiles.filter(
+      (f) => (f as { status?: string }).status === "approved"
+    );
+    if (approved.length === 0) {
+      cardsWithoutApprovedFiles.push(cardId);
+    }
+  }
+  if (cardsWithoutApprovedFiles.length > 0) {
+    return {
+      success: false,
+      error: "Card(s) must have approved planned files",
+      validationErrors: [
+        "Build requires approved planned files or folders per card. Add and approve planned files via chat before finalizing.",
+        ...(cardsWithoutApprovedFiles.length <= 3
+          ? [`Cards without approved files: ${cardsWithoutApprovedFiles.join(", ")}`]
+          : [`${cardsWithoutApprovedFiles.length} cards without approved files`]),
+      ],
+      outcomeType: "decision_required",
+      message:
+        cardsWithoutApprovedFiles.length <= 3
+          ? `Approve planned files before build. Cards: ${cardsWithoutApprovedFiles.join(", ")}`
+          : `Approve planned files for ${cardsWithoutApprovedFiles.length} cards before build.`,
+    };
+  }
 
   // Clone repo for every build so the agent always has a valid cwd (worktree_path).
   // Without this, multi-card builds left worktree_path null → agent ran in Dossier app root → exit 1.
@@ -189,19 +214,14 @@ export async function triggerBuild(
   const assignmentIds: string[] = [];
   const assignmentErrors: string[] = [];
 
-  const DEFAULT_ALLOWED_PATHS = ["src", "app", "lib", "components"];
-
   for (const cardId of cardIds) {
     const plannedFiles = await getCardPlannedFiles(db, cardId);
     const approved = plannedFiles.filter(
       (f) => (f as { status?: string }).status === "approved"
     );
-    const allowedPaths =
-      approved.length > 0
-        ? approved.map(
-            (f) => (f as { logical_file_name: string }).logical_file_name
-          )
-        : DEFAULT_ALLOWED_PATHS;
+    const allowedPaths = approved.map(
+      (f) => (f as { logical_file_name: string }).logical_file_name
+    );
 
     await db.updateCard(cardId, { build_state: "queued" });
     const runIdShort = runId.slice(0, 8);

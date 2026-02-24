@@ -52,6 +52,8 @@ interface ImplementationCardProps {
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
   cardFinalizeProgress?: string;
+  /** When false, Finalize button is hidden (project must be finalized first) */
+  projectFinalized?: boolean;
   onSelectDoc?: (doc: ContextArtifact) => void;
   /** Canonical knowledge (optional; when loaded) */
   requirements?: CardRequirement[];
@@ -135,6 +137,7 @@ export function ImplementationCard({
   onFinalizeCard,
   finalizingCardId,
   cardFinalizeProgress,
+  projectFinalized = true,
   onSelectDoc,
   requirements = [],
   contextArtifacts = [],
@@ -207,7 +210,7 @@ export function ImplementationCard({
         buttonClass: 'bg-emerald-600 hover:bg-emerald-700',
       };
     }
-    if (!isFinalized && onFinalizeCard) {
+    if (!isFinalized && onFinalizeCard && projectFinalized) {
       return {
         label: finalizingCardId === card.id ? ACTION_BUTTONS.FINALIZING_CARD : ACTION_BUTTONS.FINALIZE_CARD,
         disabled: finalizingCardId === card.id,
@@ -249,7 +252,7 @@ export function ImplementationCard({
         buttonClass: config.button,
       };
     }
-    if ((status === 'todo' || status === 'production') && !isFinalized && onFinalizeCard) {
+    if ((status === 'todo' || status === 'production') && !isFinalized && onFinalizeCard && projectFinalized) {
       return {
         label: finalizingCardId === card.id ? ACTION_BUTTONS.FINALIZING_CARD : ACTION_BUTTONS.FINALIZE_CARD,
         disabled: finalizingCardId === card.id,

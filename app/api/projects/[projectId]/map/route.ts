@@ -56,6 +56,7 @@ export interface MapSnapshot {
     design_inspiration: string | null;
     repo_url: string | null;
     default_branch: string;
+    finalized_at: string | null;
   };
   workflows: MapWorkflow[];
 }
@@ -134,6 +135,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
         design_inspiration: (project.design_inspiration as string) ?? null,
         repo_url: (project.repo_url as string) ?? null,
         default_branch: (project.default_branch as string) ?? "main",
+        finalized_at: (project.finalized_at as string) ?? null,
       },
       workflows: workflowsWithTree.sort((a, b) => a.position - b.position),
     };

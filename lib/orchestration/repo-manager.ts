@@ -136,6 +136,50 @@ export function ensureClone(
 }
 
 /**
+ * Creates root folders in the repo and commits them.
+ * Used after project finalization to establish folder structure.
+ * Idempotent: skips commit if nothing to add.
+ */
+export function createRootFoldersInRepo(
+  clonePath: string,
+  folders: string[],
+  baseBranch: string
+): { success: boolean; error?: string } {
+  if (folders.length === 0) return { success: true };
+
+  try {
+    runGitSync(clonePath, `checkout ${baseBranch}`);
+
+    for (const folder of folders) {
+      const dirPath = path.join(clonePath, folder);
+      fs.mkdirSync(dirPath, { recursive: true });
+      const gitkeepPath = path.join(dirPath, ".gitkeep");
+      const entries = fs.readdirSync(dirPath);
+      if (entries.length === 0 && !fs.existsSync(gitkeepPath)) {
+        fs.writeFileSync(gitkeepPath, "");
+      }
+    }
+
+    runGitSync(clonePath, "add -A");
+    const status = runGitSync(clonePath, "status --porcelain");
+    if (status) {
+      runGitSync(
+        clonePath,
+        'commit -m "chore: add root folder structure (Dossier finalization)" --author="Dossier <noreply@dossier.dev>"'
+      );
+    }
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      error: `Create root folders failed: ${message}`,
+    };
+  }
+}
+
+/**
  * Creates a feature branch from the base branch.
  * Tries origin/<baseBranch> first; falls back to local <baseBranch>
  * (covers repos seeded locally that haven't been fetched yet).

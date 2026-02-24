@@ -178,31 +178,15 @@ describe("Trigger build - single-build lock (O10.6)", () => {
     );
   });
 
-  it("succeeds when card has no approved planned files (Build click is approval)", async () => {
+  it("rejects when card has no approved planned files", async () => {
     vi.mocked(orchestrationQueries.listOrchestrationRunsByProject).mockResolvedValue([]);
-    vi.mocked(orchestrationQueries.getOrchestrationRun).mockResolvedValue({
-      id: runId,
-      project_id: projectId,
-      system_policy_snapshot: { forbidden_paths: [] },
-    } as never);
-    vi.mocked(orchestrationQueries.getCardAssignment).mockResolvedValue({
-      id: assignmentId,
-      run_id: runId,
-      card_id: cardId,
-      status: "queued",
-      worktree_path: "/tmp/dossier/repos/test-project",
-    } as never);
     vi.mocked(queries.getCardById).mockResolvedValue({
       id: cardId,
       finalized_at: new Date().toISOString(),
     } as never);
     vi.mocked(queries.getCardPlannedFiles).mockResolvedValue([]);
-    vi.mocked(queries.getCardRequirements).mockResolvedValue([]);
 
-    const mockDb = createMockDbAdapter({
-      insertOrchestrationRun: vi.fn().mockResolvedValue({ id: runId }),
-      insertCardAssignment: vi.fn().mockResolvedValue({ id: assignmentId }),
-    });
+    const mockDb = createMockDbAdapter({});
     const result = await triggerBuild(mockDb, {
       project_id: projectId,
       scope: "card",
@@ -211,8 +195,10 @@ describe("Trigger build - single-build lock (O10.6)", () => {
       initiated_by: "user",
     });
 
-    expect(result.success).toBe(true);
-    expect(result.error).toBeUndefined();
-    expect(result.outcomeType).toBe("success");
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Card(s) must have approved planned files");
+    expect(result.validationErrors).toContain(
+      "Build requires approved planned files or folders per card. Add and approve planned files via chat before finalizing."
+    );
   });
 });

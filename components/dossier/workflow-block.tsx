@@ -324,6 +324,7 @@ export function WorkflowBlock({
         {viewMode === 'functionality' ? (
           <StoryMapCanvas
             workflows={snapshot.workflows}
+            projectFinalized={!!(snapshot.project as { finalized_at?: string | null }).finalized_at}
             expandedCardId={expandedCardId}
             onExpandCard={onExpandCard}
             onCardAction={onCardAction}

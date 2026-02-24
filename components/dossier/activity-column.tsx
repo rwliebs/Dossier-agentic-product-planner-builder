@@ -26,6 +26,7 @@ export interface ActivityColumnProps {
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
   cardFinalizeProgress?: string;
+  projectFinalized?: boolean;
   onSelectDoc?: (doc: ContextArtifact) => void;
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
   getCardKnowledgeLoading?: (cardId: string) => boolean;
@@ -55,6 +56,7 @@ export function ActivityColumn({
   onFinalizeCard,
   finalizingCardId,
   cardFinalizeProgress,
+  projectFinalized,
   onSelectDoc,
   getCardKnowledge,
   getCardKnowledgeLoading,
@@ -108,6 +110,7 @@ export function ActivityColumn({
               onFinalizeCard={onFinalizeCard}
               finalizingCardId={finalizingCardId}
               cardFinalizeProgress={cardFinalizeProgress}
+              projectFinalized={projectFinalized}
               onSelectDoc={onSelectDoc}
               requirements={k?.requirements}
               contextArtifacts={k?.contextArtifacts}

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Layers, Sparkles } from 'lucide-react';
+import { Layers, Sparkles, Trash2 } from 'lucide-react';
 import { ActivityColumn, type ActivityColumnProps } from './activity-column';
 import { Button } from '@/components/ui/button';
+import { InlineAddInput } from './inline-add-input';
 import { ACTION_BUTTONS } from '@/lib/constants/action-buttons';
 import type { MapWorkflow, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 import type { CodeFileForPanel } from './implementation-card';
@@ -36,6 +37,13 @@ export interface StoryMapCanvasProps {
   onPopulateWorkflow?: (workflowId: string, workflowTitle: string, workflowDescription: string | null) => void;
   /** ID of workflow currently being populated (shows loading state). */
   populatingWorkflowId?: string | null;
+  /** Add workflow/activity/card; delete workflow/activity/card. */
+  onAddWorkflow?: (title: string) => void | Promise<void>;
+  onAddActivity?: (workflowId: string, title: string) => void | Promise<void>;
+  onAddCard?: (activityId: string, title: string) => void | Promise<void>;
+  onDeleteWorkflow?: (workflowId: string, workflowTitle: string, activityCount: number, cardCount: number) => void;
+  onDeleteActivity?: (activityId: string, activityTitle: string, cardCount: number) => void;
+  onDeleteCard?: (cardId: string, cardTitle: string) => void;
 }
 
 export function StoryMapCanvas({
@@ -64,6 +72,12 @@ export function StoryMapCanvas({
   getCardKnowledgeLoading,
   onPopulateWorkflow,
   populatingWorkflowId,
+  onAddWorkflow,
+  onAddActivity,
+  onAddCard,
+  onDeleteWorkflow,
+  onDeleteActivity,
+  onDeleteCard,
 }: StoryMapCanvasProps) {
   const [uncontrolledExpandedCardId, setUncontrolledExpandedCardId] = useState<string | null>(null);
   const expandedCardId = controlledExpandedCardId ?? uncontrolledExpandedCardId;
@@ -112,6 +126,15 @@ export function StoryMapCanvas({
             <p className="text-sm text-muted-foreground">
               Workflows are scaffolded — click Populate on any workflow to add activities and cards.
             </p>
+            {onAddWorkflow && (
+              <div className="border border-dashed border-border rounded px-4 py-3 inline-flex">
+                <InlineAddInput
+                  placeholder="Workflow title"
+                  buttonLabel="+ Workflow"
+                  onConfirm={onAddWorkflow}
+                />
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -149,13 +172,25 @@ export function StoryMapCanvas({
                 </div>
               );
             }
+            const activityCount = sortedActivities.length;
+            const cardCount = sortedActivities.reduce((sum, a) => sum + a.cards.length, 0);
             return (
               <div key={wf.id} className="mb-0">
-                <div className="flex items-center gap-3 border-b border-border px-0 py-3 mb-4">
+                <div className="group flex items-center gap-3 border-b border-border px-0 py-3 mb-4">
                   <span className="text-xs font-mono text-muted-foreground uppercase tracking-widest">
                     {wf.title}
                   </span>
                   <span className="text-foreground text-xs">→</span>
+                  {onDeleteWorkflow && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteWorkflow(wf.id, wf.title, activityCount, cardCount)}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-opacity"
+                      aria-label={`Delete workflow ${wf.title}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
                 <div className="flex gap-6 mb-6">
                   {sortedActivities.map((activity, index) => (
@@ -184,10 +219,22 @@ export function StoryMapCanvas({
                         codeFiles={codeFiles}
                         getCardKnowledge={getCardKnowledge as ActivityColumnProps['getCardKnowledge']}
                         getCardKnowledgeLoading={getCardKnowledgeLoading}
+                        onAddCard={onAddCard ? (title) => onAddCard(activity.id, title) : undefined}
+                        onDeleteActivity={onDeleteActivity}
+                        onDeleteCard={onDeleteCard}
                       />
                       {index < sortedActivities.length - 1 && (
                         <div className="flex items-center h-24 text-muted-foreground/50">
                           <span className="text-lg">→</span>
+                        </div>
+                      )}
+                      {index === sortedActivities.length - 1 && onAddActivity && (
+                        <div className="flex items-center h-24 min-w-[120px] border border-dashed border-border rounded px-3 py-2">
+                          <InlineAddInput
+                            placeholder="Activity title"
+                            buttonLabel="+ Activity"
+                            onConfirm={(title) => onAddActivity(wf.id, title)}
+                          />
                         </div>
                       )}
                     </div>
@@ -196,6 +243,15 @@ export function StoryMapCanvas({
               </div>
             );
           })}
+          {onAddWorkflow && hasActivities && (
+            <div className="mt-4 mb-6 border border-dashed border-border rounded px-4 py-3 inline-flex">
+              <InlineAddInput
+                placeholder="Workflow title"
+                buttonLabel="+ Workflow"
+                onConfirm={onAddWorkflow}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

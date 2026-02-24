@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Edit2, Check, X, Plus } from 'lucide-react';
+import { ChevronDown, Edit2, Check, X, Plus, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +62,8 @@ interface ImplementationCardProps {
   quickAnswer?: string | null;
   /** Show skeleton when expanded and knowledge/planned files are loading */
   knowledgeLoading?: boolean;
+  /** Callback when user confirms delete (no args; parent has card context) */
+  onDeleteCard?: () => void;
 }
 
 const CARD_STATUS = ['todo', 'active', 'questions', 'review', 'production'] as const;
@@ -141,6 +143,7 @@ export function ImplementationCard({
   questions = [],
   quickAnswer: quickAnswerProp,
   knowledgeLoading = false,
+  onDeleteCard,
 }: ImplementationCardProps) {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState(card.description || '');
@@ -225,10 +228,25 @@ export function ImplementationCard({
     <div className={`border-2 rounded transition-all group ${config.bg} ${config.border}`}>
       <div className="p-3 space-y-2">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
-            <h4 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text}`}>
-              {card.title}
-            </h4>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h4 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} truncate`}>
+                {card.title}
+              </h4>
+              {onDeleteCard && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteCard();
+                  }}
+                  className="shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-opacity"
+                  aria-label={`Delete card ${card.title}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
             {isEditingDescription ? (
               <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
                 <textarea

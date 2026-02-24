@@ -5,6 +5,7 @@ import { Header } from '@/components/dossier/header';
 import { LeftSidebar } from '@/components/dossier/left-sidebar';
 import { WorkflowBlock } from '@/components/dossier/workflow-block';
 import { RightPanel } from '@/components/dossier/right-panel';
+import { ConfirmDeleteDialog } from '@/components/dossier/confirm-delete-dialog';
 import { Sparkles } from 'lucide-react';
 import type { ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 import type { CodeFileForPanel } from '@/components/dossier/implementation-card';
@@ -625,6 +626,156 @@ export default function DossierPage() {
     refetch();
   }, [refetch]);
 
+  const [deleteDialog, setDeleteDialog] = useState<{
+    entityType: 'workflow' | 'activity' | 'card';
+    entityName: string;
+    cascadeMessage?: string;
+    onConfirm: () => void | Promise<void>;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleAddWorkflow = useCallback(
+    async (title: string) => {
+      if (!projectId || !submitAction) return;
+      const workflows = snapshot?.workflows ?? [];
+      const position = workflows.length;
+      const result = await submitAction({
+        actions: [
+          {
+            action_type: 'createWorkflow',
+            target_ref: { project_id: projectId },
+            payload: { title, position },
+          },
+        ],
+      });
+      if (result && result.applied > 0) refetch();
+      else if (result?.results?.[0]?.rejection_reason) {
+        const { toast } = await import('sonner');
+        toast.error(result.results[0].rejection_reason);
+      }
+    },
+    [projectId, submitAction, snapshot?.workflows?.length, refetch]
+  );
+
+  const handleAddActivity = useCallback(
+    async (workflowId: string, title: string) => {
+      if (!projectId || !submitAction) return;
+      const workflow = snapshot?.workflows?.find((wf) => wf.id === workflowId);
+      const activities = workflow?.activities ?? [];
+      const position = activities.length;
+      const result = await submitAction({
+        actions: [
+          {
+            action_type: 'createActivity',
+            target_ref: { workflow_id: workflowId },
+            payload: { title, position },
+          },
+        ],
+      });
+      if (result && result.applied > 0) refetch();
+      else if (result?.results?.[0]?.rejection_reason) {
+        const { toast } = await import('sonner');
+        toast.error(result.results[0].rejection_reason);
+      }
+    },
+    [projectId, submitAction, snapshot?.workflows, refetch]
+  );
+
+  const handleAddCard = useCallback(
+    async (activityId: string, title: string) => {
+      if (!projectId || !submitAction) return;
+      const result = await submitAction({
+        actions: [
+          {
+            action_type: 'createCard',
+            target_ref: { workflow_activity_id: activityId },
+            payload: { title, status: 'todo', priority: 0, position: 0 },
+          },
+        ],
+      });
+      if (result && result.applied > 0) refetch();
+      else if (result?.results?.[0]?.rejection_reason) {
+        const { toast } = await import('sonner');
+        toast.error(result.results[0].rejection_reason);
+      }
+    },
+    [projectId, submitAction, refetch]
+  );
+
+  const performDelete = useCallback(
+    async (action: { action_type: string; target_ref: Record<string, string> }) => {
+      if (!projectId || !submitAction) return;
+      setIsDeleting(true);
+      try {
+        const result = await submitAction({
+          actions: [{ ...action, payload: {} }],
+        });
+        if (result && result.applied > 0) {
+          refetch();
+          setDeleteDialog(null);
+        } else if (result?.results?.[0]?.rejection_reason) {
+          const { toast } = await import('sonner');
+          toast.error(result.results[0].rejection_reason);
+        }
+      } finally {
+        setIsDeleting(false);
+      }
+    },
+    [projectId, submitAction, refetch]
+  );
+
+  const handleDeleteWorkflow = useCallback(
+    (workflowId: string, workflowTitle: string, activityCount: number, cardCount: number) => {
+      const cascade =
+        activityCount > 0 || cardCount > 0
+          ? `This will also delete ${activityCount} activit${activityCount === 1 ? 'y' : 'ies'} and ${cardCount} card${cardCount === 1 ? '' : 's'}.`
+          : undefined;
+      setDeleteDialog({
+        entityType: 'workflow',
+        entityName: workflowTitle,
+        cascadeMessage: cascade,
+        onConfirm: () => performDelete({
+          action_type: 'deleteWorkflow',
+          target_ref: { workflow_id: workflowId },
+        }),
+      });
+    },
+    [performDelete]
+  );
+
+  const handleDeleteActivity = useCallback(
+    (activityId: string, activityTitle: string, cardCount: number) => {
+      const cascade =
+        cardCount > 0
+          ? `This will also delete ${cardCount} card${cardCount === 1 ? '' : 's'}.`
+          : undefined;
+      setDeleteDialog({
+        entityType: 'activity',
+        entityName: activityTitle,
+        cascadeMessage: cascade,
+        onConfirm: () => performDelete({
+          action_type: 'deleteActivity',
+          target_ref: { workflow_activity_id: activityId },
+        }),
+      });
+    },
+    [performDelete]
+  );
+
+  const handleDeleteCard = useCallback(
+    (cardId: string, cardTitle: string) => {
+      setDeleteDialog({
+        entityType: 'card',
+        entityName: cardTitle,
+        onConfirm: () => performDelete({
+          action_type: 'deleteCard',
+          target_ref: { card_id: cardId },
+        }),
+      });
+    },
+    [performDelete]
+  );
+
   const handleProjectUpdate = useCallback(
     async (updates: {
       name?: string;
@@ -654,6 +805,17 @@ export default function DossierPage() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background">
+      {deleteDialog && (
+        <ConfirmDeleteDialog
+          open={true}
+          onOpenChange={(open) => !open && setDeleteDialog(null)}
+          entityType={deleteDialog.entityType}
+          entityName={deleteDialog.entityName}
+          cascadeMessage={deleteDialog.cascadeMessage}
+          onConfirm={deleteDialog.onConfirm}
+          isDeleting={isDeleting}
+        />
+      )}
       <Header
         viewMode={viewMode}
         onViewModeChange={setViewMode}
@@ -750,6 +912,12 @@ export default function DossierPage() {
                     cardFinalizeProgress={cardFinalizeProgress}
                     onPopulateWorkflow={handlePopulateWorkflow}
                     populatingWorkflowId={populatingWorkflowId}
+                    onAddWorkflow={handleAddWorkflow}
+                    onAddActivity={handleAddActivity}
+                    onAddCard={handleAddCard}
+                    onDeleteWorkflow={handleDeleteWorkflow}
+                    onDeleteActivity={handleDeleteActivity}
+                    onDeleteCard={handleDeleteCard}
                     onFinalizeProject={handleFinalizeProject}
                     finalizingProject={finalizingProject}
                     finalizeProgress={finalizeProgress}

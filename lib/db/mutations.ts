@@ -165,6 +165,12 @@ export async function applyAction(
       return applyUpdateCard(db, projectId, action);
     case "reorderCard":
       return applyReorderCard(db, projectId, action);
+    case "deleteWorkflow":
+      return applyDeleteWorkflow(db, projectId, action);
+    case "deleteActivity":
+      return applyDeleteActivity(db, projectId, action);
+    case "deleteCard":
+      return applyDeleteCard(db, projectId, action);
     case "linkContextArtifact":
       return applyLinkContextArtifact(db, projectId, action);
     case "createContextArtifact":
@@ -400,6 +406,83 @@ async function applyReorderCard(
 
   try {
     await db.updateCard(cardId, updates);
+  } catch (error) {
+    return { applied: false, rejectionReason: error instanceof Error ? error.message : String(error) };
+  }
+  return { applied: true };
+}
+
+async function applyDeleteCard(
+  db: DbAdapter,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const cardId = action.target_ref.card_id as string;
+  if (!cardId) {
+    return { applied: false, rejectionReason: "card_id is required in target_ref" };
+  }
+
+  const inProject = await verifyCardInProject(db, cardId, projectId);
+  if (!inProject) {
+    return { applied: false, rejectionReason: "Card not found or not in project" };
+  }
+
+  try {
+    await db.deleteCard(cardId);
+  } catch (error) {
+    return { applied: false, rejectionReason: error instanceof Error ? error.message : String(error) };
+  }
+  return { applied: true };
+}
+
+async function applyDeleteActivity(
+  db: DbAdapter,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const activityId = action.target_ref.workflow_activity_id as string;
+  if (!activityId) {
+    return { applied: false, rejectionReason: "workflow_activity_id is required in target_ref" };
+  }
+
+  const workflows = await getWorkflowsByProject(db, projectId);
+  let workflowId: string | null = null;
+  for (const wf of workflows) {
+    const activities = await getActivitiesByWorkflow(db, wf.id as string);
+    if (activities.some((a) => a.id === activityId)) {
+      workflowId = wf.id as string;
+      break;
+    }
+  }
+  if (!workflowId) {
+    return { applied: false, rejectionReason: "Workflow activity not found" };
+  }
+
+  try {
+    await db.deleteWorkflowActivity(activityId, workflowId);
+  } catch (error) {
+    return { applied: false, rejectionReason: error instanceof Error ? error.message : String(error) };
+  }
+  return { applied: true };
+}
+
+async function applyDeleteWorkflow(
+  db: DbAdapter,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const workflowId = action.target_ref.workflow_id as string;
+  if (!workflowId) {
+    return { applied: false, rejectionReason: "workflow_id is required in target_ref" };
+  }
+
+  const workflows = await getWorkflowsByProject(db, projectId);
+  if (!workflows.some((w) => w.id === workflowId)) {
+    return { applied: false, rejectionReason: "Workflow not found" };
+  }
+
+  try {
+    await db.deleteWorkflow(workflowId, projectId);
   } catch (error) {
     return { applied: false, rejectionReason: error instanceof Error ? error.message : String(error) };
   }

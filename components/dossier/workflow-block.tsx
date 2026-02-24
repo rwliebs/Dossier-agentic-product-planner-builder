@@ -77,6 +77,12 @@ interface WorkflowBlockProps {
   getCardKnowledgeLoading?: (cardId: string) => boolean;
   onPopulateWorkflow?: (workflowId: string, workflowTitle: string, workflowDescription: string | null) => void;
   populatingWorkflowId?: string | null;
+  onAddWorkflow?: (title: string) => void | Promise<void>;
+  onAddActivity?: (workflowId: string, title: string) => void | Promise<void>;
+  onAddCard?: (activityId: string, title: string) => void | Promise<void>;
+  onDeleteWorkflow?: (workflowId: string, workflowTitle: string, activityCount: number, cardCount: number) => void;
+  onDeleteActivity?: (activityId: string, activityTitle: string, cardCount: number) => void;
+  onDeleteCard?: (cardId: string, cardTitle: string) => void;
   onFinalizeProject?: () => void;
   finalizingProject?: boolean;
   finalizeProgress?: string;
@@ -117,6 +123,12 @@ export function WorkflowBlock({
   getCardKnowledgeLoading,
   onPopulateWorkflow,
   populatingWorkflowId,
+  onAddWorkflow,
+  onAddActivity,
+  onAddCard,
+  onDeleteWorkflow,
+  onDeleteActivity,
+  onDeleteCard,
   onFinalizeProject,
   finalizingProject,
   finalizeProgress,
@@ -300,6 +312,12 @@ export function WorkflowBlock({
             getCardKnowledgeLoading={getCardKnowledgeLoading}
             onPopulateWorkflow={onPopulateWorkflow}
             populatingWorkflowId={populatingWorkflowId}
+            onAddWorkflow={onAddWorkflow}
+            onAddActivity={onAddActivity}
+            onAddCard={onAddCard}
+            onDeleteWorkflow={onDeleteWorkflow}
+            onDeleteActivity={onDeleteActivity}
+            onDeleteCard={onDeleteCard}
           />
         ) : (
           <ArchitectureView

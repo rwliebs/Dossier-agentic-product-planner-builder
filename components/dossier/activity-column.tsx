@@ -1,6 +1,8 @@
 'use client';
 
+import { Trash2 } from 'lucide-react';
 import { ImplementationCard, type CodeFileForPanel } from './implementation-card';
+import { InlineAddInput } from './inline-add-input';
 import type { MapActivity, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 
 export interface ActivityColumnProps {
@@ -27,6 +29,9 @@ export interface ActivityColumnProps {
   codeFiles?: CodeFileForPanel[];
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
   getCardKnowledgeLoading?: (cardId: string) => boolean;
+  onAddCard?: (title: string) => void | Promise<void>;
+  onDeleteActivity?: (activityId: string, activityTitle: string, cardCount: number) => void;
+  onDeleteCard?: (cardId: string, cardTitle: string) => void;
 }
 
 export function ActivityColumn({
@@ -53,15 +58,28 @@ export function ActivityColumn({
   codeFiles = [],
   getCardKnowledge,
   getCardKnowledgeLoading,
+  onAddCard,
+  onDeleteActivity,
+  onDeleteCard,
 }: ActivityColumnProps) {
   const sortedCards = [...activity.cards].sort((a, b) => a.priority - b.priority || 0);
 
   return (
     <div className="flex flex-col min-w-72 max-w-80">
-      <div className="border-b-2 border-foreground pb-2 mb-4">
+      <div className="group flex items-center justify-between gap-2 border-b-2 border-foreground pb-2 mb-4">
         <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-foreground">
           {activity.title}
         </h3>
+        {onDeleteActivity && (
+          <button
+            type="button"
+            onClick={() => onDeleteActivity(activity.id, activity.title, activity.cards.length)}
+            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-opacity"
+            aria-label={`Delete activity ${activity.title}`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -99,9 +117,19 @@ export function ActivityColumn({
               questions={k?.questions}
               quickAnswer={k?.quickAnswer}
               knowledgeLoading={getCardKnowledgeLoading?.(card.id)}
+              onDeleteCard={onDeleteCard ? () => onDeleteCard(card.id, card.title) : undefined}
             />
           );
         })}
+        {onAddCard && (
+          <div className="pt-2 border border-dashed border-border rounded px-3 py-2">
+            <InlineAddInput
+              placeholder="Card title"
+              buttonLabel="+ Card"
+              onConfirm={onAddCard}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

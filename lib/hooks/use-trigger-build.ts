@@ -59,6 +59,9 @@ export function useTriggerBuild(
         );
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
+          if (typeof window !== "undefined") {
+            console.warn("[build] API error", res.status, data);
+          }
           const details = data.details as Record<string, string[]> | undefined;
           const parts = details
             ? Object.entries(details).flatMap(([k, v]) =>

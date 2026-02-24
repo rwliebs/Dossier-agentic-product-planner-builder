@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useRef, useCallback } from 'react';
-import { Pencil, Sparkles } from 'lucide-react';
+import { Pencil, Sparkles, ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ACTION_BUTTONS } from '@/lib/constants/action-buttons';
 import { StoryMapCanvas, type StoryMapCanvasProps } from './story-map-canvas';
@@ -65,6 +65,7 @@ interface WorkflowBlockProps {
   availableFilePaths?: string[];
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
+  onResumeBlockedCard?: (cardId: string) => void;
   buildingCardId?: string | null;
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
@@ -110,6 +111,7 @@ export function WorkflowBlock({
   availableFilePaths = [],
   onApprovePlannedFile,
   onBuildCard,
+  onResumeBlockedCard,
   buildingCardId,
   onFinalizeCard,
   finalizingCardId,
@@ -150,6 +152,26 @@ export function WorkflowBlock({
     design_inspiration?: string | null;
   };
   const [editingField, setEditingField] = useState<ProjectContextField | null>(null);
+  const [viewOnServerLoading, setViewOnServerLoading] = useState(false);
+  const handleViewOnServer = async () => {
+    setViewOnServerLoading(true);
+    try {
+      const res = await fetch('/api/dev/restart-and-open', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const { toast } = await import('sonner');
+        toast.error((data as { error?: string }).error ?? 'Failed to restart server');
+        return;
+      }
+      const { toast } = await import('sonner');
+      toast.success('Restarting server and opening browser…');
+    } catch (e) {
+      const { toast } = await import('sonner');
+      toast.error(e instanceof Error ? e.message : 'Failed to restart server');
+    } finally {
+      setViewOnServerLoading(false);
+    }
+  };
   const [draftValue, setDraftValue] = useState('');
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
@@ -222,6 +244,20 @@ export function WorkflowBlock({
                     )}
                   </div>
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-[11px] font-mono uppercase tracking-wider"
+                  onClick={handleViewOnServer}
+                  disabled={viewOnServerLoading}
+                >
+                  {viewOnServerLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <ExternalLink className="h-3 w-3" />
+                  )}
+                  View on server
+                </Button>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
@@ -299,6 +335,7 @@ export function WorkflowBlock({
             availableFilePaths={availableFilePaths}
             onApprovePlannedFile={onApprovePlannedFile}
             onBuildCard={onBuildCard}
+            onResumeBlockedCard={onResumeBlockedCard}
             buildingCardId={buildingCardId}
             onFinalizeCard={onFinalizeCard}
             finalizingCardId={finalizingCardId}

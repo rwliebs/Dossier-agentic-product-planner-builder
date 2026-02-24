@@ -206,6 +206,30 @@ describe("ImplementationCard", () => {
     expect(onResumeBlockedCard).toHaveBeenCalledWith("card-1");
   });
 
+  it("Build button triggers onBuildCard for failed build (rebuild)", () => {
+    const onBuildCard = vi.fn();
+    const failedCard: MapCard = {
+      ...baseCard,
+      status: "todo",
+      finalized_at: "2026-02-18T00:00:00Z",
+      build_state: "failed",
+    };
+
+    render(
+      <ImplementationCard
+        card={failedCard}
+        isExpanded={false}
+        onExpand={() => {}}
+        onAction={() => {}}
+        onBuildCard={onBuildCard}
+        onUpdateDescription={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(ACTION_BUTTONS.CARD_ACTION.todo, "i") }));
+    expect(onBuildCard).toHaveBeenCalledWith("card-1");
+  });
+
   it("shows failure reason when build failed with last_build_error", () => {
     const failedCard: MapCard = {
       ...baseCard,

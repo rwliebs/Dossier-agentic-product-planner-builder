@@ -42,6 +42,7 @@ export async function POST(
     });
 
     if (!result.success) {
+      console.warn("[orchestration/build] triggerBuild failed:", result.message ?? result.error, result.validationErrors);
       const outcomeType = result.outcomeType ?? "error";
       const message = result.message ?? result.error ?? "Build failed";
       const details = result.validationErrors && result.validationErrors.length > 0

@@ -14,7 +14,7 @@
   "scripts": {
     "build": "next build && npm run postbuild",
     "postbuild": "cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public",
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "rebuild": "./scripts/rebuild-and-restart.sh",
     "rebuild:prod": "./scripts/rebuild-and-restart.sh prod",
     "lint": "eslint .",

@@ -218,6 +218,12 @@ export const triggerBuildRequestSchema = z
     { message: "scope=workflow requires workflow_id; scope=card requires card_id" }
   );
 
+// Orchestration: resume blocked build (POST body; project_id from params)
+export const resumeBlockedRequestSchema = z.object({
+  card_id: z.string().uuid(),
+  actor: z.string().min(1).optional(),
+});
+
 // Orchestration: create approval request (POST body)
 export const createApprovalRequestSchema = z.object({
   run_id: z.string().uuid(),

@@ -217,6 +217,10 @@ export default function DossierPage() {
 
   const handleCardAction = useCallback(
     (cardId: string, action: string) => {
+      if (action === 'build') {
+        handleBuildCard(cardId);
+        return;
+      }
       if (action === 'monitor' || action === 'test') {
         setRightPanelTab('files');
         setRightPanelOpen(true);
@@ -233,7 +237,7 @@ export default function DossierPage() {
         }
       }
     },
-    [snapshot?.project?.repo_url]
+    [snapshot?.project?.repo_url, handleBuildCard]
   );
 
   const [populatingWorkflowId, setPopulatingWorkflowId] = useState<string | null>(null);

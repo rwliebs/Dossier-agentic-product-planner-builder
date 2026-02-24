@@ -23,6 +23,7 @@ export interface StoryMapCanvasProps {
   availableFilePaths?: string[];
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
+  onResumeBlockedCard?: (cardId: string) => void;
   buildingCardId?: string | null;
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
@@ -58,6 +59,7 @@ export function StoryMapCanvas({
   availableFilePaths = [],
   onApprovePlannedFile,
   onBuildCard,
+  onResumeBlockedCard,
   buildingCardId,
   onFinalizeCard,
   finalizingCardId,
@@ -208,6 +210,7 @@ export function StoryMapCanvas({
                         availableFilePaths={availableFilePaths}
                         onApprovePlannedFile={onApprovePlannedFile}
                         onBuildCard={onBuildCard}
+                        onResumeBlockedCard={onResumeBlockedCard}
                         buildingCardId={buildingCardId}
                         onFinalizeCard={onFinalizeCard}
                         finalizingCardId={finalizingCardId}

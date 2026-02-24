@@ -6,9 +6,9 @@ import { Toaster } from 'sonner'
 import { ErrorBoundary } from '@/components/error-boundary'
 import './globals.css'
 
-const geist = Geist({ subsets: ["latin"] });
-const geistMono = Geist_Mono({ subsets: ["latin"] });
-const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "900"] });
+const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
+const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "900"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: 'Dossier — AI-Native Product Building Platform',

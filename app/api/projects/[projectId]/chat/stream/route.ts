@@ -2,17 +2,14 @@ import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
 import type { DbAdapter } from "@/lib/db/adapter";
 import { fetchMapSnapshot, getLinkedArtifactsForPrompt } from "@/lib/db/map-snapshot";
-import type { PlanningState } from "@/lib/schemas/planning-state";
-import type { PlanningAction } from "@/lib/schemas/slice-a";
 import {
   buildScaffoldSystemPrompt,
   buildScaffoldUserMessage,
-  buildPopulateWorkflowPrompt,
-  buildPopulateWorkflowUserMessage,
 } from "@/lib/llm/planning-prompt";
 import { PLANNING_LLM } from "@/lib/feature-flags";
 import { chatStreamRequestSchema } from "@/lib/validation/request-schema";
 import { runLlmSubStep, type Emitter } from "@/lib/llm/run-llm-substep";
+import { runPopulateWorkflow } from "@/lib/llm/run-populate-workflow";
 import { runFinalizeMultiStep } from "@/lib/llm/run-finalize-multistep";
 import { getArtifactsByProject, getProject } from "@/lib/db/queries";
 import { parseRootFoldersFromArchitecturalSummary } from "@/lib/orchestration/parse-root-folders";
@@ -147,9 +144,6 @@ export async function POST(
           return;
         }
 
-        let systemPrompt: string;
-        let userMessage: string;
-
         if (mode === "populate" && workflow_id) {
           const workflow = Array.from(state.workflows.values()).find((w) => w.id === workflow_id);
           if (!workflow) {
@@ -157,26 +151,28 @@ export async function POST(
             emit("done", {});
             return;
           }
-          systemPrompt = buildPopulateWorkflowPrompt();
-          userMessage = buildPopulateWorkflowUserMessage(
-            workflow_id,
-            workflow.title,
-            workflow.description ?? null,
-            message,
+          await runPopulateWorkflow({
+            db,
+            projectId,
+            workflowId: workflow_id,
+            workflowTitle: workflow.title,
+            workflowDescription: workflow.description ?? null,
+            userRequest: message,
             state,
-          );
-        } else {
-          const linkedArtifacts = getLinkedArtifactsForPrompt(state, 3);
-          systemPrompt = buildScaffoldSystemPrompt();
-          userMessage = buildScaffoldUserMessage(message, state, linkedArtifacts);
+            emit,
+            mockResponse: mock_response,
+          });
+          emit("phase_complete", {
+            responseType: "populate_complete",
+            workflow_id,
+          });
+          emit("done", {});
+          return;
         }
 
-        const actionFilter = mode === "populate"
-          ? (a: PlanningAction) =>
-              a.action_type === "createActivity" ||
-              a.action_type === "createCard" ||
-              a.action_type === "upsertCardKnowledgeItem"
-          : undefined;
+        const linkedArtifacts = getLinkedArtifactsForPrompt(state, 3);
+        const systemPrompt = buildScaffoldSystemPrompt();
+        const userMessage = buildScaffoldUserMessage(message, state, linkedArtifacts);
 
         const result = await runLlmSubStep({
           db,
@@ -185,7 +181,6 @@ export async function POST(
           userMessage,
           state,
           emit,
-          actionFilter,
           mockResponse: mock_response,
         });
 
@@ -199,11 +194,6 @@ export async function POST(
           emit("phase_complete", {
             responseType: "scaffold_complete",
             workflow_ids: workflowIds,
-          });
-        } else if (mode === "populate") {
-          emit("phase_complete", {
-            responseType: "populate_complete",
-            workflow_id,
           });
         }
 

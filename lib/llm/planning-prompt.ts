@@ -334,6 +334,98 @@ Respond with a JSON object: { "type": "actions", "message": "optional brief summ
 }
 
 /**
+ * Build the system prompt for POPULATE phase 1: activities only.
+ * Smaller output per call reduces timeout risk.
+ */
+export function buildPopulateActivitiesPrompt(): string {
+  const skills = getPlanningSkills();
+  return `You are a planning assistant that populates a workflow with activities (columns).
+
+${skills}
+
+## Story Map Concepts
+- **Workflow**: A high-level outcome the user is trying to achieve.
+- **Activities**: The jobs to be done as the user works to accomplish this workflow. Specific to the user's lived experience, not software steps.
+
+## Your Task
+Generate createActivity actions ONLY for the specified workflow. Do NOT generate createCard or upsertCardKnowledgeItem — those will be added in a separate step.
+
+## Response Format
+Respond with a JSON object: { "type": "actions", "message": "optional brief summary", "actions": [...] }
+
+## createActivity
+- target_ref: { "workflow_id": "<the workflow's id from Workflow to Populate>" }
+- payload: { "id": "<new UUID>", "title": "Activity Title", "color": "yellow"|"blue"|"purple"|"green"|"orange"|"pink", "position": 0 }
+- **REQUIRED: include "id" in payload** — a new UUID for each activity.
+- Activities are columns representing user actions (e.g. "Browse", "Search", "Purchase", "Account")
+
+## Guidelines
+- Generate activities appropriate to the workflow's scope (typically 3–8, depending on the software being planned).
+- Use workflow_id from "Workflow to Populate" section.
+- Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+}
+
+/**
+ * Build the system prompt for POPULATE phase 2: cards and requirements for one activity.
+ */
+export function buildPopulateCardsForActivityPrompt(): string {
+  const skills = getPlanningSkills();
+  return `You are a planning assistant that populates an activity with functionality cards.
+
+${skills}
+
+## Your Task
+Generate createCard and upsertCardKnowledgeItem (requirement) actions for ONE activity only. Use the exact workflow_activity_id from "Activity to Populate".
+
+## Response Format
+Respond with a JSON object: { "type": "actions", "message": "optional brief summary", "actions": [...] }
+
+## createCard
+- target_ref: { "workflow_activity_id": "<exact id from Activity to Populate>" }
+- payload: { "id": "<new UUID>", "title": "Card Title", "description": "What to build", "status": "todo", "priority": 1|2|3, "position": 0 }
+- Cards are implementable functionality tasks under this activity.
+
+## upsertCardKnowledgeItem (requirements)
+- target_ref: { "card_id": "<the card's id>" }
+- payload: { "item_type": "requirement", "text": "Concrete requirement (e.g. User can filter by category)", "position": 0 }
+- Emit 1–3 per card. List createCard first, then upsertCardKnowledgeItem.
+
+## Guidelines
+- Generate as many cards as appropriate for this activity (domain-dependent).
+- Use status "todo", priority 1–3 (1=high).
+- Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+}
+
+/**
+ * Build the user message for populate phase 1 (activities only).
+ */
+export function buildPopulateActivitiesUserMessage(
+  workflowId: string,
+  workflowTitle: string,
+  workflowDescription: string | null,
+  userRequest: string,
+  mapSnapshot: PlanningState,
+): string {
+  const stateJson = serializeMapStateForPopulate(mapSnapshot, workflowId);
+  return `## Project Context\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow to Populate\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n- Description: ${workflowDescription ?? "—"}\n\n## Original User Request (for context)\n${userRequest}\n\n## Your Task\nGenerate createActivity actions ONLY. Output ONLY the JSON object.`;
+}
+
+/**
+ * Build the user message for populate phase 2 (cards for one activity).
+ */
+export function buildPopulateCardsForActivityUserMessage(
+  workflowId: string,
+  workflowTitle: string,
+  activityId: string,
+  activityTitle: string,
+  userRequest: string,
+  mapSnapshot: PlanningState,
+): string {
+  const stateJson = serializeMapStateForPopulate(mapSnapshot, workflowId);
+  return `## Project Context\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n\n## Activity to Populate\n- ID: ${activityId}\n- Title: ${activityTitle}\n\n## Original User Request (for context)\n${userRequest}\n\n## Your Task\nGenerate createCard and upsertCardKnowledgeItem actions for this activity. Use workflow_activity_id "${activityId}". Output ONLY the JSON object.`;
+}
+
+/**
  * Build the user message for scaffold mode.
  */
 export function buildScaffoldUserMessage(
@@ -362,6 +454,37 @@ export function buildScaffoldUserMessage(
 }
 
 /**
+ * Serialize minimal context for populate mode.
+ * Only project + target workflow + other workflow titles. Excludes activities, cards,
+ * and artifacts from other workflows to reduce token usage.
+ */
+export function serializeMapStateForPopulate(
+  state: PlanningState,
+  targetWorkflowId: string,
+): string {
+  const otherWorkflows = Array.from(state.workflows.values())
+    .filter((wf) => wf.id !== targetWorkflowId)
+    .map((wf) => ({ id: wf.id, title: wf.title }));
+
+  return JSON.stringify(
+    {
+      project: {
+        id: state.project.id,
+        name: state.project.name,
+        description: state.project.description,
+        customer_personas: state.project.customer_personas,
+        tech_stack: state.project.tech_stack,
+        deployment: state.project.deployment,
+        design_inspiration: state.project.design_inspiration,
+      },
+      other_workflows: otherWorkflows,
+    },
+    null,
+    2,
+  );
+}
+
+/**
  * Build the user message for populate mode (one workflow).
  */
 export function buildPopulateWorkflowUserMessage(
@@ -371,8 +494,8 @@ export function buildPopulateWorkflowUserMessage(
   userRequest: string,
   mapSnapshot: PlanningState,
 ): string {
-  const stateJson = serializeMapStateForPrompt(mapSnapshot);
-  return `## Current Map State\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow to Populate\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n- Description: ${workflowDescription ?? "—"}\n\n## Original User Request (for context)\n${userRequest}\n\n## Your Task\nGenerate createActivity, createCard, and upsertCardKnowledgeItem (requirement) actions for this workflow. Output ONLY the JSON object.`;
+  const stateJson = serializeMapStateForPopulate(mapSnapshot, workflowId);
+  return `## Project Context\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow to Populate\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n- Description: ${workflowDescription ?? "—"}\n\n## Original User Request (for context)\n${userRequest}\n\n## Your Task\nGenerate createActivity, createCard, and upsertCardKnowledgeItem (requirement) actions for this workflow. Output ONLY the JSON object.`;
 }
 
 /**

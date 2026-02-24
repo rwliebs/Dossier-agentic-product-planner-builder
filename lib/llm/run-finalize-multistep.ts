@@ -8,8 +8,12 @@ import {
 import { runLlmSubStep, type Emitter } from "@/lib/llm/run-llm-substep";
 
 /**
- * Run multi-step finalization: 1 LLM call per project document (5 docs = 5 calls).
- * Each sub-step generates a single artifact. Used by both streaming and non-streaming planning.
+ * Run multi-step finalization: 5 LLM calls in parallel (one per project document).
+ * Parallel execution reduces total latency vs sequential. Each doc is independent.
+ *
+ * Alternative (one prompt for all 5 docs): Would reduce input tokens (state sent once)
+ * but increases output size and timeout risk. Holistic context could improve
+ * cross-doc consistency. Consider if parallel still times out.
  */
 export async function runFinalizeMultiStep(opts: {
   db: DbAdapter;
@@ -19,56 +23,55 @@ export async function runFinalizeMultiStep(opts: {
   mockResponse?: string;
 }): Promise<number> {
   const { db, projectId, emit, mockResponse } = opts;
-  let currentState = opts.state;
+  const state = opts.state;
   const totalSteps = FINALIZE_DOC_SPECS.length;
-  let totalActions = 0;
 
-  for (let i = 0; i < FINALIZE_DOC_SPECS.length; i++) {
-    const spec = FINALIZE_DOC_SPECS[i];
-
+  for (let i = 0; i < totalSteps; i++) {
     emit("finalize_progress", {
       step: "doc",
       step_index: i,
       total_steps: totalSteps,
       status: "generating",
-      label: `Generating ${spec.label}`,
+      label: `Generating ${FINALIZE_DOC_SPECS[i].label}`,
     });
-
-    try {
-      const result = await runLlmSubStep({
-        db,
-        projectId,
-        systemPrompt: buildFinalizeDocSystemPrompt(spec),
-        userMessage: buildFinalizeDocUserMessage(currentState, spec),
-        state: currentState,
-        emit,
-        actionFilter: (a) => a.action_type === "createContextArtifact",
-        mockResponse,
-      });
-
-      totalActions += result.actionCount;
-      currentState = result.updatedState;
-
-      emit("finalize_progress", {
-        step: "doc",
-        step_index: i,
-        total_steps: totalSteps,
-        status: "complete",
-        label: `Created ${spec.label}`,
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Doc generation failed";
-      console.error(`[finalize] Doc generation failed for ${spec.name}:`, msg);
-      emit("error", { reason: `Failed to generate ${spec.label}: ${msg}` });
-      emit("finalize_progress", {
-        step: "doc",
-        step_index: i,
-        total_steps: totalSteps,
-        status: "error",
-        label: `Failed: ${spec.label}`,
-      });
-    }
   }
 
-  return totalActions;
+  const results = await Promise.all(
+    FINALIZE_DOC_SPECS.map(async (spec, i) => {
+      try {
+        const result = await runLlmSubStep({
+          db,
+          projectId,
+          systemPrompt: buildFinalizeDocSystemPrompt(spec),
+          userMessage: buildFinalizeDocUserMessage(state, spec),
+          state,
+          emit,
+          actionFilter: (a) => a.action_type === "createContextArtifact",
+          mockResponse,
+        });
+        emit("finalize_progress", {
+          step: "doc",
+          step_index: i,
+          total_steps: totalSteps,
+          status: "complete",
+          label: `Created ${spec.label}`,
+        });
+        return result.actionCount;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Doc generation failed";
+        console.error(`[finalize] Doc generation failed for ${spec.name}:`, msg);
+        emit("error", { reason: `Failed to generate ${spec.label}: ${msg}` });
+        emit("finalize_progress", {
+          step: "doc",
+          step_index: i,
+          total_steps: totalSteps,
+          status: "error",
+          label: `Failed: ${spec.label}`,
+        });
+        return 0;
+      }
+    }),
+  );
+
+  return results.reduce((a, b) => a + b, 0);
 }

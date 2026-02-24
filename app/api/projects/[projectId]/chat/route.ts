@@ -10,10 +10,9 @@ import {
   buildPlanningUserMessage,
   buildScaffoldSystemPrompt,
   buildScaffoldUserMessage,
-  buildPopulateWorkflowPrompt,
-  buildPopulateWorkflowUserMessage,
 } from "@/lib/llm/planning-prompt";
 import { runLlmSubStep } from "@/lib/llm/run-llm-substep";
+import { runPopulateWorkflow } from "@/lib/llm/run-populate-workflow";
 import { runFinalizeMultiStep } from "@/lib/llm/run-finalize-multistep";
 import { getArtifactsByProject, getProject } from "@/lib/db/queries";
 import { parseRootFoldersFromArchitecturalSummary } from "@/lib/orchestration/parse-root-folders";
@@ -157,23 +156,15 @@ export async function POST(
       return json({ status: "error", message: "Workflow not found" }, 404);
     }
     try {
-      const result = await runLlmSubStep({
+      const result = await runPopulateWorkflow({
         db,
         projectId,
-        systemPrompt: buildPopulateWorkflowPrompt(),
-        userMessage: buildPopulateWorkflowUserMessage(
-          workflow_id,
-          workflow.title,
-          workflow.description ?? null,
-          message,
-          state,
-        ),
+        workflowId: workflow_id,
+        workflowTitle: workflow.title,
+        workflowDescription: workflow.description ?? null,
+        userRequest: message,
         state,
         emit: noopEmit,
-        actionFilter: (a: PlanningAction) =>
-          a.action_type === "createActivity" ||
-          a.action_type === "createCard" ||
-          a.action_type === "upsertCardKnowledgeItem",
         mockResponse: mock_response,
       });
       return json({
@@ -204,23 +195,15 @@ export async function POST(
     let currentState = state;
     for (const workflow of emptyWorkflows) {
       try {
-        const result = await runLlmSubStep({
+        const result = await runPopulateWorkflow({
           db,
           projectId,
-          systemPrompt: buildPopulateWorkflowPrompt(),
-          userMessage: buildPopulateWorkflowUserMessage(
-            workflow.id,
-            workflow.title,
-            workflow.description ?? null,
-            message,
-            currentState,
-          ),
+          workflowId: workflow.id,
+          workflowTitle: workflow.title,
+          workflowDescription: workflow.description ?? null,
+          userRequest: message,
           state: currentState,
           emit: noopEmit,
-          actionFilter: (a: PlanningAction) =>
-            a.action_type === "createActivity" ||
-            a.action_type === "createCard" ||
-            a.action_type === "upsertCardKnowledgeItem",
           mockResponse: mock_response,
         });
         totalApplied += result.actionCount;

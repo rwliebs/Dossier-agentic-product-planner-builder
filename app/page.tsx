@@ -63,7 +63,7 @@ export default function DossierPage() {
   // appMode drives which layout to show — active whenever workflows exist so the canvas can render empty-state guidance
   const appMode = (snapshot?.workflows?.length ?? 0) > 0 ? 'active' : 'ideation';
   const { submit: submitAction } = useSubmitAction(appMode === 'active' ? projectId : undefined);
-  const { triggerBuild, resumeBlocked } = useTriggerBuild(appMode === 'active' ? projectId : undefined);
+  const { triggerBuild, resumeBlocked } = useTriggerBuild(appMode === 'active' && projectId ? projectId : undefined);
 
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const { data: cardKnowledge, loading: cardKnowledgeLoading, refetch: refetchCardKnowledge } = useCardKnowledge(

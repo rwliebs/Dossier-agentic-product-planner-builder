@@ -17,6 +17,13 @@ export interface UseTriggerBuildResult {
     message?: string;
     outcomeType?: "success" | "error" | "decision_required";
   }>;
+  resumeBlocked: (cardId: string) => Promise<{
+    runId?: string;
+    assignmentId?: string;
+    error?: string;
+    message?: string;
+    outcomeType?: "success" | "error";
+  }>;
   loading: boolean;
   error: string | null;
 }
@@ -105,5 +112,49 @@ export function useTriggerBuild(
     [projectId]
   );
 
-  return { triggerBuild, loading, error };
+  const resumeBlocked = useCallback(
+    async (cardId: string) => {
+      if (!projectId) {
+        return { error: "No project selected", outcomeType: "error" as const };
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/projects/${projectId}/orchestration/resume-blocked`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ card_id: cardId, actor: "user" }),
+          }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (typeof window !== "undefined") {
+            console.warn("[resume-blocked] API error", res.status, data);
+          }
+          const msg = data.message ?? data.error ?? "Failed to resume build";
+          setError(msg);
+          return { error: msg, message: msg, outcomeType: "error" as const };
+        }
+        return {
+          runId: data.runId,
+          assignmentId: data.assignmentId,
+          message: data.message ?? "Build resumed",
+          outcomeType: (data.outcome_type ?? "success") as "success" | "error",
+        };
+      } catch {
+        setError("Failed to resume build");
+        return {
+          error: "Failed to resume build",
+          outcomeType: "error" as const,
+        };
+      } finally {
+        setLoading(false);
+      }
+    },
+    [projectId]
+  );
+
+  return { triggerBuild, resumeBlocked, loading, error };
 }

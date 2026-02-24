@@ -92,7 +92,7 @@ describe("ImplementationCard", () => {
     expect(onAction).not.toHaveBeenCalled();
   });
 
-  it("Build button falls through to onAction when card is not finalized", () => {
+  it("Build button calls onBuildCard when provided (even if card not finalized)", () => {
     const onAction = vi.fn();
     const onBuildCard = vi.fn();
     const unfinalizedCard: MapCard = {
@@ -113,8 +113,8 @@ describe("ImplementationCard", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: new RegExp(ACTION_BUTTONS.CARD_ACTION.todo, "i") }));
-    expect(onAction).toHaveBeenCalledWith("card-1", "build");
-    expect(onBuildCard).not.toHaveBeenCalled();
+    expect(onBuildCard).toHaveBeenCalledWith("card-1");
+    expect(onAction).not.toHaveBeenCalled();
   });
 
   it("Finalize button shown when unfinalized todo and onFinalizeCard provided", () => {

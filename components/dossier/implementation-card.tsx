@@ -174,7 +174,7 @@ export function ImplementationCard({
 
     if (isBuilding || isQueuedOrRunning) {
       return {
-        label: isBuilding ? ACTION_BUTTONS.UNIFIED.BUILDING : ACTION_BUTTONS.UNIFIED.QUEUED,
+        label: (buildState === 'running' || isBuilding) ? ACTION_BUTTONS.UNIFIED.BUILDING : ACTION_BUTTONS.UNIFIED.QUEUED,
         disabled: true,
         action: null as string | null,
         buttonClass: 'bg-amber-500 cursor-not-allowed animate-pulse',
@@ -267,6 +267,7 @@ export function ImplementationCard({
   const unifiedState = getUnifiedActionState();
 
   const handleUnifiedAction = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     if (unifiedState.disabled) return;
     switch (unifiedState.action) {
@@ -274,7 +275,7 @@ export function ImplementationCard({
         onResumeBlockedCard?.(card.id);
         break;
       case 'build':
-        if (onBuildCard && card.finalized_at) {
+        if (onBuildCard) {
           onBuildCard(card.id);
         } else {
           onAction(card.id, 'build');

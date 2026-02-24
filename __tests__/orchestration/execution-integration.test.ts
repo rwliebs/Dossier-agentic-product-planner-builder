@@ -338,7 +338,7 @@ describe("Dispatch assignment", () => {
     card_id: cardId,
     status: "queued",
     feature_branch: "feat/test",
-    worktree_path: null,
+    worktree_path: "/tmp/dossier/repos/test-project",
     allowed_paths: ["src/"],
     forbidden_paths: null,
     assignment_input_snapshot: {},

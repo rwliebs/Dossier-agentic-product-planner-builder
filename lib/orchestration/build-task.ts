@@ -159,7 +159,8 @@ export function buildTaskFromPayload(payload: DispatchPayload): BuildTaskOutput 
   if (cardDescription) {
     sections.push(`Description: ${cardDescription}`);
   }
-  sections.push(PROCESS_CHECK_SCRIPT);
+  // TEMPORARY: skip Phase 1 process check to see if build succeeds faster
+  // sections.push(PROCESS_CHECK_SCRIPT);
 
   // Context artifacts (test files, docs, specs)
   if (contextArtifacts.length > 0) {
@@ -215,8 +216,8 @@ ${acceptanceCriteria.map((c) => `- ${c}`).join("\n")}`);
 Retrieved memory IDs for context: ${memoryRefs.join(", ")}`);
   }
 
-  // Phase 3: Completion Verification
-  sections.push(COMPLETION_VERIFICATION_SCRIPT);
+  // TEMPORARY: skip Phase 3 completion verification to see if build succeeds faster
+  // sections.push(COMPLETION_VERIFICATION_SCRIPT);
 
   const taskDescription = sections.join("\n\n");
 

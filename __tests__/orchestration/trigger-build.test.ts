@@ -190,6 +190,7 @@ describe("Trigger build - single-build lock (O10.6)", () => {
       run_id: runId,
       card_id: cardId,
       status: "queued",
+      worktree_path: "/tmp/dossier/repos/test-project",
     } as never);
     vi.mocked(queries.getCardById).mockResolvedValue({
       id: cardId,

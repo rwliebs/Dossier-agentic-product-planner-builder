@@ -140,12 +140,21 @@ export async function dispatchAssignment(
     module_hint: (pf as { module_hint?: string }).module_hint ?? undefined,
   }));
 
+  const worktreePath = (assignment as { worktree_path?: string }).worktree_path ?? null;
+  if (!worktreePath) {
+    return {
+      success: false,
+      error:
+        "Build misconfiguration: no worktree path. The agent must run in the project clone. Re-trigger the build from the project.",
+    };
+  }
+
   const payload: DispatchPayload = {
     run_id: (run as { id: string }).id,
     assignment_id,
     card_id: cardId,
     feature_branch: (assignment as { feature_branch: string }).feature_branch,
-    worktree_path: (assignment as { worktree_path?: string }).worktree_path ?? null,
+    worktree_path: worktreePath,
     allowed_paths: (assignment as { allowed_paths: string[] }).allowed_paths,
     forbidden_paths:
       (assignment as { forbidden_paths?: string[] }).forbidden_paths ?? null,

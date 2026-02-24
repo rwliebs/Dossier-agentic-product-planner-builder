@@ -133,21 +133,19 @@ export async function triggerBuild(
   // Planned code files are optional. Clicking Build is user approval.
   // When no approved files exist, allowed_paths defaults to ["src", "app", "lib", "components"].
 
-  // Clone repo for single-card builds (MVP); multi-card requires worktrees (deferred)
-  let clonePath: string | null = null;
-  if (cardIds.length === 1) {
-    const cloneResult = ensureClone(input.project_id, repoUrl, null, baseBranch);
-    if (!cloneResult.success) {
-      return {
-        success: false,
-        error: cloneResult.error,
-        validationErrors: [cloneResult.error ?? "Repo clone failed"],
-        outcomeType: "error",
-        message: cloneResult.error ?? "Repository clone failed.",
-      };
-    }
-    clonePath = cloneResult.clonePath ?? null;
+  // Clone repo for every build so the agent always has a valid cwd (worktree_path).
+  // Without this, multi-card builds left worktree_path null → agent ran in Dossier app root → exit 1.
+  const cloneResult = ensureClone(input.project_id, repoUrl, null, baseBranch);
+  if (!cloneResult.success) {
+    return {
+      success: false,
+      error: cloneResult.error,
+      validationErrors: [cloneResult.error ?? "Repo clone failed"],
+      outcomeType: "error",
+      message: cloneResult.error ?? "Repository clone failed.",
+    };
   }
+  const clonePath = cloneResult.clonePath ?? null;
 
   // Code file creation (planned files) is optional — all finalized cards are buildable
   const runResult = await createRun(db, {

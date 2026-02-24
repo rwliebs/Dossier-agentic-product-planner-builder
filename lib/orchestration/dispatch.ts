@@ -26,6 +26,7 @@ import {
   getCardRequirements,
 } from "@/lib/db/queries";
 import { getMemoryStore } from "@/lib/memory";
+import { isRuvectorAvailable } from "@/lib/ruvector/client";
 
 export interface DispatchAssignmentInput {
   assignment_id: string;
@@ -106,6 +107,12 @@ export async function dispatchAssignment(
         { limit: 10 }
       )
     : [];
+
+  if (MEMORY_PLANE && memoryRefs.length === 0 && isRuvectorAvailable()) {
+    console.warn(
+      "[dispatch] Memory plane enabled but retrieval empty for card — consider ingesting card context before build (e.g. on finalize)."
+    );
+  }
 
   // Fetch context artifacts (test files, docs, specs) linked to this card
   const contextLinks = await getCardContextArtifacts(db, cardId);

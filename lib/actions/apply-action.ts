@@ -70,6 +70,15 @@ export function applyAction(
       case "reorderCard":
         return applyReorderCard(action, newState);
 
+      case "deleteWorkflow":
+        return applyDeleteWorkflow(action, newState);
+
+      case "deleteActivity":
+        return applyDeleteActivity(action, newState);
+
+      case "deleteCard":
+        return applyDeleteCard(action, newState);
+
       case "linkContextArtifact":
         return applyLinkContextArtifact(action, newState);
 

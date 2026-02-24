@@ -80,6 +80,30 @@ Harvest: Post-build
 
 ---
 
+## Where to see stored data
+
+To verify that memory is actually being stored:
+
+1. **API (project-scoped)**  
+   `GET /api/projects/[projectId]/memory`  
+   Returns `count`, `units` (id, title, content_type, status, content_preview, link_url), and `storage` paths for SQLite and RuVector. Use any project ID after at least one card has been finalized (ingest) or one build has completed (harvest).
+
+2. **SQLite (raw)**  
+   Default path: `~/.dossier/dossier.db` (or `DOSSIER_DATA_DIR/dossier.db`).  
+   ```bash
+   sqlite3 ~/.dossier/dossier.db "SELECT id, title, status, substr(content_text,1,120) FROM memory_unit ORDER BY updated_at DESC LIMIT 20;"
+   ```
+   Relations (which unit belongs to which card/project):
+   ```bash
+   sqlite3 ~/.dossier/dossier.db "SELECT * FROM memory_unit_relation LIMIT 20;"
+   ```
+
+3. **RuVector (vectors)**  
+   Default path: `~/.dossier/ruvector/vectors.db` (or `DOSSIER_DATA_DIR/ruvector/vectors.db`).  
+   This file is the HNSW index; content is in SQLite. Vector count (if supported by ruvector-core): use the app’s memory API or SQLite `memory_unit` row count.
+
+---
+
 ## Verification
 - [x] Retrieval excludes rejected knowledge items
 - [x] Mock store used when RuVector unavailable

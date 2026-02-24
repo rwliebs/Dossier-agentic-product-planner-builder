@@ -173,8 +173,14 @@ export function buildTaskFromPayload(payload: DispatchPayload): BuildTaskOutput 
   // Phase 2: Implementation
   sections.push(`## Phase 2: IMPLEMENTATION`);
 
+  const worktreeSection =
+    payload.worktree_path
+      ? `CRITICAL: Your working directory is set to the target repository.
+Verify: run \`pwd\` to confirm you are in the repo root, then \`git branch\` to confirm you are on branch \`${payload.feature_branch}\`.
+Worktree: \`${payload.worktree_path}\``
+      : "";
   sections.push(`Implement the card scope on branch \`${payload.feature_branch}\`.
-${payload.worktree_path ? `Worktree: \`${payload.worktree_path}\`` : ""}`);
+${worktreeSection}`);
 
   if (plannedFilesDetail.length > 0) {
     sections.push(`## Planned files (with intent)`);
@@ -187,10 +193,10 @@ ${payload.worktree_path ? `Worktree: \`${payload.worktree_path}\`` : ""}`);
     sections.push(`Only modify files within the allowed paths above.`);
   } else if (allowedPaths.length > 0) {
     sections.push(`## Planned files
-Create or edit these files:
+Create or edit files under these allowed paths:
 ${allowedPaths.map((p) => `- \`${p}\``).join("\n")}
 
-Only modify files within the allowed paths above.`);
+You MUST implement the card scope by creating or editing concrete code files (e.g. components, API routes, lib modules, pages) under the paths above. Do not deliver only a README or documentation — deliver working code that fulfills the card description and acceptance criteria. Only modify files within the allowed paths above.`);
   }
 
   if (forbiddenPaths.length > 0) {

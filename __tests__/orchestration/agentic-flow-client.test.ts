@@ -3,6 +3,9 @@
  * - Factory throws when agentic-flow dependencies are missing
  * - Factory resolves ANTHROPIC_API_KEY from process.env or ~/.dossier/config
  * - Real client calls buildTaskFromPayload during dispatch
+ *
+ * CWD passthrough is verified by build-task.test.ts (worktree_path in task description)
+ * and by manual/integration runs with a real agent.
  */
 
 import { describe, it, expect, vi } from "vitest";

@@ -151,6 +151,168 @@ describe("Action Application (Mutations)", () => {
     });
   });
 
+  describe("Delete Card", () => {
+    it("removes card from state", () => {
+      initialState.cards.set(cardId, {
+        id: cardId,
+        workflow_activity_id: activityId,
+        title: "To Remove",
+        description: null,
+        status: "todo",
+        priority: 1,
+        position: 0,
+      });
+
+      const action: PlanningAction = {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        project_id: projectId,
+        action_type: "deleteCard",
+        target_ref: { card_id: cardId },
+        payload: {},
+      };
+
+      const result = applyAction(action, initialState);
+      expect(result.success).toBe(true);
+      expect(result.newState!.cards.has(cardId)).toBe(false);
+    });
+
+    it("fails when card does not exist", () => {
+      const action: PlanningAction = {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        project_id: projectId,
+        action_type: "deleteCard",
+        target_ref: { card_id: "nonexistent-card-id" },
+        payload: {},
+      };
+
+      const result = applyAction(action, initialState);
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain("not found");
+    });
+  });
+
+  describe("Delete Activity", () => {
+    it("removes activity and cascades to its cards", () => {
+      const cardId2 = "66666666-6666-4666-8666-666666666666";
+
+      initialState.activities.set(activityId, {
+        id: activityId,
+        workflow_id: workflowId,
+        title: "To Remove",
+        position: 0,
+      });
+      initialState.cards.set(cardId, {
+        id: cardId,
+        workflow_activity_id: activityId,
+        title: "Card 1",
+        description: null,
+        status: "todo",
+        priority: 1,
+        position: 0,
+      });
+      initialState.cards.set(cardId2, {
+        id: cardId2,
+        workflow_activity_id: activityId,
+        title: "Card 2",
+        description: null,
+        status: "todo",
+        priority: 2,
+        position: 1,
+      });
+
+      const action: PlanningAction = {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        project_id: projectId,
+        action_type: "deleteActivity",
+        target_ref: { workflow_activity_id: activityId },
+        payload: {},
+      };
+
+      const result = applyAction(action, initialState);
+      expect(result.success).toBe(true);
+      expect(result.newState!.activities.has(activityId)).toBe(false);
+      expect(result.newState!.cards.has(cardId)).toBe(false);
+      expect(result.newState!.cards.has(cardId2)).toBe(false);
+    });
+
+    it("fails when activity does not exist", () => {
+      const action: PlanningAction = {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        project_id: projectId,
+        action_type: "deleteActivity",
+        target_ref: { workflow_activity_id: "nonexistent-activity-id" },
+        payload: {},
+      };
+
+      const result = applyAction(action, initialState);
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain("not found");
+    });
+  });
+
+  describe("Delete Workflow", () => {
+    it("removes workflow and cascades to activities and cards", () => {
+      const activityId2 = "44444444-4444-4444-8444-444444444444";
+
+      initialState.workflows.set(workflowId, {
+        id: workflowId,
+        project_id: projectId,
+        title: "To Remove",
+        position: 0,
+      });
+      initialState.activities.set(activityId, {
+        id: activityId,
+        workflow_id: workflowId,
+        title: "Activity 1",
+        position: 0,
+      });
+      initialState.activities.set(activityId2, {
+        id: activityId2,
+        workflow_id: workflowId,
+        title: "Activity 2",
+        position: 1,
+      });
+      initialState.cards.set(cardId, {
+        id: cardId,
+        workflow_activity_id: activityId,
+        title: "Card",
+        description: null,
+        status: "todo",
+        priority: 1,
+        position: 0,
+      });
+
+      const action: PlanningAction = {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        project_id: projectId,
+        action_type: "deleteWorkflow",
+        target_ref: { workflow_id: workflowId },
+        payload: {},
+      };
+
+      const result = applyAction(action, initialState);
+      expect(result.success).toBe(true);
+      expect(result.newState!.workflows.has(workflowId)).toBe(false);
+      expect(result.newState!.activities.has(activityId)).toBe(false);
+      expect(result.newState!.activities.has(activityId2)).toBe(false);
+      expect(result.newState!.cards.has(cardId)).toBe(false);
+    });
+
+    it("fails when workflow does not exist", () => {
+      const action: PlanningAction = {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        project_id: projectId,
+        action_type: "deleteWorkflow",
+        target_ref: { workflow_id: "nonexistent-workflow-id" },
+        payload: {},
+      };
+
+      const result = applyAction(action, initialState);
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain("not found");
+    });
+  });
+
   describe("Update Card", () => {
     it("updates card title and status", () => {
       initialState.cards.set(cardId, {

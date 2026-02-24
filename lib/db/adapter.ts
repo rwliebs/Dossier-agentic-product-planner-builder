@@ -31,6 +31,7 @@ export interface DbAdapter {
   getWorkflowsByProject(projectId: string): Promise<DbRow[]>;
   insertWorkflow(row: DbRow): Promise<void>;
   upsertWorkflow(row: DbRow): Promise<void>;
+  deleteWorkflow(id: string, projectId: string): Promise<void>;
 
   // --- Workflow activities ---
   getActivitiesByWorkflow(workflowId: string): Promise<DbRow[]>;
@@ -38,6 +39,7 @@ export interface DbAdapter {
   getActivitiesByProject(projectId: string): Promise<DbRow[]>;
   insertWorkflowActivity(row: DbRow): Promise<void>;
   upsertWorkflowActivity(row: DbRow): Promise<void>;
+  deleteWorkflowActivity(id: string, workflowId: string): Promise<void>;
 
   // --- Cards ---
   getCardsByActivity(activityId: string): Promise<DbRow[]>;
@@ -47,6 +49,7 @@ export interface DbAdapter {
   insertCard(row: DbRow): Promise<void>;
   updateCard(cardId: string, updates: DbRow): Promise<void>;
   upsertCard(row: DbRow): Promise<void>;
+  deleteCard(id: string): Promise<void>;
 
   // --- Planning actions ---
   getPlanningActionsByProject(

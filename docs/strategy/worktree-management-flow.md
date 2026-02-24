@@ -76,6 +76,19 @@ agentic-flow reports:
 
 Dossier records these in `AgentExecution` and `AgentCommit`.
 
+### 4a) Auto-Commit (Dossier-owned, single-card builds)
+
+When `worktree_path` is set (single-card builds), Dossier automatically commits agent-produced files before running checks:
+
+1. Verify current branch matches `feature_branch`
+2. List changed files via `git status --porcelain`
+3. Exclude build artifacts (`.next/`, `node_modules/`, `test-results/`, etc.)
+4. Stage eligible paths (intersection with `allowed_paths` plus root allowlist)
+5. Commit with message `feat: <card title>`
+6. Insert `agent_commit` record and log `commit_created` event
+
+If no eligible changes exist, the assignment is marked `blocked` and checks are skipped. See [docs/strategy/worktree-auto-commit.md](worktree-auto-commit.md).
+
 ### 5) Mandatory Checks (Dossier-owned gate)
 
 Before any approval request, Dossier runs required checks:

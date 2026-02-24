@@ -65,6 +65,7 @@ export const createActivityTargetRefSchema = z.object({
 // ============================================================================
 
 export const createCardPayloadSchema = z.object({
+  id: z.string().uuid().optional(), // when provided, used as card id so upsertCardKnowledgeItem can target this card
   title: z.string().min(1),
   description: z.string().nullable().optional(),
   status: cardStatusSchema,
@@ -198,6 +199,36 @@ export const setCardKnowledgeStatusTargetRefSchema = z.object({
 });
 
 // ============================================================================
+// deleteWorkflow: Delete a workflow and its activities/cards (cascade)
+// ============================================================================
+
+export const deleteWorkflowPayloadSchema = z.object({});
+
+export const deleteWorkflowTargetRefSchema = z.object({
+  workflow_id: z.string().uuid(),
+});
+
+// ============================================================================
+// deleteActivity: Delete a workflow activity and its cards (cascade)
+// ============================================================================
+
+export const deleteActivityPayloadSchema = z.object({});
+
+export const deleteActivityTargetRefSchema = z.object({
+  workflow_activity_id: z.string().uuid(),
+});
+
+// ============================================================================
+// deleteCard: Delete a card
+// ============================================================================
+
+export const deleteCardPayloadSchema = z.object({});
+
+export const deleteCardTargetRefSchema = z.object({
+  card_id: z.string().uuid(),
+});
+
+// ============================================================================
 // Payload and target_ref by action type (for validation by action_type)
 // ============================================================================
 
@@ -211,6 +242,9 @@ export const payloadSchemaByActionType: Record<
   createCard: createCardPayloadSchema,
   updateCard: updateCardPayloadSchema,
   reorderCard: reorderCardPayloadSchema,
+  deleteWorkflow: deleteWorkflowPayloadSchema,
+  deleteActivity: deleteActivityPayloadSchema,
+  deleteCard: deleteCardPayloadSchema,
   linkContextArtifact: linkContextArtifactPayloadSchema,
   createContextArtifact: createContextArtifactPayloadSchema,
   upsertCardPlannedFile: upsertCardPlannedFilePayloadSchema,
@@ -229,6 +263,9 @@ export const targetRefSchemaByActionType: Record<
   createCard: createCardTargetRefSchema,
   updateCard: updateCardTargetRefSchema,
   reorderCard: reorderCardTargetRefSchema,
+  deleteWorkflow: deleteWorkflowTargetRefSchema,
+  deleteActivity: deleteActivityTargetRefSchema,
+  deleteCard: deleteCardTargetRefSchema,
   linkContextArtifact: linkContextArtifactTargetRefSchema,
   createContextArtifact: createContextArtifactTargetRefSchema,
   upsertCardPlannedFile: upsertCardPlannedFileTargetRefSchema,

@@ -38,6 +38,11 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/feature-flags", () => ({
   PLANNING_LLM: true,
+  MEMORY_PLANE: false,
+}));
+
+vi.mock("@/lib/memory/ingestion", () => ({
+  ingestCardContext: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock("@/lib/db/map-snapshot", () => ({

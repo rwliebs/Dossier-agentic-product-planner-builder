@@ -41,6 +41,7 @@ export interface MapCard {
   build_state?: string | null;
   last_built_at?: string | null;
   last_build_ref?: string | null;
+  last_build_error?: string | null;
 }
 
 export interface MapActivity {

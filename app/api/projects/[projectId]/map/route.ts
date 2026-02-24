@@ -7,6 +7,7 @@ import {
   getCardsByProject,
 } from "@/lib/db/queries";
 import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
+import { recoverStaleRuns } from "@/lib/orchestration/recover-stale-runs";
 
 type RouteParams = { params: Promise<{ projectId: string }> };
 
@@ -22,6 +23,7 @@ export interface MapCard {
   build_state: string | null;
   last_built_at: string | null;
   last_build_ref: string | null;
+  last_build_error?: string | null;
 }
 
 export interface MapActivity {
@@ -63,6 +65,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { projectId } = await params;
     const db = getDb();
+
+    // Recover runs stuck in "running" >30 min so cards show correct state
+    await recoverStaleRuns(db, projectId);
 
     const project = await getProject(db, projectId);
     if (!project) {
@@ -153,5 +158,6 @@ function normalizeCard(row: Record<string, unknown>): MapCard {
     build_state: (row.build_state as string) ?? null,
     last_built_at: (row.last_built_at as string) ?? null,
     last_build_ref: (row.last_build_ref as string) ?? null,
+    last_build_error: (row.last_build_error as string) ?? null,
   };
 }

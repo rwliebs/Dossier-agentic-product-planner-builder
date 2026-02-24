@@ -458,6 +458,12 @@ ALTER TABLE context_artifact_new RENAME TO context_artifact;
 CREATE INDEX IF NOT EXISTS idx_context_artifact_project_id ON context_artifact(project_id);
 `,
   },
+  {
+    name: "009_card_last_build_error.sql",
+    sql: /* sql */ `
+ALTER TABLE card ADD COLUMN last_build_error TEXT;
+`,
+  },
 ];
 
 /** One-time: replace non-UUID workflow, workflow_activity, and card ids with UUIDs so build API and DB stay in sync. */

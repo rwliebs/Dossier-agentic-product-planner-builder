@@ -33,7 +33,7 @@ export interface CodeFileForPanel {
 interface ImplementationCardProps {
   card: MapCard;
   isExpanded: boolean;
-  onExpand: (cardId: string) => void;
+  onExpand: (cardId: string | null) => void;
   onAction: (cardId: string, action: string) => void;
   onUpdateDescription: (cardId: string, description: string) => void;
   onUpdateQuickAnswer?: (cardId: string, quickAnswer: string) => void;
@@ -161,6 +161,144 @@ export function ImplementationCard({
 
   const getActionButtonText = () =>
     ACTION_BUTTONS.CARD_ACTION[status as keyof typeof ACTION_BUTTONS.CARD_ACTION] ?? ACTION_BUTTONS.CARD_ACTION.todo;
+
+  /** Unified action button: single button with priority-ordered label and behavior. */
+  const getUnifiedActionState = () => {
+    const buildState = card.build_state ?? null;
+    const isBuilding = buildingCardId === card.id;
+    const isQueuedOrRunning = buildState === 'queued' || buildState === 'running';
+    const isBlocked = buildState === 'blocked';
+    const isCompleted = buildState === 'completed';
+    const isFinalized = !!card.finalized_at;
+    const canResume = isBlocked && !!onResumeBlockedCard;
+
+    if (isBuilding || isQueuedOrRunning) {
+      return {
+        label: isBuilding ? ACTION_BUTTONS.UNIFIED.BUILDING : ACTION_BUTTONS.UNIFIED.QUEUED,
+        disabled: true,
+        action: null as string | null,
+        buttonClass: 'bg-amber-500 cursor-not-allowed animate-pulse',
+      };
+    }
+    if (isBlocked && canResume) {
+      return {
+        label: ACTION_BUTTONS.UNIFIED.RESUME_BUILD,
+        disabled: false,
+        action: 'resume',
+        buttonClass: 'bg-amber-600 hover:bg-amber-700',
+      };
+    }
+    if (isBlocked && !canResume) {
+      return {
+        label: ACTION_BUTTONS.CARD_ACTION.todo,
+        disabled: false,
+        action: 'build',
+        buttonClass: config.button,
+      };
+    }
+    if (isCompleted) {
+      return {
+        label: ACTION_BUTTONS.UNIFIED.MERGE_FEATURE,
+        disabled: false,
+        action: 'merge',
+        buttonClass: 'bg-emerald-600 hover:bg-emerald-700',
+      };
+    }
+    if (!isFinalized && onFinalizeCard) {
+      return {
+        label: finalizingCardId === card.id ? ACTION_BUTTONS.FINALIZING_CARD : ACTION_BUTTONS.FINALIZE_CARD,
+        disabled: finalizingCardId === card.id,
+        action: 'finalize',
+        buttonClass: finalizingCardId === card.id
+          ? 'bg-indigo-400 cursor-not-allowed animate-pulse'
+          : 'bg-indigo-600 hover:bg-indigo-700',
+      };
+    }
+    if (status === 'questions') {
+      return {
+        label: ACTION_BUTTONS.CARD_ACTION.questions,
+        disabled: false,
+        action: 'reply',
+        buttonClass: config.button,
+      };
+    }
+    if (status === 'review') {
+      return {
+        label: ACTION_BUTTONS.CARD_ACTION.review,
+        disabled: false,
+        action: 'test',
+        buttonClass: config.button,
+      };
+    }
+    if (status === 'active') {
+      return {
+        label: ACTION_BUTTONS.CARD_ACTION.active,
+        disabled: false,
+        action: 'monitor',
+        buttonClass: config.button,
+      };
+    }
+    if ((status === 'todo' || status === 'production') && isFinalized && onBuildCard) {
+      return {
+        label: ACTION_BUTTONS.CARD_ACTION.todo,
+        disabled: false,
+        action: 'build',
+        buttonClass: config.button,
+      };
+    }
+    if ((status === 'todo' || status === 'production') && !isFinalized && onFinalizeCard) {
+      return {
+        label: finalizingCardId === card.id ? ACTION_BUTTONS.FINALIZING_CARD : ACTION_BUTTONS.FINALIZE_CARD,
+        disabled: finalizingCardId === card.id,
+        action: 'finalize',
+        buttonClass: finalizingCardId === card.id
+          ? 'bg-indigo-400 cursor-not-allowed animate-pulse'
+          : 'bg-indigo-600 hover:bg-indigo-700',
+      };
+    }
+    return {
+      label: getActionButtonText(),
+      disabled: false,
+      action: 'build',
+      buttonClass: config.button,
+    };
+  };
+
+  const unifiedState = getUnifiedActionState();
+
+  const handleUnifiedAction = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (unifiedState.disabled) return;
+    switch (unifiedState.action) {
+      case 'resume':
+        onResumeBlockedCard?.(card.id);
+        break;
+      case 'build':
+        if (onBuildCard && card.finalized_at) {
+          onBuildCard(card.id);
+        } else {
+          onAction(card.id, 'build');
+        }
+        break;
+      case 'merge':
+        onAction(card.id, 'merge');
+        break;
+      case 'finalize':
+        onFinalizeCard?.(card.id);
+        break;
+      case 'reply':
+        onAction(card.id, 'reply');
+        break;
+      case 'test':
+        onAction(card.id, 'test');
+        break;
+      case 'monitor':
+        onAction(card.id, 'monitor');
+        break;
+      default:
+        onAction(card.id, unifiedState.action ?? 'build');
+    }
+  };
 
   const handleSaveDescription = () => {
     onUpdateDescription(card.id, editedDescription);
@@ -303,6 +441,17 @@ export function ImplementationCard({
           {sortedArtifacts.length > 2 && <span className="text-[10px] text-gray-500">+{sortedArtifacts.length - 2}</span>}
         </div>
 
+        {card.build_state === 'failed' && card.last_build_error && (
+          <div className="mt-2 rounded border border-red-200 bg-red-50 p-2">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-red-800 mb-1">
+              Failure reason
+            </p>
+            <p className="text-xs text-red-900/90 leading-relaxed break-words">
+              {card.last_build_error}
+            </p>
+          </div>
+        )}
+
         {card.build_state === 'blocked' && (
           <div className="mt-2 rounded border border-amber-300 bg-amber-50 p-2">
             <p className="text-[10px] font-mono uppercase tracking-wider text-amber-800 mb-1">
@@ -368,28 +517,12 @@ export function ImplementationCard({
               <ChevronDown className="h-4 w-4" /> {ACTION_BUTTONS.VIEW_DETAILS_EDIT}
             </button>
           )}
-          {onFinalizeCard && !card.finalized_at && (
-            <div className="space-y-1">
-              <button
-                type="button"
-                disabled={finalizingCardId === card.id}
-                onClick={(e) => { e.stopPropagation(); onFinalizeCard(card.id); }}
-                className={`w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold rounded transition-colors ${
-                  finalizingCardId === card.id
-                    ? 'bg-indigo-400 text-white cursor-not-allowed animate-pulse'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                }`}
-              >
-                {finalizingCardId === card.id ? 'Finalizing…' : ACTION_BUTTONS.FINALIZE_CARD}
-              </button>
-              {finalizingCardId === card.id && cardFinalizeProgress && (
-                <p className="text-[10px] font-mono text-indigo-500 truncate px-1">
-                  {cardFinalizeProgress}
-                </p>
-              )}
-            </div>
+          {finalizingCardId === card.id && cardFinalizeProgress && (
+            <p className="text-[10px] font-mono text-indigo-500 truncate px-1">
+              {cardFinalizeProgress}
+            </p>
           )}
-          {card.finalized_at && (
+          {card.finalized_at && unifiedState.action !== 'finalize' && (
             <div className="flex items-center gap-2 px-2 py-1.5 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 font-mono">
               <Check className="h-3 w-3" />
               Finalized
@@ -397,40 +530,11 @@ export function ImplementationCard({
           )}
           <button
             type="button"
-            disabled={
-              buildingCardId === card.id ||
-              (card.build_state === 'blocked' && !onResumeBlockedCard)
-            }
-            onClick={(e) => {
-              e.stopPropagation();
-              if (card.build_state === 'blocked' && onResumeBlockedCard) {
-                onResumeBlockedCard(card.id);
-                return;
-              }
-              const action = status === 'active' ? 'monitor' : status === 'review' ? 'test' : 'build';
-              if (action === 'build' && onBuildCard && card.finalized_at) {
-                onBuildCard(card.id);
-              } else {
-                onAction(card.id, action);
-              }
-            }}
-            className={`w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold text-white rounded transition-colors ${
-              buildingCardId === card.id
-                ? 'bg-amber-500 cursor-not-allowed animate-pulse'
-                : card.build_state === 'blocked' && onResumeBlockedCard
-                  ? 'bg-amber-600 hover:bg-amber-700'
-                  : card.build_state === 'blocked'
-                    ? 'bg-amber-400 cursor-not-allowed opacity-60'
-                    : config.button
-            }`}
+            disabled={unifiedState.disabled}
+            onClick={handleUnifiedAction}
+            className={`w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold text-white rounded transition-colors ${unifiedState.buttonClass}`}
           >
-            {buildingCardId === card.id
-              ? 'Building…'
-              : card.build_state === 'blocked' && onResumeBlockedCard
-                ? 'Resume build'
-                : card.build_state === 'blocked'
-                  ? 'Blocked'
-                  : getActionButtonText()}
+            {unifiedState.label}
           </button>
         </div>
       </div>
@@ -657,7 +761,7 @@ export function ImplementationCard({
 
             <button
               type="button"
-              onClick={() => onExpand(card.id)}
+              onClick={() => onExpand(null)}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 mt-2 text-xs font-semibold bg-secondary text-foreground rounded hover:bg-secondary/80 transition-colors border border-border"
             >
               <ChevronDown className="h-4 w-4 rotate-180" /> Collapse

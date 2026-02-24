@@ -200,8 +200,8 @@ export async function dispatchAssignment(
 
   await updateCardAssignmentStatus(db, assignment_id, "running");
 
-  // Sync card build_state to running
-  await db.updateCard(cardId, { build_state: "running" });
+  // Sync card build_state to running; clear prior error for fresh build
+  await db.updateCard(cardId, { build_state: "running", last_build_error: null });
 
   // Ensure run status is running when first assignment dispatched
   const runStatus = (run as { status?: string }).status;

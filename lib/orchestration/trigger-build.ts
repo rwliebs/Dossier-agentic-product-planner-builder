@@ -16,6 +16,7 @@ import {
   getProject,
 } from "@/lib/db/queries";
 import { listOrchestrationRunsByProject } from "@/lib/db/queries/orchestration";
+import { recoverStaleRuns } from "./recover-stale-runs";
 
 export interface TriggerBuildInput {
   project_id: string;
@@ -46,22 +47,7 @@ export async function triggerBuild(
 ): Promise<TriggerBuildResult> {
   // O10.6: Single-build lock — strategy-mandated safety
   // Auto-expire runs stuck in "running" for >30 min (crash/disconnect recovery).
-  const STALE_RUN_MS = 30 * 60 * 1000;
-  const runningRuns = await listOrchestrationRunsByProject(db, input.project_id, {
-    status: "running",
-    limit: 5,
-  });
-  for (const run of runningRuns) {
-    const startedAt = (run as { started_at?: string }).started_at;
-    const createdAt = (run as { created_at?: string }).created_at;
-    const ts = startedAt ?? createdAt;
-    if (ts && Date.now() - new Date(ts).getTime() > STALE_RUN_MS) {
-      await db.updateOrchestrationRun((run as { id: string }).id, {
-        status: "failed",
-        ended_at: new Date().toISOString(),
-      });
-    }
-  }
+  await recoverStaleRuns(db, input.project_id);
   const stillRunning = await listOrchestrationRunsByProject(db, input.project_id, {
     status: "running",
     limit: 1,
@@ -259,10 +245,12 @@ export async function triggerBuild(
     });
 
     if (!assignResult.success) {
-      assignmentErrors.push(
-        `Card ${cardId}: failed to create assignment (${assignResult.error ?? "unknown error"})`
-      );
-      await db.updateCard(cardId, { build_state: "failed" });
+      const err = assignResult.error ?? "unknown error";
+      assignmentErrors.push(`Card ${cardId}: failed to create assignment (${err})`);
+      await db.updateCard(cardId, {
+        build_state: "failed",
+        last_build_error: `Failed to create assignment: ${err}`,
+      });
       continue;
     }
 
@@ -273,10 +261,12 @@ export async function triggerBuild(
       });
 
       if (!dispatchResult.success) {
-        assignmentErrors.push(
-          `Card ${cardId}: dispatch failed (${dispatchResult.error ?? "unknown error"})`
-        );
-        await db.updateCard(cardId, { build_state: "failed" });
+        const err = dispatchResult.error ?? "unknown error";
+        assignmentErrors.push(`Card ${cardId}: dispatch failed (${err})`);
+        await db.updateCard(cardId, {
+          build_state: "failed",
+          last_build_error: `Dispatch failed: ${err}`,
+        });
         await db.updateCardAssignment(assignResult.assignmentId, { status: "failed" });
       } else {
         assignmentIds.push(assignResult.assignmentId);

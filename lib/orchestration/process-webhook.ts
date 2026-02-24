@@ -275,7 +275,10 @@ export async function processWebhook(
         } else {
           autoCommitOk = false;
           await db.updateCardAssignment(assignment_id, { status: "failed" });
-          await db.updateCard(cardId, { build_state: "failed" });
+          await db.updateCard(cardId, {
+            build_state: "failed",
+            last_build_error: autoResult.error ?? "Auto-commit failed",
+          });
           await logEvent(db, {
             project_id: projectId,
             run_id: runId,
@@ -294,6 +297,7 @@ export async function processWebhook(
         await db.updateCard(cardId, {
           build_state: "completed",
           last_built_at: new Date().toISOString(),
+          last_build_error: null,
         });
       }
 
@@ -369,7 +373,11 @@ export async function processWebhook(
       });
 
       const failedCardId = (assignment as { card_id: string }).card_id;
-      await db.updateCard(failedCardId, { build_state: "failed" });
+      const errorMsg = payload.error ?? "Build failed";
+      await db.updateCard(failedCardId, {
+        build_state: "failed",
+        last_build_error: errorMsg,
+      });
       await writeKnowledgeToCard(db, failedCardId, payload.knowledge);
 
       await logEvent(db, {

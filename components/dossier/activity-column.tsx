@@ -8,7 +8,7 @@ import type { MapActivity, ContextArtifact, CardKnowledgeForDisplay } from '@/li
 export interface ActivityColumnProps {
   activity: MapActivity;
   expandedCardId: string | null;
-  onExpandCard: (cardId: string) => void;
+  onExpandCard: (cardId: string | null) => void;
   onCardAction: (cardId: string, action: string) => void;
   onUpdateCardDescription?: (cardId: string, description: string) => void;
   onUpdateQuickAnswer?: (cardId: string, quickAnswer: string) => void;
@@ -20,6 +20,7 @@ export interface ActivityColumnProps {
   availableFilePaths?: string[];
   onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
+  onResumeBlockedCard?: (cardId: string) => void;
   buildingCardId?: string | null;
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
@@ -47,6 +48,7 @@ export function ActivityColumn({
   availableFilePaths = [],
   onApprovePlannedFile,
   onBuildCard,
+  onResumeBlockedCard,
   buildingCardId,
   onFinalizeCard,
   finalizingCardId,
@@ -98,6 +100,7 @@ export function ActivityColumn({
               availableFilePaths={availableFilePaths}
               onApprovePlannedFile={onApprovePlannedFile}
               onBuildCard={onBuildCard}
+              onResumeBlockedCard={onResumeBlockedCard}
               buildingCardId={buildingCardId}
               onFinalizeCard={onFinalizeCard}
               finalizingCardId={finalizingCardId}

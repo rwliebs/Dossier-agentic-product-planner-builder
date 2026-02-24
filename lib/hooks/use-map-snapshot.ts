@@ -28,7 +28,9 @@ export function useMapSnapshot(projectId: string | undefined): UseMapSnapshotRes
     if (isInitialLoad) setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/map`);
+      const res = await fetch(`/api/projects/${projectId}/map`, {
+        cache: "no-store",
+      });
       if (!res.ok) {
         setError(res.status === 404 ? "Project not found" : "Failed to load map");
         setData(null);

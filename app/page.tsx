@@ -63,7 +63,7 @@ export default function DossierPage() {
   // appMode drives which layout to show — active whenever workflows exist so the canvas can render empty-state guidance
   const appMode = (snapshot?.workflows?.length ?? 0) > 0 ? 'active' : 'ideation';
   const { submit: submitAction } = useSubmitAction(appMode === 'active' ? projectId : undefined);
-  const { triggerBuild } = useTriggerBuild(appMode === 'active' ? projectId : undefined);
+  const { triggerBuild, resumeBlocked } = useTriggerBuild(appMode === 'active' ? projectId : undefined);
 
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const { data: cardKnowledge, loading: cardKnowledgeLoading, refetch: refetchCardKnowledge } = useCardKnowledge(
@@ -194,12 +194,47 @@ export default function DossierPage() {
     [triggerBuild, refetch]
   );
 
-  const handleCardAction = useCallback((cardId: string, action: string) => {
-    if (action === 'monitor' || action === 'test') {
-      setRightPanelTab('files');
-      setRightPanelOpen(true);
-    }
-  }, []);
+  const handleResumeBlockedCard = useCallback(
+    async (cardId: string) => {
+      setBuildingCardId(cardId);
+      try {
+        const result = await resumeBlocked(cardId);
+        const { toast } = await import('sonner');
+        if (result.outcomeType === 'success') {
+          toast.success(result.message ?? 'Build resumed — agent is working');
+          setRightPanelTab('files');
+          setRightPanelOpen(true);
+          refetch();
+        } else {
+          toast.error(result.message ?? result.error ?? 'Failed to resume build');
+        }
+      } finally {
+        setBuildingCardId(null);
+      }
+    },
+    [resumeBlocked, refetch]
+  );
+
+  const handleCardAction = useCallback(
+    (cardId: string, action: string) => {
+      if (action === 'monitor' || action === 'test') {
+        setRightPanelTab('files');
+        setRightPanelOpen(true);
+      } else if (action === 'reply') {
+        setExpandedCardId(cardId);
+      } else if (action === 'merge') {
+        const repoUrl = snapshot?.project?.repo_url;
+        if (repoUrl) {
+          window.open(repoUrl, '_blank', 'noopener,noreferrer');
+        } else {
+          import('sonner').then(({ toast }) => {
+            toast.warning('Connect a repository in project settings to open merge flow.');
+          });
+        }
+      }
+    },
+    [snapshot?.project?.repo_url]
+  );
 
   const [populatingWorkflowId, setPopulatingWorkflowId] = useState<string | null>(null);
   const handlePopulateWorkflow = useCallback(
@@ -261,8 +296,20 @@ export default function DossierPage() {
     )
   ) ?? false;
 
+  const hadActiveBuildsRef = useRef(false);
   useEffect(() => {
-    if (!projectId || !hasActiveBuilds) return;
+    if (hasActiveBuilds) hadActiveBuildsRef.current = true;
+  }, [hasActiveBuilds]);
+
+  useEffect(() => {
+    if (!projectId || !hasActiveBuilds) {
+      // When transitioning from active to inactive, do one final refetch to catch completion
+      if (hadActiveBuildsRef.current && !hasActiveBuilds) {
+        hadActiveBuildsRef.current = false;
+        refetch();
+      }
+      return;
+    }
     const intervalId = window.setInterval(() => {
       refetch();
     }, 2000);
@@ -875,7 +922,7 @@ export default function DossierPage() {
             </div>
           ) : (
             <>
-              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
+              <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-auto">
                 {mapLoading && <MapSkeleton />}
                 {!mapLoading && mapError && (
                   <div className="flex flex-col items-center justify-center py-16 gap-2">
@@ -907,6 +954,7 @@ export default function DossierPage() {
                     availableFilePaths={availableFilePaths}
                     onApprovePlannedFile={handleApprovePlannedFile}
                     onBuildCard={handleBuildCard}
+                    onResumeBlockedCard={handleResumeBlockedCard}
                     buildingCardId={buildingCardId}
                     onFinalizeCard={handleFinalizeCard}
                     finalizingCardId={finalizingCardId}

@@ -29,7 +29,7 @@ export interface ActivityColumnProps {
   codeFiles?: CodeFileForPanel[];
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
   getCardKnowledgeLoading?: (cardId: string) => boolean;
-  onAddCard?: (title: string) => void | Promise<void>;
+  onAddCard?: (title: string, position?: number, priority?: number) => void | Promise<void>;
   onDeleteActivity?: (activityId: string, activityTitle: string, cardCount: number) => void;
   onDeleteCard?: (cardId: string, cardTitle: string) => void;
 }
@@ -122,11 +122,11 @@ export function ActivityColumn({
           );
         })}
         {onAddCard && (
-          <div className="pt-2 border border-dashed border-border rounded px-3 py-2">
+          <div className="border border-dashed border-border rounded px-2 py-1.5">
             <InlineAddInput
               placeholder="Card title"
               buttonLabel="+ Card"
-              onConfirm={onAddCard}
+              onConfirm={(title) => onAddCard(title, sortedCards.length, sortedCards[sortedCards.length - 1]?.priority ?? 0)}
             />
           </div>
         )}

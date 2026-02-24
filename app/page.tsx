@@ -658,17 +658,17 @@ export default function DossierPage() {
   );
 
   const handleAddActivity = useCallback(
-    async (workflowId: string, title: string) => {
+    async (workflowId: string, title: string, position?: number) => {
       if (!projectId || !submitAction) return;
       const workflow = snapshot?.workflows?.find((wf) => wf.id === workflowId);
       const activities = workflow?.activities ?? [];
-      const position = activities.length;
+      const pos = position ?? activities.length;
       const result = await submitAction({
         actions: [
           {
             action_type: 'createActivity',
             target_ref: { workflow_id: workflowId },
-            payload: { title, position },
+            payload: { title, position: pos },
           },
         ],
       });
@@ -682,14 +682,16 @@ export default function DossierPage() {
   );
 
   const handleAddCard = useCallback(
-    async (activityId: string, title: string) => {
+    async (activityId: string, title: string, position?: number, priority?: number) => {
       if (!projectId || !submitAction) return;
+      const pos = position ?? 0;
+      const prio = priority ?? 0;
       const result = await submitAction({
         actions: [
           {
             action_type: 'createCard',
             target_ref: { workflow_activity_id: activityId },
-            payload: { title, status: 'todo', priority: 0, position: 0 },
+            payload: { title, status: 'todo', priority: prio, position: pos },
           },
         ],
       });
@@ -703,8 +705,8 @@ export default function DossierPage() {
   );
 
   const performDelete = useCallback(
-    async (action: { action_type: string; target_ref: Record<string, string> }) => {
-      if (!projectId || !submitAction) return;
+    async (action: { action_type: string; target_ref: Record<string, string> }): Promise<boolean> => {
+      if (!projectId || !submitAction) return false;
       setIsDeleting(true);
       try {
         const result = await submitAction({
@@ -712,11 +714,13 @@ export default function DossierPage() {
         });
         if (result && result.applied > 0) {
           refetch();
-          setDeleteDialog(null);
-        } else if (result?.results?.[0]?.rejection_reason) {
+          return true;
+        }
+        if (result?.results?.[0]?.rejection_reason) {
           const { toast } = await import('sonner');
           toast.error(result.results[0].rejection_reason);
         }
+        return false;
       } finally {
         setIsDeleting(false);
       }
@@ -734,10 +738,11 @@ export default function DossierPage() {
         entityType: 'workflow',
         entityName: workflowTitle,
         cascadeMessage: cascade,
-        onConfirm: () => performDelete({
-          action_type: 'deleteWorkflow',
-          target_ref: { workflow_id: workflowId },
-        }),
+        onConfirm: () =>
+          performDelete({
+            action_type: 'deleteWorkflow',
+            target_ref: { workflow_id: workflowId },
+          }),
       });
     },
     [performDelete]
@@ -753,10 +758,11 @@ export default function DossierPage() {
         entityType: 'activity',
         entityName: activityTitle,
         cascadeMessage: cascade,
-        onConfirm: () => performDelete({
-          action_type: 'deleteActivity',
-          target_ref: { workflow_activity_id: activityId },
-        }),
+        onConfirm: () =>
+          performDelete({
+            action_type: 'deleteActivity',
+            target_ref: { workflow_activity_id: activityId },
+          }),
       });
     },
     [performDelete]
@@ -767,10 +773,11 @@ export default function DossierPage() {
       setDeleteDialog({
         entityType: 'card',
         entityName: cardTitle,
-        onConfirm: () => performDelete({
-          action_type: 'deleteCard',
-          target_ref: { card_id: cardId },
-        }),
+        onConfirm: () =>
+          performDelete({
+            action_type: 'deleteCard',
+            target_ref: { card_id: cardId },
+          }),
       });
     },
     [performDelete]
@@ -874,7 +881,7 @@ export default function DossierPage() {
             </div>
           ) : (
             <>
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
                 {mapLoading && <MapSkeleton />}
                 {!mapLoading && mapError && (
                   <div className="flex flex-col items-center justify-center py-16 gap-2">

@@ -11,6 +11,7 @@ import {
   getProject,
   getWorkflowsByProject,
   getActivitiesByWorkflow,
+  getCardsByActivity,
   getCardById,
   getArtifactById,
   verifyCardInProject,
@@ -278,6 +279,19 @@ async function applyCreateActivity(
   }
 
   try {
+    // Shift activities at or after insert position to make room
+    const toShift = activities.filter((a) => (a.position as number) >= position);
+    for (const a of toShift) {
+      await db.upsertWorkflowActivity({
+        id: a.id,
+        workflow_id: workflowId,
+        title: a.title,
+        color: a.color ?? null,
+        position: (a.position as number) + 1,
+        created_at: a.created_at,
+        updated_at: new Date().toISOString(),
+      });
+    }
     await db.insertWorkflowActivity({
       id,
       workflow_id: workflowId,
@@ -332,6 +346,13 @@ async function applyCreateCard(
   }
 
   try {
+    const cards = await getCardsByActivity(db, activityId);
+    const toShift = cards.filter((c) => ((c.position as number) ?? 0) >= position);
+    for (const c of toShift) {
+      await db.updateCard(c.id as string, {
+        position: ((c.position as number) ?? 0) + 1,
+      });
+    }
     await db.insertCard({
       id,
       workflow_activity_id: activityId,

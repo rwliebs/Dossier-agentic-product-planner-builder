@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
 
 export interface InlineAddInputProps {
   placeholder: string;
@@ -84,7 +83,6 @@ export function InlineAddInput({
       className={`h-7 gap-1.5 text-[11px] font-mono uppercase tracking-wider border-dashed ${className}`}
       onClick={() => setIsEditing(true)}
     >
-      <Plus className="h-3 w-3" />
       {buttonLabel}
     </Button>
   );

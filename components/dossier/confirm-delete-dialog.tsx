@@ -16,7 +16,8 @@ export interface ConfirmDeleteDialogProps {
   entityType: 'workflow' | 'activity' | 'card';
   entityName: string;
   cascadeMessage?: string;
-  onConfirm: () => void | Promise<void>;
+  /** Return true to close the dialog (success), false to keep it open (failure). */
+  onConfirm: () => boolean | Promise<boolean>;
   isDeleting?: boolean;
 }
 
@@ -37,8 +38,8 @@ export function ConfirmDeleteDialog({
         : 'Card';
 
   const handleConfirm = async () => {
-    await onConfirm();
-    onOpenChange(false);
+    const success = await onConfirm();
+    if (success) onOpenChange(false);
   };
 
   return (

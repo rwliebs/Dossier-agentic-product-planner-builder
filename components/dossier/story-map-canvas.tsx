@@ -39,8 +39,8 @@ export interface StoryMapCanvasProps {
   populatingWorkflowId?: string | null;
   /** Add workflow/activity/card; delete workflow/activity/card. */
   onAddWorkflow?: (title: string) => void | Promise<void>;
-  onAddActivity?: (workflowId: string, title: string) => void | Promise<void>;
-  onAddCard?: (activityId: string, title: string) => void | Promise<void>;
+  onAddActivity?: (workflowId: string, title: string, position?: number) => void | Promise<void>;
+  onAddCard?: (activityId: string, title: string, position?: number, priority?: number) => void | Promise<void>;
   onDeleteWorkflow?: (workflowId: string, workflowTitle: string, activityCount: number, cardCount: number) => void;
   onDeleteActivity?: (activityId: string, activityTitle: string, cardCount: number) => void;
   onDeleteCard?: (cardId: string, cardTitle: string) => void;
@@ -127,12 +127,15 @@ export function StoryMapCanvas({
               Workflows are scaffolded — click Populate on any workflow to add activities and cards.
             </p>
             {onAddWorkflow && (
-              <div className="border border-dashed border-border rounded px-4 py-3 inline-flex">
-                <InlineAddInput
-                  placeholder="Workflow title"
-                  buttonLabel="+ Workflow"
-                  onConfirm={onAddWorkflow}
-                />
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Add workflow</span>
+                <div className="border border-dashed border-border rounded px-4 py-3 inline-flex">
+                  <InlineAddInput
+                    placeholder="Workflow title"
+                    buttonLabel="+ Workflow"
+                    onConfirm={onAddWorkflow}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -194,7 +197,7 @@ export function StoryMapCanvas({
                 </div>
                 <div className="flex gap-6 mb-6">
                   {sortedActivities.map((activity, index) => (
-                    <div key={activity.id} className="flex items-start gap-6">
+                    <div key={activity.id} className="flex items-start gap-4">
                       <ActivityColumn
                         activity={activity}
                         expandedCardId={expandedCardId}
@@ -219,22 +222,21 @@ export function StoryMapCanvas({
                         codeFiles={codeFiles}
                         getCardKnowledge={getCardKnowledge as ActivityColumnProps['getCardKnowledge']}
                         getCardKnowledgeLoading={getCardKnowledgeLoading}
-                        onAddCard={onAddCard ? (title) => onAddCard(activity.id, title) : undefined}
+                        onAddCard={onAddCard ? (title, position, priority) => onAddCard(activity.id, title, position, priority) : undefined}
                         onDeleteActivity={onDeleteActivity}
                         onDeleteCard={onDeleteCard}
                       />
-                      {index < sortedActivities.length - 1 && (
-                        <div className="flex items-center h-24 text-muted-foreground/50">
-                          <span className="text-lg">→</span>
-                        </div>
-                      )}
-                      {index === sortedActivities.length - 1 && onAddActivity && (
-                        <div className="flex items-center h-24 min-w-[120px] border border-dashed border-border rounded px-3 py-2">
+                      {onAddActivity && (
+                        <div className="flex flex-col items-center gap-0.5 self-start shrink-0">
                           <InlineAddInput
-                            placeholder="Activity title"
-                            buttonLabel="+ Activity"
-                            onConfirm={(title) => onAddActivity(wf.id, title)}
+                            placeholder="Activity"
+                            buttonLabel="+"
+                            onConfirm={(title) => onAddActivity(wf.id, title, index + 1)}
+                            className="text-muted-foreground/50 hover:text-muted-foreground/80 bg-transparent border-0 shadow-none h-6 text-[10px]"
                           />
+                          {index < sortedActivities.length - 1 && (
+                            <span className="text-sm text-muted-foreground/40">→</span>
+                          )}
                         </div>
                       )}
                     </div>
@@ -244,12 +246,15 @@ export function StoryMapCanvas({
             );
           })}
           {onAddWorkflow && hasActivities && (
-            <div className="mt-4 mb-6 border border-dashed border-border rounded px-4 py-3 inline-flex">
-              <InlineAddInput
-                placeholder="Workflow title"
-                buttonLabel="+ Workflow"
-                onConfirm={onAddWorkflow}
-              />
+            <div className="mt-6 mb-6 flex flex-col gap-2">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Add workflow</span>
+              <div className="border border-dashed border-border rounded px-4 py-3 inline-flex">
+                <InlineAddInput
+                  placeholder="Workflow title"
+                  buttonLabel="+ Workflow"
+                  onConfirm={onAddWorkflow}
+                />
+              </div>
             </div>
           )}
         </div>

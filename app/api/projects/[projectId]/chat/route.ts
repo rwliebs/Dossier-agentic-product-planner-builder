@@ -23,7 +23,9 @@ import { json } from "@/lib/api/response-helpers";
 import { PLANNING_LLM } from "@/lib/feature-flags";
 import { chatRequestSchema } from "@/lib/validation/request-schema";
 
-const POPULATE_INTENT = /populate|add activities|add cards|fill in|activities and cards|functionality cards/i;
+// Only trigger auto-populate when user explicitly requests workflow population.
+// Avoid broad patterns: "fill in" and "add cards" match common unrelated phrases.
+const POPULATE_INTENT = /\b(populate|add activities|activities and cards|functionality cards)\b/i;
 
 export interface ChatResponse {
   status: "success" | "error";

@@ -365,7 +365,8 @@ export default function DossierPage() {
     });
   }, [snapshot]);
 
-  // When snapshot changes and any card's data has changed, prompt user to refresh
+  // When snapshot changes and card content (not build_state) has changed, prompt user to refresh.
+  // build_state is excluded so build transitions only trigger the specific toasts above, not this generic one.
   useEffect(() => {
     if (!snapshot) return;
     const fingerprint = JSON.stringify(
@@ -373,7 +374,6 @@ export default function DossierPage() {
         wf.activities.flatMap((a) =>
           a.cards.map((c) => ({
             id: c.id,
-            build_state: c.build_state,
             quick_answer: c.quick_answer,
             finalized_at: c.finalized_at,
             last_built_at: c.last_built_at,

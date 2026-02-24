@@ -441,7 +441,6 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
       setPopulateProgress(null);
       setIsPopulating(false);
       addMessage('agent', `Populated ${total} workflow(s) with activities and cards.`);
-      addMessage('agent', "Next: let's define user actions for each workflow and card. What should users be able to do on each one? For example: View Details & Edit, Monitor, Reply, Test, Build, or custom actions. Reply with your choices per card or workflow, or say \"use defaults\" to keep the standard actions.");
       onPlanningApplied?.();
       return;
     }

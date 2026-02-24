@@ -29,9 +29,13 @@ async function findFreePort(): Promise<number | null> {
  * Tries ports 3001, 3002, ... until a free port is found.
  * Does not kill or restart the primary server on 3000.
  * Spawns a detached child process so the API can respond immediately.
- * Dev-only: intended for local development workflow.
+ * Dev-only: disabled in production to prevent unauthenticated DoS.
  */
 export async function POST() {
+  if (process.env.NODE_ENV !== "development") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const root = path.resolve(process.cwd());
   const port = await findFreePort();
 

@@ -16,9 +16,12 @@ import {
 import { runLlmSubStep } from "@/lib/llm/run-llm-substep";
 import { runFinalizeMultiStep } from "@/lib/llm/run-finalize-multistep";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
+import { getWorkflowActivities } from "@/lib/schemas/planning-state";
 import { json } from "@/lib/api/response-helpers";
 import { PLANNING_LLM } from "@/lib/feature-flags";
 import { chatRequestSchema } from "@/lib/validation/request-schema";
+
+const POPULATE_INTENT = /populate|add activities|add cards|fill in|activities and cards|functionality cards/i;
 
 export interface ChatResponse {
   status: "success" | "error";
@@ -154,6 +157,59 @@ export async function POST(
       console.error("[chat] Populate error:", msg);
       return json({ status: "error", message: msg }, 502);
     }
+  }
+
+  // When workflows exist but have no activities, and user asks to populate — route to populate per workflow
+  const emptyWorkflows = Array.from(state.workflows.values()).filter(
+    (wf) => getWorkflowActivities(state, wf.id).length === 0,
+  );
+  if (
+    !mode &&
+    emptyWorkflows.length > 0 &&
+    POPULATE_INTENT.test(message)
+  ) {
+    let totalApplied = 0;
+    let currentState = state;
+    for (const workflow of emptyWorkflows) {
+      try {
+        const result = await runLlmSubStep({
+          db,
+          projectId,
+          systemPrompt: buildPopulateWorkflowPrompt(),
+          userMessage: buildPopulateWorkflowUserMessage(
+            workflow.id,
+            workflow.title,
+            workflow.description ?? null,
+            message,
+            currentState,
+          ),
+          state: currentState,
+          emit: noopEmit,
+          actionFilter: (a: PlanningAction) =>
+            a.action_type === "createActivity" ||
+            a.action_type === "createCard" ||
+            a.action_type === "upsertCardKnowledgeItem",
+          mockResponse: mock_response,
+        });
+        totalApplied += result.actionCount;
+        if (result.actionCount > 0) {
+          const fresh = await fetchMapSnapshot(db, projectId);
+          if (fresh) currentState = fresh;
+        }
+      } catch (err) {
+        console.error("[chat] Populate workflow error:", err);
+      }
+    }
+    return json({
+      status: "success",
+      responseType: "actions" as const,
+      message:
+        totalApplied > 0
+          ? `Added activities and functionality cards to ${emptyWorkflows.length} workflow(s).`
+          : "No activities or cards were generated. Try adding more context.",
+      applied: totalApplied,
+      workflow_ids_created: [],
+    });
   }
 
   const linkedArtifacts = getLinkedArtifactsForPrompt(state, 5);

@@ -78,7 +78,7 @@ export default function DossierPage() {
     appMode === 'active' ? projectId : undefined,
     expandedCardId ?? undefined
   );
-  const { data: projectArtifacts } = useArtifacts(appMode === 'active' ? projectId : undefined);
+  const { data: projectArtifacts, refetch: refetchArtifacts } = useArtifacts(appMode === 'active' ? projectId : undefined);
   const { data: projectFilesTree } = useProjectFiles(appMode === 'active' ? projectId : undefined);
   const cardKnowledgeLoadingState = cardKnowledgeLoading || cardPlannedFilesLoading || cardContextArtifactsLoading;
 
@@ -401,6 +401,7 @@ export default function DossierPage() {
             label: 'Refresh',
             onClick: () => {
               refetch();
+              refetchArtifacts();
               if (expandedCardId) {
                 refetchCardKnowledge();
                 refetchCardPlannedFiles();
@@ -411,7 +412,7 @@ export default function DossierPage() {
         });
       });
     }
-  }, [snapshot, expandedCardId, refetch, refetchCardKnowledge, refetchCardPlannedFiles, refetchCardContextArtifacts]);
+  }, [snapshot, expandedCardId, refetch, refetchArtifacts, refetchCardKnowledge, refetchCardPlannedFiles, refetchCardContextArtifacts]);
 
   const handleFinalizeProject = useCallback(
     async () => {
@@ -445,6 +446,7 @@ export default function DossierPage() {
           toast.success(`Finalized: ${count} context documents created`);
         }
         refetch();
+        refetchArtifacts();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Finalize failed';
         const { toast } = await import('sonner');
@@ -454,7 +456,7 @@ export default function DossierPage() {
         setFinalizeProgress('');
       }
     },
-    [projectId, refetch]
+    [projectId, refetch, refetchArtifacts]
   );
 
   const handleFinalizeCard = useCallback(
@@ -538,6 +540,7 @@ export default function DossierPage() {
           toast.success(parts.join(' — '));
         }
         refetch();
+        refetchArtifacts();
         refetchCardContextArtifacts();
         refetchCardPlannedFiles();
       } catch (err) {
@@ -549,7 +552,7 @@ export default function DossierPage() {
         setCardFinalizeProgress('');
       }
     },
-    [projectId, refetch, refetchCardContextArtifacts, refetchCardPlannedFiles]
+    [projectId, refetch, refetchArtifacts, refetchCardContextArtifacts, refetchCardPlannedFiles]
   );
 
   const handleUpdateCardDescription = useCallback(
@@ -904,6 +907,7 @@ export default function DossierPage() {
           onPlanningApplied={() => {
             setAgentStatus(hasContent ? 'reviewing' : 'building');
             refetch();
+            refetchArtifacts();
           }}
           onPlanningStateChange={setIsPlanning}
           onProjectUpdate={handleProjectUpdate}

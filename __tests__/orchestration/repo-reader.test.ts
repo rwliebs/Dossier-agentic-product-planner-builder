@@ -11,8 +11,10 @@ import {
   getRepoFileTree,
   getChangedFiles,
   getFileContent,
+  getWorkingFileContent,
   getFileDiff,
   getRepoFileTreeWithStatus,
+  getWorkingTreeFileTreeWithStatus,
 } from "@/lib/orchestration/repo-reader";
 
 describe("repo-reader", () => {
@@ -101,6 +103,24 @@ describe("repo-reader", () => {
       expect(newNode?.status).toBe("added");
       const modNode = findNodeByPath(result.tree!, "/src/index.ts");
       expect(modNode?.status).toBe("modified");
+    });
+  });
+
+  describe("working tree readers", () => {
+    it("includes uncommitted files in working tree", () => {
+      fs.writeFileSync(path.join(repoPath, "src", "draft.ts"), "// draft\n", "utf-8");
+      const result = getWorkingTreeFileTreeWithStatus(repoPath, "feat/test", "main");
+      expect(result.success).toBe(true);
+      const draftNode = findNodeByPath(result.tree!, "/src/draft.ts");
+      expect(draftNode).toBeTruthy();
+      expect(draftNode?.status).toBe("added");
+    });
+
+    it("reads uncommitted file content from working tree", () => {
+      fs.writeFileSync(path.join(repoPath, "src", "draft.ts"), "// draft content\n", "utf-8");
+      const result = getWorkingFileContent(repoPath, "/src/draft.ts");
+      expect(result.success).toBe(true);
+      expect(result.content).toContain("// draft content");
     });
   });
 });

@@ -12,6 +12,8 @@ import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
 import {
   getRepoFileTreeWithStatus,
   getFileContent,
+  getWorkingFileContent,
+  getWorkingTreeFileTreeWithStatus,
   getFileDiff,
   type FileNode,
 } from "@/lib/orchestration/repo-reader";
@@ -88,24 +90,27 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       const assignments = await getCardAssignmentsByRun(db, runRow.id);
       const assignment = assignments.find(
         (a) => (a as { worktree_path?: string }).worktree_path
-      ) as { feature_branch: string } | undefined;
+      ) as { feature_branch: string; worktree_path?: string | null } | undefined;
       if (!assignment) {
         return json(
           { error: "No assignment with worktree. Trigger a build first." },
           404
         );
       }
+      const repoPath = assignment.worktree_path ?? runRow.worktree_root;
 
       const filePath = searchParams.get("path");
       const wantContent = searchParams.get("content") === "1";
       const wantDiff = searchParams.get("diff") === "1";
 
       if (wantContent && filePath) {
-        const contentResult = getFileContent(
-          runRow.worktree_root,
-          assignment.feature_branch,
-          filePath
-        );
+        const workingContent = getWorkingFileContent(repoPath, filePath);
+        if (workingContent.success) {
+          return new Response(workingContent.content ?? "", {
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+          });
+        }
+        const contentResult = getFileContent(repoPath, assignment.feature_branch, filePath);
         if (!contentResult.success) {
           return json(
             { error: contentResult.error ?? "Failed to read file" },
@@ -119,7 +124,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
       if (wantDiff && filePath) {
         const diffResult = getFileDiff(
-          runRow.worktree_root,
+          repoPath,
           runRow.base_branch,
           assignment.feature_branch,
           filePath
@@ -135,11 +140,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         });
       }
 
-      const result = getRepoFileTreeWithStatus(
-        runRow.worktree_root,
+      let result = getWorkingTreeFileTreeWithStatus(
+        repoPath,
         assignment.feature_branch,
         runRow.base_branch
       );
+      if (!result.success) {
+        result = getRepoFileTreeWithStatus(
+          repoPath,
+          assignment.feature_branch,
+          runRow.base_branch
+        );
+      }
       if (!result.success) {
         return json(
           { error: result.error ?? "Failed to read repository files" },

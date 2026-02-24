@@ -11,7 +11,11 @@ import {
   getCardAssignmentsByRun,
 } from "@/lib/db/queries/orchestration";
 
-const STALE_RUN_MS = 30 * 60 * 1000; // 30 minutes
+const STALE_RUN_MINUTES = parseInt(
+  process.env.DOSSIER_STALE_RUN_MINUTES ?? "5",
+  10
+);
+const STALE_RUN_MS = STALE_RUN_MINUTES * 60 * 1000;
 
 export async function recoverStaleRuns(
   db: DbAdapter,
@@ -43,7 +47,7 @@ export async function recoverStaleRuns(
         await db.updateCardAssignment(assignmentId, { status: "failed" });
         await db.updateCard(cardId, {
           build_state: "failed",
-          last_build_error: "Build timed out or agent stopped (recovered after 30+ min)",
+          last_build_error: `Build timed out or agent stopped (recovered after ${STALE_RUN_MINUTES}+ min)`,
         });
       }
     }

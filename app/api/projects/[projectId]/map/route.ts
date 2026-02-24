@@ -66,7 +66,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     const { projectId } = await params;
     const db = getDb();
 
-    // Recover runs stuck in "running" >30 min so cards show correct state
+    // Recover runs stuck in "running" >5 min (configurable) so cards show correct state
     await recoverStaleRuns(db, projectId);
 
     const project = await getProject(db, projectId);

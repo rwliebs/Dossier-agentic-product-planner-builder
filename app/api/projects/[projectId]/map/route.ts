@@ -66,7 +66,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     const { projectId } = await params;
     const db = getDb();
 
-    // Recover runs stuck in "running" >5 min (configurable) so cards show correct state
+    // Optionally recover runs stuck in "running" (DOSSIER_STALE_RUN_MINUTES > 0)
     await recoverStaleRuns(db, projectId);
 
     const project = await getProject(db, projectId);

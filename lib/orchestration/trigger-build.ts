@@ -46,7 +46,7 @@ export async function triggerBuild(
   input: TriggerBuildInput
 ): Promise<TriggerBuildResult> {
   // O10.6: Single-build lock — strategy-mandated safety
-  // Auto-expire runs stuck in "running" for >30 min (crash/disconnect recovery).
+  // Optionally recover runs stuck in "running" (set DOSSIER_STALE_RUN_MINUTES > 0).
   await recoverStaleRuns(db, input.project_id);
   const stillRunning = await listOrchestrationRunsByProject(db, input.project_id, {
     status: "running",

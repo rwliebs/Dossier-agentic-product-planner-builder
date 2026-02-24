@@ -464,6 +464,13 @@ CREATE INDEX IF NOT EXISTS idx_context_artifact_project_id ON context_artifact(p
 ALTER TABLE card ADD COLUMN last_build_error TEXT;
 `,
   },
+  {
+    name: "010_project_finalized_at.sql",
+    sql: /* sql */ `
+-- Add finalized_at to project for project-before-cards gate
+ALTER TABLE project ADD COLUMN finalized_at TEXT;
+`,
+  },
 ];
 
 /** One-time: replace non-UUID workflow, workflow_activity, and card ids with UUIDs so build API and DB stay in sync. */

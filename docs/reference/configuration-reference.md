@@ -45,6 +45,7 @@ ttl_expires_on: null
 | SQLITE_PATH | ~/.dossier/dossier.db | Override SQLite path |
 | EMBEDDING_MODEL | all-MiniLM-L6-v2 | RuVector embedding model |
 | PLANNING_LLM_MODEL | claude-haiku-4-5-20251001 | Planning LLM model |
+| DOSSIER_STALE_RUN_MINUTES | 0 | Minutes before marking stuck runs as failed. 0 = disabled (no timeout). |
 
 ---
 

@@ -12,7 +12,7 @@ import {
 } from "@/lib/db/queries/orchestration";
 
 const STALE_RUN_MINUTES = parseInt(
-  process.env.DOSSIER_STALE_RUN_MINUTES ?? "5",
+  process.env.DOSSIER_STALE_RUN_MINUTES ?? "0",
   10
 );
 const STALE_RUN_MS = STALE_RUN_MINUTES * 60 * 1000;
@@ -21,6 +21,9 @@ export async function recoverStaleRuns(
   db: DbAdapter,
   projectId: string
 ): Promise<number> {
+  // 0 = disabled: no automatic timeout for execution runs
+  if (STALE_RUN_MINUTES === 0) return 0;
+
   const runningRuns = await listOrchestrationRunsByProject(db, projectId, {
     status: "running",
     limit: 10,

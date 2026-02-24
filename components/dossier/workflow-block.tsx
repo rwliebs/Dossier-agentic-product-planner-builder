@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ACTION_BUTTONS } from '@/lib/constants/action-buttons';
 import { StoryMapCanvas, type StoryMapCanvasProps } from './story-map-canvas';
 import { ArchitectureView } from './architecture-view';
-import type { MapSnapshot, MapCard, ContextArtifact, CardKnowledgeForDisplay, CodeFile } from '@/lib/types/ui';
-import type { CodeFileForPanel } from './implementation-card';
+import type { MapSnapshot, MapCard, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 
 const EPIC_COLORS = ['yellow', 'blue', 'purple', 'green', 'orange', 'pink'] as const;
 
@@ -71,7 +70,6 @@ interface WorkflowBlockProps {
   finalizingCardId?: string | null;
   cardFinalizeProgress?: string;
   onSelectDoc?: (doc: ContextArtifact) => void;
-  onFileClick?: (file: CodeFileForPanel | CodeFile) => void;
   onUpdateFileDescription?: (fileId: string, description: string) => void;
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
   getCardKnowledgeLoading?: (cardId: string) => boolean;
@@ -117,7 +115,6 @@ export function WorkflowBlock({
   finalizingCardId,
   cardFinalizeProgress,
   onSelectDoc,
-  onFileClick,
   onUpdateFileDescription,
   getCardKnowledge,
   getCardKnowledgeLoading,
@@ -307,7 +304,6 @@ export function WorkflowBlock({
             finalizingCardId={finalizingCardId}
             cardFinalizeProgress={cardFinalizeProgress}
             onSelectDoc={onSelectDoc}
-            onSelectFile={onFileClick}
             getCardKnowledge={getCardKnowledge}
             getCardKnowledgeLoading={getCardKnowledgeLoading}
             onPopulateWorkflow={onPopulateWorkflow}
@@ -323,7 +319,6 @@ export function WorkflowBlock({
           <ArchitectureView
             snapshot={snapshot}
             onUpdateFileDescription={onUpdateFileDescription}
-            onFileClick={onFileClick}
           />
         )}
       </div>

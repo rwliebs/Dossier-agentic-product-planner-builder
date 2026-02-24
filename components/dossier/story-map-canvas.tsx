@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { InlineAddInput } from './inline-add-input';
 import { ACTION_BUTTONS } from '@/lib/constants/action-buttons';
 import type { MapWorkflow, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
-import type { CodeFileForPanel } from './implementation-card';
 
 export interface StoryMapCanvasProps {
   workflows: MapWorkflow[];
@@ -29,8 +28,6 @@ export interface StoryMapCanvasProps {
   finalizingCardId?: string | null;
   cardFinalizeProgress?: string;
   onSelectDoc?: (doc: ContextArtifact) => void;
-  onSelectFile?: (file: CodeFileForPanel) => void;
-  codeFiles?: CodeFileForPanel[];
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
   getCardKnowledgeLoading?: (cardId: string) => boolean;
   /** When workflows are scaffolded (no activities), call to populate a single workflow. */
@@ -66,8 +63,6 @@ export function StoryMapCanvas({
   finalizingCardId,
   cardFinalizeProgress,
   onSelectDoc,
-  onSelectFile,
-  codeFiles,
   getCardKnowledge,
   getCardKnowledgeLoading,
   onPopulateWorkflow,
@@ -218,8 +213,6 @@ export function StoryMapCanvas({
                         finalizingCardId={finalizingCardId}
                         cardFinalizeProgress={cardFinalizeProgress}
                         onSelectDoc={onSelectDoc}
-                        onSelectFile={onSelectFile}
-                        codeFiles={codeFiles}
                         getCardKnowledge={getCardKnowledge as ActivityColumnProps['getCardKnowledge']}
                         getCardKnowledgeLoading={getCardKnowledgeLoading}
                         onAddCard={onAddCard ? (title, position, priority) => onAddCard(activity.id, title, position, priority) : undefined}

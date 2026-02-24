@@ -1,7 +1,7 @@
 'use client';
 
 import { Trash2 } from 'lucide-react';
-import { ImplementationCard, type CodeFileForPanel } from './implementation-card';
+import { ImplementationCard } from './implementation-card';
 import { InlineAddInput } from './inline-add-input';
 import type { MapActivity, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 
@@ -25,8 +25,6 @@ export interface ActivityColumnProps {
   finalizingCardId?: string | null;
   cardFinalizeProgress?: string;
   onSelectDoc?: (doc: ContextArtifact) => void;
-  onSelectFile?: (file: CodeFileForPanel) => void;
-  codeFiles?: CodeFileForPanel[];
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
   getCardKnowledgeLoading?: (cardId: string) => boolean;
   onAddCard?: (title: string, position?: number, priority?: number) => void | Promise<void>;
@@ -54,8 +52,6 @@ export function ActivityColumn({
   finalizingCardId,
   cardFinalizeProgress,
   onSelectDoc,
-  onSelectFile,
-  codeFiles = [],
   getCardKnowledge,
   getCardKnowledgeLoading,
   onAddCard,
@@ -107,8 +103,6 @@ export function ActivityColumn({
               finalizingCardId={finalizingCardId}
               cardFinalizeProgress={cardFinalizeProgress}
               onSelectDoc={onSelectDoc}
-              onSelectFile={onSelectFile}
-              codeFiles={codeFiles}
               requirements={k?.requirements}
               contextArtifacts={k?.contextArtifacts}
               plannedFiles={k?.plannedFiles}

@@ -8,8 +8,7 @@ import { RightPanel } from '@/components/dossier/right-panel';
 import { ConfirmDeleteDialog } from '@/components/dossier/confirm-delete-dialog';
 import { Sparkles } from 'lucide-react';
 import type { ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
-import type { CodeFileForPanel } from '@/components/dossier/implementation-card';
-import { useMapSnapshot, useCardKnowledge, useCardPlannedFiles, useCardContextArtifacts, useArtifacts, useProjectFiles, useSubmitAction, useTriggerBuild, useDocsIndex, docsEntryToArtifact, fetchRefDocContent } from '@/lib/hooks';
+import { useMapSnapshot, useCardKnowledge, useCardPlannedFiles, useCardContextArtifacts, useArtifacts, useProjectFiles, useSubmitAction, useTriggerBuild, fetchRefDocContent } from '@/lib/hooks';
 import { useProjects } from '@/lib/hooks/use-projects';
 import { MapErrorBoundary } from '@/components/dossier/map-error-boundary';
 import { ChatErrorBoundary } from '@/components/dossier/chat-error-boundary';
@@ -80,11 +79,7 @@ export default function DossierPage() {
     expandedCardId ?? undefined
   );
   const { data: projectArtifacts } = useArtifacts(appMode === 'active' ? projectId : undefined);
-  const { data: docsIndex } = useDocsIndex();
   const { data: projectFilesTree } = useProjectFiles(appMode === 'active' ? projectId : undefined);
-
-  const referenceDocs = (docsIndex ?? []).map(docsEntryToArtifact);
-  const allDocsList = [...(projectArtifacts ?? []), ...referenceDocs];
   const cardKnowledgeLoadingState = cardKnowledgeLoading || cardPlannedFilesLoading || cardContextArtifactsLoading;
 
   const getCardKnowledgeLoading = useCallback(
@@ -124,9 +119,8 @@ export default function DossierPage() {
 
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
-  const [rightPanelTab, setRightPanelTab] = useState<'files' | 'terminal' | 'docs' | 'chat'>('files');
+  const [rightPanelTab, setRightPanelTab] = useState<'files' | 'docs' | 'chat'>('files');
   const [selectedDoc, setSelectedDoc] = useState<ContextArtifact | null>(null);
-  const [selectedFile, setSelectedFile] = useState<CodeFileForPanel | null>(null);
 
   const LEFT_WIDTH_KEY = 'dossier_left_sidebar_width';
   const RIGHT_WIDTH_KEY = 'dossier_right_panel_width';
@@ -202,7 +196,7 @@ export default function DossierPage() {
 
   const handleCardAction = useCallback((cardId: string, action: string) => {
     if (action === 'monitor' || action === 'test') {
-      setRightPanelTab('terminal');
+      setRightPanelTab('files');
       setRightPanelOpen(true);
     }
   }, []);
@@ -934,11 +928,6 @@ export default function DossierPage() {
                       setRightPanelTab('docs');
                       setRightPanelOpen(true);
                     }}
-                    onFileClick={(file) => {
-                      setSelectedFile(file);
-                      setRightPanelTab('terminal');
-                      setRightPanelOpen(true);
-                    }}
                     onUpdateFileDescription={handleUpdateFileDescription}
                     getCardKnowledge={getCardKnowledge}
                     getCardKnowledgeLoading={getCardKnowledgeLoading}
@@ -961,12 +950,11 @@ export default function DossierPage() {
               isOpen={rightPanelOpen}
               onClose={() => setRightPanelOpen(false)}
               activeDoc={selectedDoc}
-              activeFile={selectedFile}
               activeTab={rightPanelTab}
               onTabChange={setRightPanelTab}
               projectId={appMode === 'active' ? projectId : undefined}
               width={rightWidth}
-              docsList={allDocsList}
+              docsList={projectArtifacts ?? []}
               onSelectDoc={async (doc) => {
                 if (!doc) {
                   setSelectedDoc(null);

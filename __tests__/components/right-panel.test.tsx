@@ -31,7 +31,6 @@ describe("RightPanel", () => {
         isOpen
         onClose={() => {}}
         activeDoc={null}
-        activeFile={null}
         activeTab="files"
         onTabChange={() => {}}
         projectId="p1"
@@ -56,7 +55,6 @@ describe("RightPanel", () => {
         isOpen
         onClose={() => {}}
         activeDoc={null}
-        activeFile={null}
         activeTab="files"
         onTabChange={() => {}}
         projectId="p1"
@@ -64,8 +62,8 @@ describe("RightPanel", () => {
     );
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith("/api/projects/p1/files");
+      expect(fetch).toHaveBeenCalledWith("/api/projects/p1/files?source=repo");
     });
-    expect(screen.getByText("main")).toBeInTheDocument();
+    expect(screen.getByText("feature")).toBeInTheDocument();
   });
 });

@@ -50,8 +50,6 @@ interface ImplementationCardProps {
   finalizingCardId?: string | null;
   cardFinalizeProgress?: string;
   onSelectDoc?: (doc: ContextArtifact) => void;
-  onSelectFile?: (file: CodeFileForPanel) => void;
-  codeFiles?: CodeFileForPanel[];
   /** Canonical knowledge (optional; when loaded) */
   requirements?: CardRequirement[];
   contextArtifacts?: ContextArtifact[];
@@ -133,8 +131,6 @@ export function ImplementationCard({
   finalizingCardId,
   cardFinalizeProgress,
   onSelectDoc,
-  onSelectFile,
-  codeFiles = [],
   requirements = [],
   contextArtifacts = [],
   plannedFiles = [],

@@ -30,3 +30,8 @@ next-env.d.ts
 # ruvector local data
 *.db
 .dossier/
+
+# local tool artifacts (Claude Code, macOS)
+.claude.json
+.claude/
+.DS_Store

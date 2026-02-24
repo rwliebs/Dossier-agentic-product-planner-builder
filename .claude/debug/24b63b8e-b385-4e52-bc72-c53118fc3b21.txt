@@ -1,0 +1,316 @@
+2026-02-24T03:03:51.625Z [ERROR] Failed to save config with lock: Error: ENOENT: no such file or directory, lstat '/Users/richardliebrecht/Dossier/.claude.json'
+2026-02-24T03:03:51.625Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231625
+2026-02-24T03:03:51.625Z [DEBUG] Setting permissions for new file: 600
+2026-02-24T03:03:51.625Z [DEBUG] Temp file written successfully, size: 50 bytes
+2026-02-24T03:03:51.625Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231625 to .claude.json
+2026-02-24T03:03:51.625Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.625Z [DEBUG] [init] configureGlobalMTLS starting
+2026-02-24T03:03:51.625Z [DEBUG] [init] configureGlobalMTLS complete
+2026-02-24T03:03:51.625Z [DEBUG] [init] configureGlobalAgents starting
+2026-02-24T03:03:51.626Z [DEBUG] [init] configureGlobalAgents complete
+2026-02-24T03:03:51.626Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231626
+2026-02-24T03:03:51.627Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.627Z [DEBUG] Temp file written successfully, size: 130 bytes
+2026-02-24T03:03:51.627Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.627Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231626 to .claude.json
+2026-02-24T03:03:51.627Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.628Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231628
+2026-02-24T03:03:51.628Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.628Z [DEBUG] Temp file written successfully, size: 166 bytes
+2026-02-24T03:03:51.628Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.628Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231628 to .claude.json
+2026-02-24T03:03:51.628Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.628Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231628
+2026-02-24T03:03:51.628Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.628Z [DEBUG] Temp file written successfully, size: 205 bytes
+2026-02-24T03:03:51.628Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.628Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231628 to .claude.json
+2026-02-24T03:03:51.628Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.632Z [DEBUG] [STARTUP] Loading MCP configs...
+2026-02-24T03:03:51.633Z [DEBUG] [ToolSearch:optimistic] mode=tst-auto, ENABLE_TOOL_SEARCH=undefined, result=true
+2026-02-24T03:03:51.633Z [DEBUG] [STARTUP] Running setup()...
+2026-02-24T03:03:51.637Z [DEBUG] Loading skills from: managed=/Library/Application Support/ClaudeCode/.claude/skills, user=.claude/skills, project=[]
+2026-02-24T03:03:51.637Z [DEBUG] Error log sink initialized
+2026-02-24T03:03:51.639Z [DEBUG] [STARTUP] setup() completed in 6ms
+2026-02-24T03:03:51.639Z [DEBUG] [STARTUP] Loading commands and agents...
+2026-02-24T03:03:51.642Z [DEBUG] Found 0 plugins (0 enabled, 0 disabled)
+2026-02-24T03:03:51.642Z [DEBUG] getPluginSkills: Processing 0 enabled plugins
+2026-02-24T03:03:51.642Z [DEBUG] Total plugin skills loaded: 0
+2026-02-24T03:03:51.642Z [DEBUG] Total plugin commands loaded: 0
+2026-02-24T03:03:51.642Z [DEBUG] Registered 0 hooks from 0 plugins
+2026-02-24T03:03:51.642Z [DEBUG] [claudeai-mcp] Checking gate (cached)...
+2026-02-24T03:03:51.642Z [DEBUG] [claudeai-mcp] Gate returned: false
+2026-02-24T03:03:51.642Z [DEBUG] [claudeai-mcp] Disabled via gate
+2026-02-24T03:03:51.648Z [DEBUG] Total plugin agents loaded: 0
+2026-02-24T03:03:51.649Z [DEBUG] Loaded 0 unique skills (0 unconditional, 0 conditional, managed: 0, user: 0, project: 0, additional: 0, legacy commands: 0)
+2026-02-24T03:03:51.649Z [DEBUG] getSkills returning: 0 skill dir commands, 0 plugin skills, 3 bundled skills
+2026-02-24T03:03:51.650Z [DEBUG] [STARTUP] Commands and agents loaded in 11ms
+2026-02-24T03:03:51.650Z [DEBUG] [LSP MANAGER] initializeLspServerManager() called
+2026-02-24T03:03:51.650Z [DEBUG] [LSP MANAGER] Created manager instance, state=pending
+2026-02-24T03:03:51.650Z [DEBUG] [LSP MANAGER] Starting async initialization (generation 1)
+2026-02-24T03:03:51.650Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-24T03:03:51.650Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-24T03:03:51.651Z [DEBUG] Total LSP servers loaded: 0
+2026-02-24T03:03:51.652Z [DEBUG] [STARTUP] MCP configs loaded in 20ms
+2026-02-24T03:03:51.652Z [DEBUG] [LSP SERVER MANAGER] getAllLspServers returned 0 server(s)
+2026-02-24T03:03:51.652Z [DEBUG] LSP manager initialized with 0 servers
+2026-02-24T03:03:51.652Z [DEBUG] LSP server manager initialized successfully
+2026-02-24T03:03:51.652Z [DEBUG] LSP notification handlers registered successfully for all 0 server(s)
+2026-02-24T03:03:51.652Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-24T03:03:51.658Z [DEBUG] installed_plugins.json doesn't exist, returning empty V2 object
+2026-02-24T03:03:51.658Z [DEBUG] Initialized versioned plugins system with 0 plugins
+2026-02-24T03:03:51.671Z [DEBUG] [Perfetto] initializePerfettoTracing called, env value: undefined
+2026-02-24T03:03:51.671Z [DEBUG] [3P telemetry] isTelemetryEnabled=false (CLAUDE_CODE_ENABLE_TELEMETRY=undefined)
+2026-02-24T03:03:51.675Z [DEBUG] Getting matching hook commands for SessionStart with query: startup
+2026-02-24T03:03:51.675Z [DEBUG] Found 0 hook matchers in settings
+2026-02-24T03:03:51.675Z [DEBUG] Matched 0 unique hooks for query "startup" (0 before deduplication)
+2026-02-24T03:03:51.677Z [DEBUG] [FileIndex] getProjectFiles called, respectGitignore=true
+2026-02-24T03:03:51.677Z [DEBUG] [FileIndex] getFilesUsingGit called
+2026-02-24T03:03:51.679Z [DEBUG] installPluginsForHeadless: starting
+2026-02-24T03:03:51.679Z [DEBUG] Found 0 installed plugins (V2 format)
+2026-02-24T03:03:51.679Z [DEBUG] installPluginsForHeadless: no missing plugins or marketplaces configured
+2026-02-24T03:03:51.690Z [DEBUG] Total plugin output styles loaded: 0
+2026-02-24T03:03:51.694Z [DEBUG] Git remote URL: https://github.com/rwliebs/Dossier.git
+2026-02-24T03:03:51.694Z [DEBUG] Parsed repository: rwliebs/Dossier from https://github.com/rwliebs/Dossier.git
+2026-02-24T03:03:51.694Z [DEBUG] Parsed repository: rwliebs/Dossier from URL: https://github.com/rwliebs/Dossier.git
+2026-02-24T03:03:51.698Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2026-02-24T03:03:51.698Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2026-02-24T03:03:51.698Z [DEBUG] Hooks: Found 0 total hooks in registry
+2026-02-24T03:03:51.698Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2026-02-24T03:03:51.698Z [DEBUG] Sending 1 skills via attachment (initial, 1 total sent)
+2026-02-24T03:03:51.699Z [DEBUG] Getting matching hook commands for UserPromptSubmit with query: undefined
+2026-02-24T03:03:51.699Z [DEBUG] Found 0 hook matchers in settings
+2026-02-24T03:03:51.699Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-24T03:03:51.701Z [DEBUG] autocompact: tokens=420 threshold=167000 effectiveWindow=180000
+2026-02-24T03:03:51.701Z [DEBUG] Auto tool search disabled: 0 tokens (threshold: 20000, 10% of context) [source: query]
+2026-02-24T03:03:51.709Z [DEBUG] attribution header x-anthropic-billing-header: cc_version=2.1.47.b96; cc_entrypoint=sdk-ts; cch=00000;
+2026-02-24T03:03:51.710Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-24T03:03:51.710Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-24T03:03:51.711Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-24T03:03:51.807Z [DEBUG] [FileIndex] git ls-files (tracked) took 130ms
+2026-02-24T03:03:51.807Z [DEBUG] [FileIndex] git ls-files: 350 tracked files in 130ms
+2026-02-24T03:03:51.807Z [DEBUG] [FileIndex] using git ls-files result (350 files)
+2026-02-24T03:03:51.808Z [DEBUG] [FileIndex] Not in bundled mode, using Fuse.js fallback
+2026-02-24T03:03:51.808Z [DEBUG] [FileIndex] cache refresh completed in 131ms (465 files)
+2026-02-24T03:03:51.812Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-24T03:03:51.812Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-24T03:03:51.812Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-24T03:03:51.818Z [DEBUG] [FileIndex] background untracked fetch: 9 files
+2026-02-24T03:03:51.818Z [DEBUG] [FileIndex] merged 9 untracked files into JS cache
+2026-02-24T03:03:51.855Z [ERROR] "AxiosError: AxiosError: Request failed with status code 403\n    at _x (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:34:1138)\n    at Unzip.<anonymous> (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:35:9827)\n    at Unzip.emit (node:events:530:35)\n    at endReadableNT (node:internal/streams/readable:1698:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)\n    at Gv6.request (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:37:2132)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async Of9 (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:1691:366)\n    at async Y (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:54:19570)\n    at async jf9 (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:1691:509)"
+2026-02-24T03:03:51.858Z [ERROR] "AxiosError: AxiosError: Request failed with status code 403\n    at _x (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:34:1138)\n    at Unzip.<anonymous> (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:35:9827)\n    at Unzip.emit (node:events:530:35)\n    at endReadableNT (node:internal/streams/readable:1698:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)\n    at Gv6.request (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:37:2132)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async o$6 (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:104:3132)\n    at async p_A (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:104:8015)"
+2026-02-24T03:03:51.870Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231870
+2026-02-24T03:03:51.870Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.870Z [DEBUG] Temp file written successfully, size: 277 bytes
+2026-02-24T03:03:51.870Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.870Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231870 to .claude.json
+2026-02-24T03:03:51.870Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.871Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231871
+2026-02-24T03:03:51.871Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.871Z [DEBUG] Temp file written successfully, size: 305 bytes
+2026-02-24T03:03:51.871Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.871Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231871 to .claude.json
+2026-02-24T03:03:51.871Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.871Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231871
+2026-02-24T03:03:51.871Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.871Z [DEBUG] Temp file written successfully, size: 357 bytes
+2026-02-24T03:03:51.871Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.871Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231871 to .claude.json
+2026-02-24T03:03:51.871Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.871Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231871
+2026-02-24T03:03:51.871Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.872Z [DEBUG] Temp file written successfully, size: 497 bytes
+2026-02-24T03:03:51.872Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.872Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231871 to .claude.json
+2026-02-24T03:03:51.872Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.872Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231872
+2026-02-24T03:03:51.872Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.872Z [DEBUG] Temp file written successfully, size: 536 bytes
+2026-02-24T03:03:51.872Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.872Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231872 to .claude.json
+2026-02-24T03:03:51.872Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.873Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231873
+2026-02-24T03:03:51.873Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.873Z [DEBUG] Temp file written successfully, size: 575 bytes
+2026-02-24T03:03:51.873Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.873Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231873 to .claude.json
+2026-02-24T03:03:51.873Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.873Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231873
+2026-02-24T03:03:51.873Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.873Z [DEBUG] Temp file written successfully, size: 613 bytes
+2026-02-24T03:03:51.873Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.873Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231873 to .claude.json
+2026-02-24T03:03:51.873Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.873Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231873
+2026-02-24T03:03:51.873Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.874Z [DEBUG] Temp file written successfully, size: 645 bytes
+2026-02-24T03:03:51.874Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.874Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231873 to .claude.json
+2026-02-24T03:03:51.874Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.874Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231874
+2026-02-24T03:03:51.874Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.874Z [DEBUG] Temp file written successfully, size: 675 bytes
+2026-02-24T03:03:51.874Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.874Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231874 to .claude.json
+2026-02-24T03:03:51.874Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.874Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231874
+2026-02-24T03:03:51.874Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.874Z [DEBUG] Temp file written successfully, size: 708 bytes
+2026-02-24T03:03:51.874Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.874Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231874 to .claude.json
+2026-02-24T03:03:51.874Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.875Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231875
+2026-02-24T03:03:51.875Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.875Z [DEBUG] Temp file written successfully, size: 751 bytes
+2026-02-24T03:03:51.875Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.875Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231875 to .claude.json
+2026-02-24T03:03:51.875Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.875Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231875
+2026-02-24T03:03:51.875Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.875Z [DEBUG] Temp file written successfully, size: 803 bytes
+2026-02-24T03:03:51.875Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.875Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231875 to .claude.json
+2026-02-24T03:03:51.875Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.875Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231875
+2026-02-24T03:03:51.875Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.875Z [DEBUG] Temp file written successfully, size: 835 bytes
+2026-02-24T03:03:51.875Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.875Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231875 to .claude.json
+2026-02-24T03:03:51.876Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.876Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231876
+2026-02-24T03:03:51.876Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.876Z [DEBUG] Temp file written successfully, size: 871 bytes
+2026-02-24T03:03:51.876Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.876Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231876 to .claude.json
+2026-02-24T03:03:51.876Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.876Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231876
+2026-02-24T03:03:51.876Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.876Z [DEBUG] Temp file written successfully, size: 901 bytes
+2026-02-24T03:03:51.876Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.876Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231876 to .claude.json
+2026-02-24T03:03:51.876Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.877Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231877
+2026-02-24T03:03:51.877Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.877Z [DEBUG] Temp file written successfully, size: 925 bytes
+2026-02-24T03:03:51.877Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.877Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231877 to .claude.json
+2026-02-24T03:03:51.877Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.877Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231877
+2026-02-24T03:03:51.877Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.877Z [DEBUG] Temp file written successfully, size: 962 bytes
+2026-02-24T03:03:51.877Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.877Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231877 to .claude.json
+2026-02-24T03:03:51.877Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.877Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231877
+2026-02-24T03:03:51.878Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.878Z [DEBUG] Temp file written successfully, size: 999 bytes
+2026-02-24T03:03:51.878Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.878Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231877 to .claude.json
+2026-02-24T03:03:51.878Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.878Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231878
+2026-02-24T03:03:51.878Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.878Z [DEBUG] Temp file written successfully, size: 1034 bytes
+2026-02-24T03:03:51.878Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.878Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231878 to .claude.json
+2026-02-24T03:03:51.878Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.879Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231879
+2026-02-24T03:03:51.879Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.879Z [DEBUG] Temp file written successfully, size: 1078 bytes
+2026-02-24T03:03:51.879Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.879Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231879 to .claude.json
+2026-02-24T03:03:51.879Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.879Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231879
+2026-02-24T03:03:51.879Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.879Z [DEBUG] Temp file written successfully, size: 1113 bytes
+2026-02-24T03:03:51.879Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.879Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231879 to .claude.json
+2026-02-24T03:03:51.879Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.879Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231879
+2026-02-24T03:03:51.879Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.879Z [DEBUG] Temp file written successfully, size: 1160 bytes
+2026-02-24T03:03:51.879Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.879Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231879 to .claude.json
+2026-02-24T03:03:51.880Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.880Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231880
+2026-02-24T03:03:51.880Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.880Z [DEBUG] Temp file written successfully, size: 1198 bytes
+2026-02-24T03:03:51.880Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.880Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231880 to .claude.json
+2026-02-24T03:03:51.880Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.880Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231880
+2026-02-24T03:03:51.880Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.880Z [DEBUG] Temp file written successfully, size: 1236 bytes
+2026-02-24T03:03:51.880Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.880Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231880 to .claude.json
+2026-02-24T03:03:51.880Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.881Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231881
+2026-02-24T03:03:51.881Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.881Z [DEBUG] Temp file written successfully, size: 1281 bytes
+2026-02-24T03:03:51.881Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.881Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231881 to .claude.json
+2026-02-24T03:03:51.881Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.881Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231881
+2026-02-24T03:03:51.881Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.881Z [DEBUG] Temp file written successfully, size: 1348 bytes
+2026-02-24T03:03:51.881Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.881Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231881 to .claude.json
+2026-02-24T03:03:51.881Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.881Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231881
+2026-02-24T03:03:51.881Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.881Z [DEBUG] Temp file written successfully, size: 1394 bytes
+2026-02-24T03:03:51.881Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.881Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231881 to .claude.json
+2026-02-24T03:03:51.882Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.882Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231882
+2026-02-24T03:03:51.882Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.882Z [DEBUG] Temp file written successfully, size: 1419 bytes
+2026-02-24T03:03:51.882Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.882Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231882 to .claude.json
+2026-02-24T03:03:51.882Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.882Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231882
+2026-02-24T03:03:51.882Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.882Z [DEBUG] Temp file written successfully, size: 1458 bytes
+2026-02-24T03:03:51.883Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.883Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231882 to .claude.json
+2026-02-24T03:03:51.883Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.883Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231883
+2026-02-24T03:03:51.883Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.883Z [DEBUG] Temp file written successfully, size: 1575 bytes
+2026-02-24T03:03:51.883Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.883Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231883 to .claude.json
+2026-02-24T03:03:51.884Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.884Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902231884
+2026-02-24T03:03:51.885Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:51.885Z [DEBUG] Temp file written successfully, size: 1617 bytes
+2026-02-24T03:03:51.885Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:51.885Z [DEBUG] Renaming .claude.json.tmp.81384.1771902231884 to .claude.json
+2026-02-24T03:03:51.885Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:51.886Z [DEBUG] Failed to fetch org fast mode status, defaulting to disabled
+2026-02-24T03:03:51.973Z [DEBUG] Tool search disabled for model 'claude-haiku-4-5-20251001': model does not support tool_reference blocks. This feature is only available on Claude Sonnet 4+, Opus 4+, and newer models.
+2026-02-24T03:03:51.973Z [DEBUG] [API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: false, has Authorization header: false
+2026-02-24T03:03:51.973Z [DEBUG] [API:auth] OAuth token check starting
+2026-02-24T03:03:51.973Z [DEBUG] [API:auth] OAuth token check complete
+2026-02-24T03:03:51.977Z [ERROR] "AxiosError: AxiosError: Request failed with status code 403\n    at _x (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:34:1138)\n    at Unzip.<anonymous> (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:35:9827)\n    at Unzip.emit (node:events:530:35)\n    at endReadableNT (node:internal/streams/readable:1698:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)\n    at Gv6.request (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:37:2132)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async Of9 (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:1691:366)\n    at async Y (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:54:19570)\n    at async jf9 (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:1691:509)"
+2026-02-24T03:03:52.076Z [ERROR] "AxiosError: AxiosError: Request failed with status code 403\n    at _x (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:34:1138)\n    at Unzip.<anonymous> (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:35:9827)\n    at Unzip.emit (node:events:530:35)\n    at endReadableNT (node:internal/streams/readable:1698:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)\n    at Gv6.request (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:37:2132)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async Of9 (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:1691:366)\n    at async Y (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:54:19570)\n    at async jf9 (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:1691:509)"
+2026-02-24T03:03:52.078Z [ERROR] "AxiosError: AxiosError: Request failed with status code 403\n    at _x (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:34:1138)\n    at Unzip.<anonymous> (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:35:9827)\n    at Unzip.emit (node:events:530:35)\n    at endReadableNT (node:internal/streams/readable:1698:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)\n    at Gv6.request (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:37:2132)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async Of9 (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:1691:366)\n    at async Y (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:54:19570)\n    at async jf9 (file:///Users/richardliebrecht/Dossier/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.2.47_zod@3.25.76/node_modules/@anthropic-ai/claude-agent-sdk/cli.js:1691:509)"
+2026-02-24T03:03:52.178Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902232178
+2026-02-24T03:03:52.178Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:52.178Z [DEBUG] Temp file written successfully, size: 1659 bytes
+2026-02-24T03:03:52.178Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:52.178Z [DEBUG] Renaming .claude.json.tmp.81384.1771902232178 to .claude.json
+2026-02-24T03:03:52.178Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:52.463Z [DEBUG] Stream started - received first chunk
+2026-02-24T03:03:52.655Z [WARN] [3P telemetry] Event dropped (no event logger initialized): api_request
+2026-02-24T03:03:52.657Z [DEBUG] Writing to temp file: .claude.json.tmp.81384.1771902232657
+2026-02-24T03:03:52.657Z [DEBUG] Preserving file permissions: 100600
+2026-02-24T03:03:52.658Z [DEBUG] Temp file written successfully, size: 2278 bytes
+2026-02-24T03:03:52.658Z [DEBUG] Applied original permissions to temp file
+2026-02-24T03:03:52.658Z [DEBUG] Renaming .claude.json.tmp.81384.1771902232657 to .claude.json
+2026-02-24T03:03:52.658Z [DEBUG] File .claude.json written atomically
+2026-02-24T03:03:52.934Z [DEBUG] Stream started - received first chunk
+2026-02-24T03:03:56.038Z [DEBUG] Getting matching hook commands for Stop with query: undefined
+2026-02-24T03:03:56.038Z [DEBUG] Found 0 hook matchers in settings
+2026-02-24T03:03:56.038Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2026-02-24T03:03:56.042Z [DEBUG] Getting matching hook commands for SessionEnd with query: other
+2026-02-24T03:03:56.042Z [DEBUG] Found 0 hook matchers in settings
+2026-02-24T03:03:56.042Z [DEBUG] Matched 0 unique hooks for query "other" (0 before deduplication)

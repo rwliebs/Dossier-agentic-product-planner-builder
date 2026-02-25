@@ -53,6 +53,10 @@ export const knowledgeItemStatusSchema = z.enum([
   "rejected",
 ]);
 
+// NOTE: Status fields are retained in the schema for DB compatibility but
+// are no longer used for gating. All items are treated as active regardless
+// of status value.
+
 export const knowledgeItemSourceSchema = z.enum([
   "agent",
   "user",

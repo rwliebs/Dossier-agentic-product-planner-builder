@@ -4,6 +4,8 @@
  */
 
 import { execSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 export interface FileNode {
   name: string;
@@ -24,6 +26,65 @@ function runGit(cwd: string, args: string[]): string {
     encoding: "utf-8",
     stdio: ["pipe", "pipe", "pipe"],
   }).trim();
+}
+
+function mapPorcelainStatus(code: string): ChangedFile["status"] | null {
+  if (code === "?" || code === "A") return "added";
+  if (code === "D") return "deleted";
+  if (code === "M" || code === "R" || code === "C" || code === "U") {
+    return "modified";
+  }
+  return null;
+}
+
+function getWorkingTreePaths(
+  clonePath: string
+): { success: boolean; paths?: string[]; error?: string } {
+  try {
+    const out = runGit(clonePath, [
+      "ls-files",
+      "--cached",
+      "--others",
+      "--exclude-standard",
+    ]);
+    const paths = out ? out.split("\n").filter(Boolean) : [];
+    return { success: true, paths };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
+}
+
+function getWorkingTreeChangedFiles(
+  clonePath: string
+): { success: boolean; files?: ChangedFile[]; error?: string } {
+  try {
+    const out = runGit(clonePath, ["status", "--porcelain"]);
+    const byPath = new Map<string, ChangedFile["status"]>();
+    for (const line of out ? out.split("\n").filter(Boolean) : []) {
+      if (line.length < 4) continue;
+      const x = line[0];
+      const y = line[1];
+      const rawPath = line.slice(3).trim();
+      const normalizedPath = rawPath.includes(" -> ")
+        ? rawPath.split(" -> ").at(-1) ?? rawPath
+        : rawPath;
+      const path = "/" + normalizedPath.replace(/^\/+/, "");
+
+      const status =
+        mapPorcelainStatus(x) ??
+        mapPorcelainStatus(y);
+      if (status) byPath.set(path, status);
+    }
+    const files = Array.from(byPath.entries()).map(([path, status]) => ({
+      path,
+      status,
+    }));
+    return { success: true, files };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
 }
 
 /**
@@ -149,6 +210,25 @@ export function getFileContent(
 }
 
 /**
+ * Returns file content from the checked-out working tree.
+ * Unlike git show(branch:path), this includes uncommitted files.
+ */
+export function getWorkingFileContent(
+  clonePath: string,
+  filePath: string
+): { success: boolean; content?: string; error?: string } {
+  try {
+    const rel = filePath.replace(/^\/+/, "");
+    const absolute = path.join(clonePath, rel);
+    const content = fs.readFileSync(absolute, "utf-8");
+    return { success: true, content };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
+}
+
+/**
  * Returns unified diff for a file between base and feature branch.
  */
 export function getFileDiff(
@@ -195,6 +275,40 @@ export function getRepoFileTreeWithStatus(
   // Rebuild tree with status annotations
   const paths = collectPathsFromTree(treeResult.tree!);
   const tree = buildTreeFromPaths(paths, statusByPath);
+  return { success: true, tree };
+}
+
+/**
+ * Returns file tree from the checked-out working tree plus status annotations.
+ * Includes committed files, staged/unstaged changes, and untracked files.
+ */
+export function getWorkingTreeFileTreeWithStatus(
+  clonePath: string,
+  featureBranch: string,
+  baseBranch: string
+): { success: boolean; tree?: FileNode[]; error?: string } {
+  const pathsResult = getWorkingTreePaths(clonePath);
+  if (!pathsResult.success) return pathsResult;
+
+  const statusByPath = new Map<string, ChangedFile["status"]>();
+
+  // Start with committed branch-level diff.
+  const committed = getChangedFiles(clonePath, baseBranch, featureBranch);
+  if (committed.success && committed.files) {
+    for (const f of committed.files) {
+      statusByPath.set(f.path, f.status);
+    }
+  }
+
+  // Overlay working-tree changes (includes untracked).
+  const working = getWorkingTreeChangedFiles(clonePath);
+  if (working.success && working.files) {
+    for (const f of working.files) {
+      statusByPath.set(f.path, f.status);
+    }
+  }
+
+  const tree = buildTreeFromPaths(pathsResult.paths ?? [], statusByPath);
   return { success: true, tree };
 }
 

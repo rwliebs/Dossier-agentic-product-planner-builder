@@ -25,7 +25,8 @@ export interface UseProjectFilesResult {
 
 export function useProjectFiles(
   projectId: string | undefined,
-  source: ProjectFilesSource = "planned"
+  source: ProjectFilesSource = "planned",
+  cardId?: string | null
 ): UseProjectFilesResult {
   const [data, setData] = useState<FileNode[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -40,10 +41,14 @@ export function useProjectFiles(
     setLoading(true);
     setError(null);
     try {
-      const url =
-        source === "repo"
-          ? `/api/projects/${projectId}/files?source=repo`
-          : `/api/projects/${projectId}/files`;
+      let url: string;
+      if (source === "repo") {
+        const params = new URLSearchParams({ source: "repo" });
+        if (cardId) params.set("cardId", cardId);
+        url = `/api/projects/${projectId}/files?${params.toString()}`;
+      } else {
+        url = `/api/projects/${projectId}/files`;
+      }
       const res = await fetch(url);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -62,7 +67,7 @@ export function useProjectFiles(
     } finally {
       setLoading(false);
     }
-  }, [projectId, source]);
+  }, [projectId, source, cardId]);
 
   useEffect(() => {
     refetch();
@@ -73,8 +78,14 @@ export function useProjectFiles(
       if (!projectId || source !== "repo") return null;
       try {
         const p = path.replace(/^\/+/, "");
+        const params = new URLSearchParams({
+          source: "repo",
+          content: "1",
+          path: p,
+        });
+        if (cardId) params.set("cardId", cardId);
         const res = await fetch(
-          `/api/projects/${projectId}/files?source=repo&content=1&path=${encodeURIComponent(p)}`
+          `/api/projects/${projectId}/files?${params.toString()}`
         );
         if (!res.ok) return null;
         return res.text();
@@ -82,7 +93,7 @@ export function useProjectFiles(
         return null;
       }
     },
-    [projectId, source]
+    [projectId, source, cardId]
   );
 
   const fetchFileDiff = useCallback(
@@ -90,8 +101,14 @@ export function useProjectFiles(
       if (!projectId || source !== "repo") return null;
       try {
         const p = path.replace(/^\/+/, "");
+        const params = new URLSearchParams({
+          source: "repo",
+          diff: "1",
+          path: p,
+        });
+        if (cardId) params.set("cardId", cardId);
         const res = await fetch(
-          `/api/projects/${projectId}/files?source=repo&diff=1&path=${encodeURIComponent(p)}`
+          `/api/projects/${projectId}/files?${params.toString()}`
         );
         if (!res.ok) return null;
         return res.text();
@@ -99,7 +116,7 @@ export function useProjectFiles(
         return null;
       }
     },
-    [projectId, source]
+    [projectId, source, cardId]
   );
 
   return {

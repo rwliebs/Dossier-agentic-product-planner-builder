@@ -24,13 +24,11 @@ function snapshotToEpics(snapshot: MapSnapshot): EpicLike[] {
 interface ArchitectureViewProps {
   snapshot: MapSnapshot;
   onUpdateFileDescription?: (fileId: string, description: string) => void;
-  onFileClick?: (file: CodeFile) => void;
 }
 
 export function ArchitectureView({
   snapshot,
   onUpdateFileDescription,
-  onFileClick,
 }: ArchitectureViewProps) {
   const epics = useMemo(() => snapshotToEpics(snapshot), [snapshot]);
   const codeFiles: CodeFile[] = []; // TODO: from snapshot or project when API provides
@@ -57,7 +55,6 @@ export function ArchitectureView({
         cards={allCards}
         epics={epics}
         onUpdateFileDescription={onUpdateFileDescription}
-        onFileClick={onFileClick}
       />
     </div>
   );

@@ -162,9 +162,7 @@ export function validateReferentialIntegrity(
       break;
 
     case "upsertCardPlannedFile":
-    case "approveCardPlannedFile":
     case "upsertCardKnowledgeItem":
-    case "setCardKnowledgeStatus":
       if (target_ref.card_id && !cardExists(state, target_ref.card_id)) {
         errors.push({
           code: "referential_integrity",

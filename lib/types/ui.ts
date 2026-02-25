@@ -41,6 +41,7 @@ export interface MapCard {
   build_state?: string | null;
   last_built_at?: string | null;
   last_build_ref?: string | null;
+  last_build_error?: string | null;
 }
 
 export interface MapActivity {
@@ -73,6 +74,7 @@ export interface MapSnapshot {
     design_inspiration: string | null;
     repo_url: string | null;
     default_branch: string;
+    finalized_at?: string | null;
   };
   workflows: MapWorkflow[];
 }

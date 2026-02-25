@@ -35,12 +35,13 @@ export const planningActionTypeSchema = z.enum([
   "createCard",
   "updateCard",
   "reorderCard",
+  "deleteWorkflow",
+  "deleteActivity",
+  "deleteCard",
   "linkContextArtifact",
   "createContextArtifact",
   "upsertCardPlannedFile",
-  "approveCardPlannedFile",
   "upsertCardKnowledgeItem",
-  "setCardKnowledgeStatus",
 ]);
 
 export const projectSchema = z.object({

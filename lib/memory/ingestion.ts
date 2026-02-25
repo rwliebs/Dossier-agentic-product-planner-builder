@@ -150,31 +150,28 @@ export async function ingestCardContext(
     getCardQuestions(db, cardId),
   ]);
 
-  const approved = (items: Array<{ status?: string; text?: string }>) =>
-    items.filter((i) => i.status === "approved");
-
-  for (const r of approved(requirements)) {
+  for (const r of requirements) {
     const text = (r as { text?: string }).text;
     if (text) {
       const id = await ingestMemoryUnit(db, { contentText: text, title: "Requirement" }, scope);
       if (id) count++;
     }
   }
-  for (const f of approved(facts)) {
+  for (const f of facts) {
     const text = (f as { text?: string }).text;
     if (text) {
       const id = await ingestMemoryUnit(db, { contentText: text, title: "Fact" }, scope);
       if (id) count++;
     }
   }
-  for (const a of approved(assumptions)) {
+  for (const a of assumptions) {
     const text = (a as { text?: string }).text;
     if (text) {
       const id = await ingestMemoryUnit(db, { contentText: text, title: "Assumption" }, scope);
       if (id) count++;
     }
   }
-  for (const q of approved(questions)) {
+  for (const q of questions) {
     const text = (q as { text?: string }).text;
     if (text) {
       const id = await ingestMemoryUnit(db, { contentText: text, title: "Question" }, scope);

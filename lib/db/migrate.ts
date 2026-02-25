@@ -13,7 +13,7 @@ function isUuid(id: string): boolean {
   return UUID_REGEX.test(id);
 }
 
-const MIGRATIONS: Array<{ name: string; sql: string }> = [
+export const MIGRATIONS: Array<{ name: string; sql: string }> = [
   {
     name: "001_schema.sql",
     sql: /* sql */ `
@@ -458,42 +458,63 @@ ALTER TABLE context_artifact_new RENAME TO context_artifact;
 CREATE INDEX IF NOT EXISTS idx_context_artifact_project_id ON context_artifact(project_id);
 `,
   },
+  {
+    name: "009_card_last_build_error.sql",
+    sql: /* sql */ `
+ALTER TABLE card ADD COLUMN last_build_error TEXT;
+`,
+  },
+  {
+    name: "010_project_finalized_at.sql",
+    sql: /* sql */ `
+-- Add finalized_at to project for project-before-cards gate
+ALTER TABLE project ADD COLUMN finalized_at TEXT;
+`,
+  },
 ];
 
 /** One-time: replace non-UUID workflow, workflow_activity, and card ids with UUIDs so build API and DB stay in sync. */
-function runNormalizeEntityUuids(db: any): void {
+export function runNormalizeEntityUuids(db: any): void {
   const name = "009_normalize_entity_uuids";
   const row = db.prepare("SELECT 1 FROM _migrations WHERE name = ?").get(name);
   if (row) return;
 
   db.pragma("foreign_keys = OFF");
 
+  const workflowMap = new Map<string, string>();
+  const activityMap = new Map<string, string>();
+  const cardMap = new Map<string, string>();
+
   try {
-    // 1. Workflows
+    // 1. Build workflow map and apply workflow updates
     const workflows = db.prepare("SELECT id FROM workflow").all() as Array<{ id: string }>;
     for (const { id: oldId } of workflows) {
       if (!isUuid(oldId)) {
         const newId = crypto.randomUUID();
+        workflowMap.set(oldId, newId);
         db.prepare("UPDATE workflow SET id = ? WHERE id = ?").run(newId, oldId);
         db.prepare("UPDATE workflow_activity SET workflow_id = ? WHERE workflow_id = ?").run(newId, oldId);
+        db.prepare("UPDATE orchestration_run SET workflow_id = ? WHERE workflow_id = ?").run(newId, oldId);
       }
     }
 
-    // 2. Workflow activities
+    // 2. Build activity map and apply activity updates
     const activities = db.prepare("SELECT id FROM workflow_activity").all() as Array<{ id: string }>;
     for (const { id: oldId } of activities) {
       if (!isUuid(oldId)) {
         const newId = crypto.randomUUID();
+        activityMap.set(oldId, newId);
         db.prepare("UPDATE workflow_activity SET id = ? WHERE id = ?").run(newId, oldId);
         db.prepare("UPDATE card SET workflow_activity_id = ? WHERE workflow_activity_id = ?").run(newId, oldId);
       }
     }
 
-    // 3. Cards and all card_id references
+    // 3. Build card map and apply card updates
     const cards = db.prepare("SELECT id FROM card").all() as Array<{ id: string }>;
     for (const { id: oldId } of cards) {
       if (!isUuid(oldId)) {
         const newId = crypto.randomUUID();
+        cardMap.set(oldId, newId);
         db.prepare("UPDATE card SET id = ? WHERE id = ?").run(newId, oldId);
         db.prepare("UPDATE card_context_artifact SET card_id = ? WHERE card_id = ?").run(newId, oldId);
         db.prepare("UPDATE card_requirement SET card_id = ? WHERE card_id = ?").run(newId, oldId);
@@ -503,6 +524,108 @@ function runNormalizeEntityUuids(db: any): void {
         db.prepare("UPDATE card_planned_file SET card_id = ? WHERE card_id = ?").run(newId, oldId);
         db.prepare("UPDATE orchestration_run SET card_id = ? WHERE card_id = ?").run(newId, oldId);
         db.prepare("UPDATE card_assignment SET card_id = ? WHERE card_id = ?").run(newId, oldId);
+      }
+    }
+
+    // 4. Update planning_action target_ref and payload JSON (used by reconstructStateFromDb replay)
+    const planningRows = db.prepare("SELECT id, action_type, target_ref, payload FROM planning_action").all() as Array<{
+      id: string;
+      action_type: string;
+      target_ref: string;
+      payload: string;
+    }>;
+    const updatePlanning = db.prepare(
+      "UPDATE planning_action SET target_ref = ?, payload = ? WHERE id = ?"
+    );
+    for (const row of planningRows) {
+      let targetRef: Record<string, unknown> = {};
+      let payload: Record<string, unknown> = {};
+      try {
+        targetRef = JSON.parse(row.target_ref || "{}") as Record<string, unknown>;
+      } catch {
+        /* keep {} */
+      }
+      try {
+        payload = JSON.parse(row.payload || "{}") as Record<string, unknown>;
+      } catch {
+        /* keep {} */
+      }
+      let changed = false;
+      if (typeof targetRef.workflow_id === "string" && workflowMap.has(targetRef.workflow_id)) {
+        targetRef.workflow_id = workflowMap.get(targetRef.workflow_id);
+        changed = true;
+      }
+      if (typeof targetRef.workflow_activity_id === "string" && activityMap.has(targetRef.workflow_activity_id)) {
+        targetRef.workflow_activity_id = activityMap.get(targetRef.workflow_activity_id);
+        changed = true;
+      }
+      if (typeof targetRef.card_id === "string" && cardMap.has(targetRef.card_id)) {
+        targetRef.card_id = cardMap.get(targetRef.card_id);
+        changed = true;
+      }
+      if (typeof payload.id === "string") {
+        if (activityMap.has(payload.id)) {
+          payload.id = activityMap.get(payload.id);
+          changed = true;
+        } else if (cardMap.has(payload.id)) {
+          payload.id = cardMap.get(payload.id);
+          changed = true;
+        }
+      }
+      if (typeof payload.card_id === "string" && cardMap.has(payload.card_id)) {
+        payload.card_id = cardMap.get(payload.card_id);
+        changed = true;
+      }
+      if (changed) {
+        updatePlanning.run(JSON.stringify(targetRef), JSON.stringify(payload), row.id);
+      }
+    }
+
+    // 5. Update memory_unit_relation entity_id (workflow, activity, card)
+    if (workflowMap.size > 0 || activityMap.size > 0 || cardMap.size > 0) {
+      const entityTypeToMap: Record<string, Map<string, string>> = {
+        workflow: workflowMap,
+        activity: activityMap,
+        card: cardMap,
+      };
+      try {
+        const relRows = db.prepare("SELECT memory_unit_id, entity_type, entity_id, relation_role FROM memory_unit_relation").all() as Array<{
+          memory_unit_id: string;
+          entity_type: string;
+          entity_id: string;
+          relation_role: string | null;
+        }>;
+        const updateRel = db.prepare(
+          "UPDATE memory_unit_relation SET entity_id = ? WHERE memory_unit_id = ? AND entity_type = ? AND entity_id = ?"
+        );
+        for (const r of relRows) {
+          const map = entityTypeToMap[r.entity_type];
+          if (map?.has(r.entity_id)) {
+            updateRel.run(map.get(r.entity_id), r.memory_unit_id, r.entity_type, r.entity_id);
+          }
+        }
+      } catch {
+        /* table may not exist in older schemas */
+      }
+
+      // 6. Update memory_retrieval_log scope_entity_id
+      try {
+        const logRows = db.prepare("SELECT id, scope_entity_type, scope_entity_id FROM memory_retrieval_log").all() as Array<{
+          id: string;
+          scope_entity_type: string;
+          scope_entity_id: string;
+        }>;
+        const updateLog = db.prepare(
+          "UPDATE memory_retrieval_log SET scope_entity_id = ? WHERE id = ?"
+        );
+        for (const r of logRows) {
+          const map = entityTypeToMap[r.scope_entity_type];
+          if (map?.has(r.scope_entity_id)) {
+            updateLog.run(map.get(r.scope_entity_id), r.id);
+          }
+        }
+      } catch {
+        /* table may not exist in older schemas */
       }
     }
 

@@ -9,6 +9,7 @@ import {
   getCardRequirements,
   getCardPlannedFiles,
   getCardById,
+  getProject,
 } from "@/lib/db/queries";
 import { fetchMapSnapshot } from "@/lib/db/map-snapshot";
 import {
@@ -16,7 +17,8 @@ import {
   buildFinalizeTestsUserMessage,
 } from "@/lib/llm/planning-prompt";
 import { runLlmSubStep, type Emitter } from "@/lib/llm/run-llm-substep";
-import { PLANNING_LLM } from "@/lib/feature-flags";
+import { MEMORY_PLANE, PLANNING_LLM } from "@/lib/feature-flags";
+import { ingestCardContext } from "@/lib/memory/ingestion";
 import { json, notFoundError, validationError, internalError } from "@/lib/api/response-helpers";
 
 type RouteParams = {
@@ -149,9 +151,22 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     return validationError("Card is already finalized");
   }
 
+  const project = await getProject(db, projectId);
+  const projectFinalizedAt = (project as { finalized_at?: string | null })?.finalized_at;
+  if (!projectFinalizedAt) {
+    return validationError("Project must be finalized before cards can be finalized");
+  }
+
   const requirements = await getCardRequirements(db, cardId);
   if (requirements.length === 0) {
     return validationError("Card must have at least one requirement before finalization");
+  }
+
+  const plannedFiles = await getCardPlannedFiles(db, cardId);
+  if (plannedFiles.length === 0) {
+    return validationError(
+      "Card must have at least one planned file or folder before finalization."
+    );
   }
 
   if (!PLANNING_LLM) {
@@ -236,6 +251,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         };
 
         let testGenerated = false;
+        let contextDocsGenerated = 0;
         try {
           const result = await runLlmSubStep({
             db,
@@ -248,6 +264,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           });
 
           testGenerated = result.actionCount > 0;
+          contextDocsGenerated = result.actionCount > 1 ? result.actionCount - 1 : 0;
 
           emit("finalize_progress", {
             step: "test_gen",
@@ -255,7 +272,9 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             total_steps: totalSteps,
             status: testGenerated ? "complete" : "error",
             label: testGenerated
-              ? `Generated e2e test for "${cardRow.title}"`
+              ? contextDocsGenerated > 0
+                ? `Generated e2e test and ${contextDocsGenerated} context doc(s) for "${cardRow.title}"`
+                : `Generated e2e test for "${cardRow.title}"`
               : `No test artifact produced for "${cardRow.title}"`,
           });
         } catch (err) {
@@ -283,6 +302,14 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         const now = new Date().toISOString();
         await db.updateCard(cardId, { finalized_at: now });
 
+        if (MEMORY_PLANE) {
+          try {
+            await ingestCardContext(db, cardId, projectId);
+          } catch (ingestErr) {
+            console.warn("[card-finalize] Memory ingest failed (build context may be empty):", ingestErr instanceof Error ? ingestErr.message : String(ingestErr));
+          }
+        }
+
         emit("finalize_progress", {
           step: "confirm",
           step_index: 2,
@@ -297,6 +324,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           finalized_at: now,
           docs_linked: docsLinked,
           test_generated: testGenerated,
+          context_docs_generated: contextDocsGenerated,
         });
 
         emit("done", {});

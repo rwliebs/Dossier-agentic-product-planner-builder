@@ -10,15 +10,22 @@ import {
   buildPlanningUserMessage,
   buildScaffoldSystemPrompt,
   buildScaffoldUserMessage,
-  buildPopulateWorkflowPrompt,
-  buildPopulateWorkflowUserMessage,
 } from "@/lib/llm/planning-prompt";
 import { runLlmSubStep } from "@/lib/llm/run-llm-substep";
+import { runPopulateWorkflow } from "@/lib/llm/run-populate-workflow";
 import { runFinalizeMultiStep } from "@/lib/llm/run-finalize-multistep";
+import { getArtifactsByProject, getProject } from "@/lib/db/queries";
+import { parseRootFoldersFromArchitecturalSummary } from "@/lib/orchestration/parse-root-folders";
+import { ensureClone, createRootFoldersInRepo } from "@/lib/orchestration/repo-manager";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
+import { getWorkflowActivities } from "@/lib/schemas/planning-state";
 import { json } from "@/lib/api/response-helpers";
 import { PLANNING_LLM } from "@/lib/feature-flags";
 import { chatRequestSchema } from "@/lib/validation/request-schema";
+
+// Only trigger auto-populate when user explicitly requests workflow population.
+// Avoid broad patterns: "fill in" and "add cards" match common unrelated phrases.
+const POPULATE_INTENT = /\b(populate|add activities|activities and cards|functionality cards)\b/i;
 
 export interface ChatResponse {
   status: "success" | "error";
@@ -101,6 +108,35 @@ export async function POST(
         emit: noopEmit,
         mockResponse: mock_response,
       });
+
+      const artifacts = await getArtifactsByProject(db, projectId);
+      const archSummary = artifacts.find(
+        (a: Record<string, unknown>) => (a.name as string) === "architectural-summary"
+      );
+      const content = (archSummary as { content?: string } | undefined)?.content ?? "";
+      const rootFolders = parseRootFoldersFromArchitecturalSummary(content);
+
+      const project = await getProject(db, projectId);
+      const repoUrl = (project as { repo_url?: string })?.repo_url;
+      const baseBranch = (project as { default_branch?: string })?.default_branch ?? "main";
+      if (repoUrl && !repoUrl.includes("placeholder") && rootFolders.length > 0) {
+        const cloneResult = ensureClone(projectId, repoUrl, null, baseBranch);
+        if (cloneResult.success && cloneResult.clonePath) {
+          const folderResult = createRootFoldersInRepo(
+            cloneResult.clonePath,
+            rootFolders,
+            baseBranch
+          );
+          if (!folderResult.success) {
+            console.warn("[chat] Root folder creation failed:", folderResult.error);
+          }
+        }
+      } else if (!repoUrl || repoUrl.includes("placeholder")) {
+        console.warn("[chat] No repo connected; skipping root folder creation");
+      }
+
+      const now = new Date().toISOString();
+      await db.updateProject(projectId, { finalized_at: now });
       return json({
         status: "success",
         responseType: "actions" as const,
@@ -122,23 +158,15 @@ export async function POST(
       return json({ status: "error", message: "Workflow not found" }, 404);
     }
     try {
-      const result = await runLlmSubStep({
+      const result = await runPopulateWorkflow({
         db,
         projectId,
-        systemPrompt: buildPopulateWorkflowPrompt(),
-        userMessage: buildPopulateWorkflowUserMessage(
-          workflow_id,
-          workflow.title,
-          workflow.description ?? null,
-          message,
-          state,
-        ),
+        workflowId: workflow_id,
+        workflowTitle: workflow.title,
+        workflowDescription: workflow.description ?? null,
+        userRequest: message,
         state,
         emit: noopEmit,
-        actionFilter: (a: PlanningAction) =>
-          a.action_type === "createActivity" ||
-          a.action_type === "createCard" ||
-          a.action_type === "upsertCardKnowledgeItem",
         mockResponse: mock_response,
       });
       return json({
@@ -154,6 +182,51 @@ export async function POST(
       console.error("[chat] Populate error:", msg);
       return json({ status: "error", message: msg }, 502);
     }
+  }
+
+  // When workflows exist but have no activities, and user asks to populate — route to populate per workflow
+  const emptyWorkflows = Array.from(state.workflows.values()).filter(
+    (wf) => getWorkflowActivities(state, wf.id).length === 0,
+  );
+  if (
+    !mode &&
+    emptyWorkflows.length > 0 &&
+    POPULATE_INTENT.test(message)
+  ) {
+    let totalApplied = 0;
+    let currentState = state;
+    for (const workflow of emptyWorkflows) {
+      try {
+        const result = await runPopulateWorkflow({
+          db,
+          projectId,
+          workflowId: workflow.id,
+          workflowTitle: workflow.title,
+          workflowDescription: workflow.description ?? null,
+          userRequest: message,
+          state: currentState,
+          emit: noopEmit,
+          mockResponse: mock_response,
+        });
+        totalApplied += result.actionCount;
+        if (result.actionCount > 0) {
+          const fresh = await fetchMapSnapshot(db, projectId);
+          if (fresh) currentState = fresh;
+        }
+      } catch (err) {
+        console.error("[chat] Populate workflow error:", err);
+      }
+    }
+    return json({
+      status: "success",
+      responseType: "actions" as const,
+      message:
+        totalApplied > 0
+          ? `Added activities and functionality cards to ${emptyWorkflows.length} workflow(s).`
+          : "No activities or cards were generated. Try adding more context.",
+      applied: totalApplied,
+      workflow_ids_created: [],
+    });
   }
 
   const linkedArtifacts = getLinkedArtifactsForPrompt(state, 5);

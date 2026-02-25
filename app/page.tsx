@@ -5,10 +5,10 @@ import { Header } from '@/components/dossier/header';
 import { LeftSidebar } from '@/components/dossier/left-sidebar';
 import { WorkflowBlock } from '@/components/dossier/workflow-block';
 import { RightPanel } from '@/components/dossier/right-panel';
+import { ConfirmDeleteDialog } from '@/components/dossier/confirm-delete-dialog';
 import { Sparkles } from 'lucide-react';
 import type { ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
-import type { CodeFileForPanel } from '@/components/dossier/implementation-card';
-import { useMapSnapshot, useCardKnowledge, useCardPlannedFiles, useCardContextArtifacts, useArtifacts, useProjectFiles, useSubmitAction, useTriggerBuild, useDocsIndex, docsEntryToArtifact, fetchRefDocContent } from '@/lib/hooks';
+import { useMapSnapshot, useCardKnowledge, useCardPlannedFiles, useCardContextArtifacts, useArtifacts, useProjectFiles, useSubmitAction, useTriggerBuild, fetchRefDocContent } from '@/lib/hooks';
 import { useProjects } from '@/lib/hooks/use-projects';
 import { MapErrorBoundary } from '@/components/dossier/map-error-boundary';
 import { ChatErrorBoundary } from '@/components/dossier/chat-error-boundary';
@@ -63,7 +63,7 @@ export default function DossierPage() {
   // appMode drives which layout to show — active whenever workflows exist so the canvas can render empty-state guidance
   const appMode = (snapshot?.workflows?.length ?? 0) > 0 ? 'active' : 'ideation';
   const { submit: submitAction } = useSubmitAction(appMode === 'active' ? projectId : undefined);
-  const { triggerBuild } = useTriggerBuild(appMode === 'active' ? projectId : undefined);
+  const { triggerBuild, resumeBlocked } = useTriggerBuild(appMode === 'active' ? projectId : undefined);
 
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const { data: cardKnowledge, loading: cardKnowledgeLoading, refetch: refetchCardKnowledge } = useCardKnowledge(
@@ -78,12 +78,8 @@ export default function DossierPage() {
     appMode === 'active' ? projectId : undefined,
     expandedCardId ?? undefined
   );
-  const { data: projectArtifacts } = useArtifacts(appMode === 'active' ? projectId : undefined);
-  const { data: docsIndex } = useDocsIndex();
+  const { data: projectArtifacts, refetch: refetchArtifacts } = useArtifacts(appMode === 'active' ? projectId : undefined);
   const { data: projectFilesTree } = useProjectFiles(appMode === 'active' ? projectId : undefined);
-
-  const referenceDocs = (docsIndex ?? []).map(docsEntryToArtifact);
-  const allDocsList = [...(projectArtifacts ?? []), ...referenceDocs];
   const cardKnowledgeLoadingState = cardKnowledgeLoading || cardPlannedFilesLoading || cardContextArtifactsLoading;
 
   const getCardKnowledgeLoading = useCallback(
@@ -122,10 +118,11 @@ export default function DossierPage() {
   const availableFilePaths = projectFilesTree ? flattenFilePaths(projectFilesTree) : [];
 
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [isPlanning, setIsPlanning] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
-  const [rightPanelTab, setRightPanelTab] = useState<'files' | 'terminal' | 'docs' | 'chat'>('files');
+  const [rightPanelTab, setRightPanelTab] = useState<'files' | 'docs' | 'chat'>('files');
   const [selectedDoc, setSelectedDoc] = useState<ContextArtifact | null>(null);
-  const [selectedFile, setSelectedFile] = useState<CodeFileForPanel | null>(null);
+  const [filesBranchCardId, setFilesBranchCardId] = useState<string | null>(null);
 
   const LEFT_WIDTH_KEY = 'dossier_left_sidebar_width';
   const RIGHT_WIDTH_KEY = 'dossier_right_panel_width';
@@ -186,6 +183,7 @@ export default function DossierPage() {
           toast.warning(result.message ?? result.error ?? 'Decision required before build can continue');
         } else if (result.runId && result.outcomeType === 'success') {
           toast.success(result.message ?? 'Build started — agent is working');
+          setFilesBranchCardId(cardId);
           setRightPanelTab('files');
           setRightPanelOpen(true);
           refetch();
@@ -199,12 +197,59 @@ export default function DossierPage() {
     [triggerBuild, refetch]
   );
 
-  const handleCardAction = useCallback((cardId: string, action: string) => {
-    if (action === 'monitor' || action === 'test') {
-      setRightPanelTab('terminal');
-      setRightPanelOpen(true);
-    }
+  const handleResumeBlockedCard = useCallback(
+    async (cardId: string) => {
+      setBuildingCardId(cardId);
+      try {
+        const result = await resumeBlocked(cardId);
+        const { toast } = await import('sonner');
+        if (result.outcomeType === 'success') {
+          toast.success(result.message ?? 'Build resumed — agent is working');
+          setFilesBranchCardId(cardId);
+          setRightPanelTab('files');
+          setRightPanelOpen(true);
+          refetch();
+        } else {
+          toast.error(result.message ?? result.error ?? 'Failed to resume build');
+        }
+      } finally {
+        setBuildingCardId(null);
+      }
+    },
+    [resumeBlocked, refetch]
+  );
+
+  const handleShowCardFiles = useCallback((cardId: string) => {
+    setFilesBranchCardId(cardId);
+    setRightPanelTab('files');
+    setRightPanelOpen(true);
   }, []);
+
+  const handleCardAction = useCallback(
+    (cardId: string, action: string) => {
+      if (action === 'build') {
+        handleBuildCard(cardId);
+        return;
+      }
+      if (action === 'monitor' || action === 'test') {
+        setFilesBranchCardId(cardId);
+        setRightPanelTab('files');
+        setRightPanelOpen(true);
+      } else if (action === 'reply') {
+        setExpandedCardId(cardId);
+      } else if (action === 'merge') {
+        const repoUrl = snapshot?.project?.repo_url;
+        if (repoUrl) {
+          window.open(repoUrl, '_blank', 'noopener,noreferrer');
+        } else {
+          import('sonner').then(({ toast }) => {
+            toast.warning('Connect a repository in project settings to open merge flow.');
+          });
+        }
+      }
+    },
+    [snapshot?.project?.repo_url, handleBuildCard]
+  );
 
   const [populatingWorkflowId, setPopulatingWorkflowId] = useState<string | null>(null);
   const handlePopulateWorkflow = useCallback(
@@ -236,7 +281,9 @@ export default function DossierPage() {
         }
         if ((data.applied ?? 0) === 0) {
           const { toast } = await import('sonner');
-          toast.warning('No activities or cards were generated. Try again or add more context in the Agent chat.');
+          toast.warning(
+            'No activities or cards were generated. Ensure the project has a description and try again. If it persists, try adding more context in the Agent chat or use a stronger model (e.g. Sonnet).'
+          );
         }
         refetch();
       } catch (err) {
@@ -266,8 +313,20 @@ export default function DossierPage() {
     )
   ) ?? false;
 
+  const hadActiveBuildsRef = useRef(false);
   useEffect(() => {
-    if (!projectId || !hasActiveBuilds) return;
+    if (hasActiveBuilds) hadActiveBuildsRef.current = true;
+  }, [hasActiveBuilds]);
+
+  useEffect(() => {
+    if (!projectId || !hasActiveBuilds) {
+      // When transitioning from active to inactive, do one final refetch to catch completion
+      if (hadActiveBuildsRef.current && !hasActiveBuilds) {
+        hadActiveBuildsRef.current = false;
+        refetch();
+      }
+      return;
+    }
     const intervalId = window.setInterval(() => {
       refetch();
     }, 2000);
@@ -319,7 +378,8 @@ export default function DossierPage() {
     });
   }, [snapshot]);
 
-  // When snapshot changes and any card's data has changed, prompt user to refresh
+  // When snapshot changes and card content (not build_state) has changed, prompt user to refresh.
+  // build_state is excluded so build transitions only trigger the specific toasts above, not this generic one.
   useEffect(() => {
     if (!snapshot) return;
     const fingerprint = JSON.stringify(
@@ -327,7 +387,6 @@ export default function DossierPage() {
         wf.activities.flatMap((a) =>
           a.cards.map((c) => ({
             id: c.id,
-            build_state: c.build_state,
             quick_answer: c.quick_answer,
             finalized_at: c.finalized_at,
             last_built_at: c.last_built_at,
@@ -344,6 +403,7 @@ export default function DossierPage() {
             label: 'Refresh',
             onClick: () => {
               refetch();
+              refetchArtifacts();
               if (expandedCardId) {
                 refetchCardKnowledge();
                 refetchCardPlannedFiles();
@@ -354,7 +414,7 @@ export default function DossierPage() {
         });
       });
     }
-  }, [snapshot, expandedCardId, refetch, refetchCardKnowledge, refetchCardPlannedFiles, refetchCardContextArtifacts]);
+  }, [snapshot, expandedCardId, refetch, refetchArtifacts, refetchCardKnowledge, refetchCardPlannedFiles, refetchCardContextArtifacts]);
 
   const handleFinalizeProject = useCallback(
     async () => {
@@ -380,14 +440,21 @@ export default function DossierPage() {
           return;
         }
         const count = data.artifacts_created ?? 0;
+        const expectedCount = 5;
         if (count === 0) {
           const { toast } = await import('sonner');
           toast.warning('No context documents were generated.');
+        } else if (count < expectedCount) {
+          const { toast } = await import('sonner');
+          toast.warning(
+            `Created ${count} of ${expectedCount} documents. One may have failed (e.g. Data Contracts) — check Docs tab.`
+          );
         } else {
           const { toast } = await import('sonner');
           toast.success(`Finalized: ${count} context documents created`);
         }
         refetch();
+        refetchArtifacts();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Finalize failed';
         const { toast } = await import('sonner');
@@ -397,7 +464,7 @@ export default function DossierPage() {
         setFinalizeProgress('');
       }
     },
-    [projectId, refetch]
+    [projectId, refetch, refetchArtifacts]
   );
 
   const handleFinalizeCard = useCallback(
@@ -481,6 +548,7 @@ export default function DossierPage() {
           toast.success(parts.join(' — '));
         }
         refetch();
+        refetchArtifacts();
         refetchCardContextArtifacts();
         refetchCardPlannedFiles();
       } catch (err) {
@@ -492,7 +560,7 @@ export default function DossierPage() {
         setCardFinalizeProgress('');
       }
     },
-    [projectId, refetch, refetchCardContextArtifacts, refetchCardPlannedFiles]
+    [projectId, refetch, refetchArtifacts, refetchCardContextArtifacts, refetchCardPlannedFiles]
   );
 
   const handleUpdateCardDescription = useCallback(
@@ -605,25 +673,166 @@ export default function DossierPage() {
     [projectId, refetchCardPlannedFiles]
   );
 
-  const handleApprovePlannedFile = useCallback(
-    async (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => {
+  const handleUpdateFileDescription = useCallback((_fileId: string, _description: string) => {
+    refetch();
+  }, [refetch]);
+
+  const [deleteDialog, setDeleteDialog] = useState<{
+    entityType: 'workflow' | 'activity' | 'card';
+    entityName: string;
+    cascadeMessage?: string;
+    onConfirm: () => void | Promise<void>;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleAddWorkflow = useCallback(
+    async (title: string) => {
+      if (!projectId || !submitAction) return;
+      const workflows = snapshot?.workflows ?? [];
+      const position = workflows.length;
       const result = await submitAction({
         actions: [
           {
-            action_type: 'approveCardPlannedFile',
-            target_ref: { card_id: cardId },
-            payload: { planned_file_id: plannedFileId, status },
+            action_type: 'createWorkflow',
+            target_ref: { project_id: projectId },
+            payload: { title, position },
           },
         ],
       });
       if (result && result.applied > 0) refetch();
+      else if (result?.results?.[0]?.rejection_reason) {
+        const { toast } = await import('sonner');
+        toast.error(result.results[0].rejection_reason);
+      }
     },
-    [submitAction, refetch]
+    [projectId, submitAction, snapshot?.workflows?.length, refetch]
   );
 
-  const handleUpdateFileDescription = useCallback((_fileId: string, _description: string) => {
-    refetch();
-  }, [refetch]);
+  const handleAddActivity = useCallback(
+    async (workflowId: string, title: string, position?: number) => {
+      if (!projectId || !submitAction) return;
+      const workflow = snapshot?.workflows?.find((wf) => wf.id === workflowId);
+      const activities = workflow?.activities ?? [];
+      const pos = position ?? activities.length;
+      const result = await submitAction({
+        actions: [
+          {
+            action_type: 'createActivity',
+            target_ref: { workflow_id: workflowId },
+            payload: { title, position: pos },
+          },
+        ],
+      });
+      if (result && result.applied > 0) refetch();
+      else if (result?.results?.[0]?.rejection_reason) {
+        const { toast } = await import('sonner');
+        toast.error(result.results[0].rejection_reason);
+      }
+    },
+    [projectId, submitAction, snapshot?.workflows, refetch]
+  );
+
+  const handleAddCard = useCallback(
+    async (activityId: string, title: string, position?: number, priority?: number) => {
+      if (!projectId || !submitAction) return;
+      const pos = position ?? 0;
+      const prio = priority ?? 0;
+      const result = await submitAction({
+        actions: [
+          {
+            action_type: 'createCard',
+            target_ref: { workflow_activity_id: activityId },
+            payload: { title, status: 'todo', priority: prio, position: pos },
+          },
+        ],
+      });
+      if (result && result.applied > 0) refetch();
+      else if (result?.results?.[0]?.rejection_reason) {
+        const { toast } = await import('sonner');
+        toast.error(result.results[0].rejection_reason);
+      }
+    },
+    [projectId, submitAction, refetch]
+  );
+
+  const performDelete = useCallback(
+    async (action: { action_type: string; target_ref: Record<string, string> }): Promise<boolean> => {
+      if (!projectId || !submitAction) return false;
+      setIsDeleting(true);
+      try {
+        const result = await submitAction({
+          actions: [{ ...action, payload: {} }],
+        });
+        if (result && result.applied > 0) {
+          refetch();
+          return true;
+        }
+        if (result?.results?.[0]?.rejection_reason) {
+          const { toast } = await import('sonner');
+          toast.error(result.results[0].rejection_reason);
+        }
+        return false;
+      } finally {
+        setIsDeleting(false);
+      }
+    },
+    [projectId, submitAction, refetch]
+  );
+
+  const handleDeleteWorkflow = useCallback(
+    (workflowId: string, workflowTitle: string, activityCount: number, cardCount: number) => {
+      const cascade =
+        activityCount > 0 || cardCount > 0
+          ? `This will also delete ${activityCount} activit${activityCount === 1 ? 'y' : 'ies'} and ${cardCount} card${cardCount === 1 ? '' : 's'}.`
+          : undefined;
+      setDeleteDialog({
+        entityType: 'workflow',
+        entityName: workflowTitle,
+        cascadeMessage: cascade,
+        onConfirm: () =>
+          performDelete({
+            action_type: 'deleteWorkflow',
+            target_ref: { workflow_id: workflowId },
+          }),
+      });
+    },
+    [performDelete]
+  );
+
+  const handleDeleteActivity = useCallback(
+    (activityId: string, activityTitle: string, cardCount: number) => {
+      const cascade =
+        cardCount > 0
+          ? `This will also delete ${cardCount} card${cardCount === 1 ? '' : 's'}.`
+          : undefined;
+      setDeleteDialog({
+        entityType: 'activity',
+        entityName: activityTitle,
+        cascadeMessage: cascade,
+        onConfirm: () =>
+          performDelete({
+            action_type: 'deleteActivity',
+            target_ref: { workflow_activity_id: activityId },
+          }),
+      });
+    },
+    [performDelete]
+  );
+
+  const handleDeleteCard = useCallback(
+    (cardId: string, cardTitle: string) => {
+      setDeleteDialog({
+        entityType: 'card',
+        entityName: cardTitle,
+        onConfirm: () =>
+          performDelete({
+            action_type: 'deleteCard',
+            target_ref: { card_id: cardId },
+          }),
+      });
+    },
+    [performDelete]
+  );
 
   const handleProjectUpdate = useCallback(
     async (updates: {
@@ -654,6 +863,17 @@ export default function DossierPage() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background">
+      {deleteDialog && (
+        <ConfirmDeleteDialog
+          open={true}
+          onOpenChange={(open) => !open && setDeleteDialog(null)}
+          entityType={deleteDialog.entityType}
+          entityName={deleteDialog.entityName}
+          cascadeMessage={deleteDialog.cascadeMessage}
+          onConfirm={deleteDialog.onConfirm}
+          isDeleting={isDeleting}
+        />
+      )}
       <Header
         viewMode={viewMode}
         onViewModeChange={setViewMode}
@@ -679,7 +899,9 @@ export default function DossierPage() {
           onPlanningApplied={() => {
             setAgentStatus(hasContent ? 'reviewing' : 'building');
             refetch();
+            refetchArtifacts();
           }}
+          onPlanningStateChange={setIsPlanning}
           onProjectUpdate={handleProjectUpdate}
         />
         </ChatErrorBoundary>
@@ -697,22 +919,31 @@ export default function DossierPage() {
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center max-w-md px-6">
                 <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-secondary mb-6">
-                  <Sparkles className="h-8 w-8 text-muted-foreground" />
+                  <Sparkles className={`h-8 w-8 text-muted-foreground ${isPlanning ? 'animate-pulse' : ''}`} />
                 </div>
-                <h2 className="text-xl font-semibold text-foreground mb-3">Describe your idea</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-3">
+                  {isPlanning ? 'Creating your map' : 'Describe your idea'}
+                </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Use the Agent chat in the left panel to describe what you want to build.
-                  The planning agent will generate workflows, activities, and cards for your implementation map.
+                  {isPlanning
+                    ? 'The planning agent is structuring your idea into workflows, activities, and cards.'
+                    : 'Use the Agent chat in the left panel to describe what you want to build. The planning agent will generate workflows, activities, and cards for your implementation map.'}
                 </p>
                 <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                  <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
-                  <span>Waiting for your input...</span>
+                  <div className={`h-2 w-2 rounded-full ${isPlanning ? 'bg-primary animate-pulse' : 'bg-yellow-500 animate-pulse'}`} />
+                  <span>{isPlanning ? 'Creating your map…' : 'Waiting for your input…'}</span>
                 </div>
               </div>
             </div>
           ) : (
             <>
-              <div className="flex-1 overflow-y-auto">
+              {isPlanning && (
+                <div className="flex-shrink-0 flex items-center justify-center gap-2 py-2 px-3 bg-primary/10 border-b border-grid-line text-xs text-muted-foreground">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                  <span>Updating map…</span>
+                </div>
+              )}
+              <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-auto scrollbar-map">
                 {mapLoading && <MapSkeleton />}
                 {!mapLoading && mapError && (
                   <div className="flex flex-col items-center justify-center py-16 gap-2">
@@ -742,14 +973,21 @@ export default function DossierPage() {
                     onAddPlannedFile={handleAddPlannedFile}
                     availableArtifacts={projectArtifacts ?? []}
                     availableFilePaths={availableFilePaths}
-                    onApprovePlannedFile={handleApprovePlannedFile}
                     onBuildCard={handleBuildCard}
+                    onResumeBlockedCard={handleResumeBlockedCard}
+                    onShowCardFiles={handleShowCardFiles}
                     buildingCardId={buildingCardId}
                     onFinalizeCard={handleFinalizeCard}
                     finalizingCardId={finalizingCardId}
                     cardFinalizeProgress={cardFinalizeProgress}
                     onPopulateWorkflow={handlePopulateWorkflow}
                     populatingWorkflowId={populatingWorkflowId}
+                    onAddWorkflow={handleAddWorkflow}
+                    onAddActivity={handleAddActivity}
+                    onAddCard={handleAddCard}
+                    onDeleteWorkflow={handleDeleteWorkflow}
+                    onDeleteActivity={handleDeleteActivity}
+                    onDeleteCard={handleDeleteCard}
                     onFinalizeProject={handleFinalizeProject}
                     finalizingProject={finalizingProject}
                     finalizeProgress={finalizeProgress}
@@ -757,11 +995,6 @@ export default function DossierPage() {
                     onSelectDoc={(doc) => {
                       setSelectedDoc(doc);
                       setRightPanelTab('docs');
-                      setRightPanelOpen(true);
-                    }}
-                    onFileClick={(file) => {
-                      setSelectedFile(file);
-                      setRightPanelTab('terminal');
                       setRightPanelOpen(true);
                     }}
                     onUpdateFileDescription={handleUpdateFileDescription}
@@ -786,12 +1019,20 @@ export default function DossierPage() {
               isOpen={rightPanelOpen}
               onClose={() => setRightPanelOpen(false)}
               activeDoc={selectedDoc}
-              activeFile={selectedFile}
               activeTab={rightPanelTab}
               onTabChange={setRightPanelTab}
               projectId={appMode === 'active' ? projectId : undefined}
               width={rightWidth}
-              docsList={allDocsList}
+              docsList={projectArtifacts ?? []}
+              filesBranchCardId={filesBranchCardId}
+              onFilesBranchChange={setFilesBranchCardId}
+              filesBranchCardTitle={
+                filesBranchCardId && snapshot
+                  ? snapshot.workflows
+                      .flatMap((wf) => wf.activities.flatMap((a) => a.cards))
+                      .find((c) => c.id === filesBranchCardId)?.title
+                  : undefined
+              }
               onSelectDoc={async (doc) => {
                 if (!doc) {
                   setSelectedDoc(null);

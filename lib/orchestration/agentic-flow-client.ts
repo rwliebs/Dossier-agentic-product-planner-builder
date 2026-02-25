@@ -268,6 +268,7 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
         let eventType: WebhookEventType;
         let summary: string;
         let errorMsg: string | undefined;
+        let learnings: string[] = [];
 
         try {
           const output = await withRetry(() =>
@@ -285,6 +286,10 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
           entry.summary = output.substring(0, 500);
           eventType = "execution_completed";
           summary = entry.summary;
+          const trimmed = output?.trim();
+          if (trimmed) {
+            learnings = [trimmed.length > 8000 ? trimmed.substring(0, 8000) + "\n[... truncated]" : trimmed];
+          }
         } catch (err) {
           if (abortController.signal.aborted) {
             entry.status = "cancelled";
@@ -312,6 +317,7 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
             ended_at: entry.endedAt!,
             summary,
             error: errorMsg,
+            learnings,
             knowledge: {
               facts: [],
               assumptions: [],

@@ -26,6 +26,7 @@ import {
   getCardRequirements,
 } from "@/lib/db/queries";
 import { getMemoryStore } from "@/lib/memory";
+import { isRuvectorAvailable } from "@/lib/ruvector/client";
 
 export interface DispatchAssignmentInput {
   assignment_id: string;
@@ -77,10 +78,6 @@ export async function dispatchAssignment(
   }
 
   const plannedFiles = await getCardPlannedFiles(db, cardId);
-  const approvedPlannedFiles = plannedFiles.filter(
-    (f) => (f as { status?: string }).status === "approved"
-  );
-  // Planned files are optional — use assignment's allowed_paths when none approved
 
   const requirements = await getCardRequirements(db, cardId);
   const acceptanceCriteria = requirements.map(
@@ -107,6 +104,12 @@ export async function dispatchAssignment(
       )
     : [];
 
+  if (MEMORY_PLANE && memoryRefs.length === 0 && isRuvectorAvailable()) {
+    console.warn(
+      "[dispatch] Memory plane enabled but retrieval empty for card — consider ingesting card context before build (e.g. on finalize)."
+    );
+  }
+
   // Fetch context artifacts (test files, docs, specs) linked to this card
   const contextLinks = await getCardContextArtifacts(db, cardId);
   const contextArtifacts: Array<{ name: string; type: string; title?: string; content: string }> = [];
@@ -124,7 +127,7 @@ export async function dispatchAssignment(
   }
 
   // Build planned files detail (intent, contract notes, module hint)
-  const plannedFilesDetail = approvedPlannedFiles.map((pf) => ({
+  const plannedFilesDetail = plannedFiles.map((pf) => ({
     logical_file_name: (pf as { logical_file_name: string }).logical_file_name,
     action: (pf as { action?: string }).action ?? "edit",
     artifact_kind: (pf as { artifact_kind?: string }).artifact_kind ?? "component",
@@ -133,12 +136,21 @@ export async function dispatchAssignment(
     module_hint: (pf as { module_hint?: string }).module_hint ?? undefined,
   }));
 
+  const worktreePath = (assignment as { worktree_path?: string }).worktree_path ?? null;
+  if (!worktreePath) {
+    return {
+      success: false,
+      error:
+        "Build misconfiguration: no worktree path. The agent must run in the project clone. Re-trigger the build from the project.",
+    };
+  }
+
   const payload: DispatchPayload = {
     run_id: (run as { id: string }).id,
     assignment_id,
     card_id: cardId,
     feature_branch: (assignment as { feature_branch: string }).feature_branch,
-    worktree_path: (assignment as { worktree_path?: string }).worktree_path ?? null,
+    worktree_path: worktreePath,
     allowed_paths: (assignment as { allowed_paths: string[] }).allowed_paths,
     forbidden_paths:
       (assignment as { forbidden_paths?: string[] }).forbidden_paths ?? null,
@@ -193,8 +205,8 @@ export async function dispatchAssignment(
 
   await updateCardAssignmentStatus(db, assignment_id, "running");
 
-  // Sync card build_state to running
-  await db.updateCard(cardId, { build_state: "running" });
+  // Sync card build_state to running; clear prior error for fresh build
+  await db.updateCard(cardId, { build_state: "running", last_build_error: null });
 
   // Ensure run status is running when first assignment dispatched
   const runStatus = (run as { status?: string }).status;

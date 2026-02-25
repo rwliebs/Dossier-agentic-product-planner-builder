@@ -16,6 +16,7 @@ import {
   getProject,
 } from "@/lib/db/queries";
 import { listOrchestrationRunsByProject } from "@/lib/db/queries/orchestration";
+import { recoverStaleRuns } from "./recover-stale-runs";
 
 export interface TriggerBuildInput {
   project_id: string;
@@ -45,23 +46,8 @@ export async function triggerBuild(
   input: TriggerBuildInput
 ): Promise<TriggerBuildResult> {
   // O10.6: Single-build lock — strategy-mandated safety
-  // Auto-expire runs stuck in "running" for >30 min (crash/disconnect recovery).
-  const STALE_RUN_MS = 30 * 60 * 1000;
-  const runningRuns = await listOrchestrationRunsByProject(db, input.project_id, {
-    status: "running",
-    limit: 5,
-  });
-  for (const run of runningRuns) {
-    const startedAt = (run as { started_at?: string }).started_at;
-    const createdAt = (run as { created_at?: string }).created_at;
-    const ts = startedAt ?? createdAt;
-    if (ts && Date.now() - new Date(ts).getTime() > STALE_RUN_MS) {
-      await db.updateOrchestrationRun((run as { id: string }).id, {
-        status: "failed",
-        ended_at: new Date().toISOString(),
-      });
-    }
-  }
+  // Optionally recover runs stuck in "running" (set DOSSIER_STALE_RUN_MINUTES > 0).
+  await recoverStaleRuns(db, input.project_id);
   const stillRunning = await listOrchestrationRunsByProject(db, input.project_id, {
     status: "running",
     limit: 1,
@@ -144,24 +130,19 @@ export async function triggerBuild(
     };
   }
 
-  // Planned code files are optional. Clicking Build is user approval.
-  // When no approved files exist, allowed_paths defaults to ["src", "app", "lib", "components"].
-
-  // Clone repo for single-card builds (MVP); multi-card requires worktrees (deferred)
-  let clonePath: string | null = null;
-  if (cardIds.length === 1) {
-    const cloneResult = ensureClone(input.project_id, repoUrl, null, baseBranch);
-    if (!cloneResult.success) {
-      return {
-        success: false,
-        error: cloneResult.error,
-        validationErrors: [cloneResult.error ?? "Repo clone failed"],
-        outcomeType: "error",
-        message: cloneResult.error ?? "Repository clone failed.",
-      };
-    }
-    clonePath = cloneResult.clonePath ?? null;
+  // Clone repo for every build so the agent always has a valid cwd (worktree_path).
+  // Without this, multi-card builds left worktree_path null → agent ran in Dossier app root → exit 1.
+  const cloneResult = ensureClone(input.project_id, repoUrl, null, baseBranch);
+  if (!cloneResult.success) {
+    return {
+      success: false,
+      error: cloneResult.error,
+      validationErrors: [cloneResult.error ?? "Repo clone failed"],
+      outcomeType: "error",
+      message: cloneResult.error ?? "Repository clone failed.",
+    };
   }
+  const clonePath = cloneResult.clonePath ?? null;
 
   // Code file creation (planned files) is optional — all finalized cards are buildable
   const runResult = await createRun(db, {
@@ -205,19 +186,11 @@ export async function triggerBuild(
   const assignmentIds: string[] = [];
   const assignmentErrors: string[] = [];
 
-  const DEFAULT_ALLOWED_PATHS = ["src", "app", "lib", "components"];
-
   for (const cardId of cardIds) {
     const plannedFiles = await getCardPlannedFiles(db, cardId);
-    const approved = plannedFiles.filter(
-      (f) => (f as { status?: string }).status === "approved"
+    const allowedPaths = plannedFiles.map(
+      (f) => (f as { logical_file_name: string }).logical_file_name
     );
-    const allowedPaths =
-      approved.length > 0
-        ? approved.map(
-            (f) => (f as { logical_file_name: string }).logical_file_name
-          )
-        : DEFAULT_ALLOWED_PATHS;
 
     await db.updateCard(cardId, { build_state: "queued" });
     const runIdShort = runId.slice(0, 8);
@@ -254,15 +227,17 @@ export async function triggerBuild(
       forbidden_paths: null,
       assignment_input_snapshot: {
         card_id: cardId,
-        planned_file_ids: approved.map((f) => (f as { id: string }).id),
+        planned_file_ids: plannedFiles.map((f) => (f as { id: string }).id),
       },
     });
 
     if (!assignResult.success) {
-      assignmentErrors.push(
-        `Card ${cardId}: failed to create assignment (${assignResult.error ?? "unknown error"})`
-      );
-      await db.updateCard(cardId, { build_state: "failed" });
+      const err = assignResult.error ?? "unknown error";
+      assignmentErrors.push(`Card ${cardId}: failed to create assignment (${err})`);
+      await db.updateCard(cardId, {
+        build_state: "failed",
+        last_build_error: `Failed to create assignment: ${err}`,
+      });
       continue;
     }
 
@@ -273,10 +248,12 @@ export async function triggerBuild(
       });
 
       if (!dispatchResult.success) {
-        assignmentErrors.push(
-          `Card ${cardId}: dispatch failed (${dispatchResult.error ?? "unknown error"})`
-        );
-        await db.updateCard(cardId, { build_state: "failed" });
+        const err = dispatchResult.error ?? "unknown error";
+        assignmentErrors.push(`Card ${cardId}: dispatch failed (${err})`);
+        await db.updateCard(cardId, {
+          build_state: "failed",
+          last_build_error: `Dispatch failed: ${err}`,
+        });
         await db.updateCardAssignment(assignResult.assignmentId, { status: "failed" });
       } else {
         assignmentIds.push(assignResult.assignmentId);

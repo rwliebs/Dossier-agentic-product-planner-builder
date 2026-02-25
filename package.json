@@ -14,7 +14,7 @@
   "scripts": {
     "build": "next build && npm run postbuild",
     "postbuild": "cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public",
-    "dev": "next dev",
+    "dev": "next dev -H 127.0.0.1",
     "rebuild": "./scripts/rebuild-and-restart.sh",
     "rebuild:prod": "./scripts/rebuild-and-restart.sh prod",
     "lint": "eslint .",
@@ -32,6 +32,7 @@
     "demo:mock-tasks": "tsx examples/run-mock-task-demo.ts",
     "generate:mock-task": "tsx examples/generate-mock-task.ts",
     "validate:payload": "tsx examples/validate-mock-payload.ts",
+    "commit-all-to-branches": "tsx scripts/commit-all-to-branches.ts",
     "start": "next start",
     "dossier": "node bin/dossier.mjs",
     "prepare": "husky"
@@ -77,6 +78,7 @@
     "cmdk": "1.0.4",
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.5.1",
+    "geist": "^1.3.1",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
     "next": "16.0.10",

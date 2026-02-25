@@ -49,8 +49,8 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -101,5 +101,27 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Map scroll: always-visible scrollbar (macOS hides overlay scrollbars by default) */
+@layer utilities {
+  .scrollbar-map::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scrollbar-map::-webkit-scrollbar-track {
+    background: oklch(0.96 0 0);
+  }
+  .scrollbar-map::-webkit-scrollbar-thumb {
+    background: oklch(0.7 0 0);
+    border-radius: 5px;
+  }
+  .scrollbar-map::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.6 0 0);
+  }
+  .scrollbar-map {
+    scrollbar-width: auto;
+    scrollbar-color: oklch(0.7 0 0) oklch(0.96 0 0);
   }
 }

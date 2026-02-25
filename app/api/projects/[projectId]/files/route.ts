@@ -10,11 +10,16 @@ import {
 } from "@/lib/db/queries/orchestration";
 import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
 import {
+  getRepoFileTree,
   getRepoFileTreeWithStatus,
   getFileContent,
+  getWorkingFileContent,
+  getWorkingTreeFileTreeWithStatus,
   getFileDiff,
   type FileNode,
 } from "@/lib/orchestration/repo-reader";
+import { getClonePath } from "@/lib/orchestration/repo-manager";
+import * as fs from "node:fs";
 
 export type { FileNode };
 
@@ -66,44 +71,104 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { searchParams } = new URL(request.url);
     const source = searchParams.get("source") ?? "planned";
+    const cardId = searchParams.get("cardId") ?? null;
 
     if (source === "repo") {
       const runs = await listOrchestrationRunsByProject(db, projectId, {
-        limit: 5,
+        limit: 20,
       });
-      const run = runs.find(
+      const runWithWorktree = runs.find(
         (r) => (r as { worktree_root?: string }).worktree_root
       );
-      if (!run) {
+
+      // Fallback: if no build yet but repo is connected and clone exists (e.g. after finalization),
+      // show the clone's file tree so users see the directory structure created by finalization.
+      if (!runWithWorktree) {
+        const repoUrl = (project as { repo_url?: string })?.repo_url;
+        const baseBranch =
+          (project as { default_branch?: string })?.default_branch ?? "main";
+        if (
+          repoUrl &&
+          !repoUrl.includes("placeholder") &&
+          !cardId // card-specific view needs a run
+        ) {
+          const clonePath = getClonePath(projectId);
+          if (fs.existsSync(clonePath)) {
+            const result = getRepoFileTree(clonePath, baseBranch);
+            if (result.success && result.tree) {
+              return json(result.tree);
+            }
+          }
+        }
         return json(
           { error: "No build with repository available. Trigger a build first." },
           404
         );
       }
-      const runRow = run as {
+      const defaultRun = runWithWorktree as {
         worktree_root: string;
         base_branch: string;
         id: string;
       };
-      const assignments = await getCardAssignmentsByRun(db, runRow.id);
-      const assignment = assignments.find(
-        (a) => (a as { worktree_path?: string }).worktree_path
-      ) as { feature_branch: string } | undefined;
-      if (!assignment) {
-        return json(
-          { error: "No assignment with worktree. Trigger a build first." },
-          404
-        );
+
+      let assignment: { feature_branch: string; worktree_path?: string | null } | null = null;
+      let effectiveRun = defaultRun;
+
+      if (cardId) {
+        for (const run of runs) {
+          const wt = (run as { worktree_root?: string }).worktree_root;
+          if (!wt) continue;
+          const assignments = await getCardAssignmentsByRun(db, (run as { id: string }).id);
+          const found = assignments.find(
+            (a) =>
+              (a as { card_id: string }).card_id === cardId &&
+              (a as { worktree_path?: string }).worktree_path
+          ) as { feature_branch: string; worktree_path?: string | null } | undefined;
+          if (found) {
+            assignment = found;
+            effectiveRun = run as { worktree_root: string; base_branch: string; id: string };
+            break;
+          }
+        }
+      } else {
+        for (const run of runs) {
+          const wt = (run as { worktree_root?: string }).worktree_root;
+          if (!wt) continue;
+          const assignments = await getCardAssignmentsByRun(db, (run as { id: string }).id);
+          const hasCompleted = assignments.some(
+            (a) =>
+              (a as { status?: string }).status === "completed" &&
+              (a as { worktree_path?: string }).worktree_path
+          );
+          if (hasCompleted) {
+            effectiveRun = run as { worktree_root: string; base_branch: string; id: string };
+            break;
+          }
+        }
       }
+
+      const useMainBranch = !assignment;
+      const effectiveBranch = useMainBranch
+        ? effectiveRun.base_branch
+        : assignment!.feature_branch;
+      const repoPath = assignment?.worktree_path ?? effectiveRun.worktree_root;
 
       const filePath = searchParams.get("path");
       const wantContent = searchParams.get("content") === "1";
       const wantDiff = searchParams.get("diff") === "1";
 
       if (wantContent && filePath) {
+        if (!useMainBranch) {
+          const workingContent = getWorkingFileContent(repoPath, filePath);
+          if (workingContent.success) {
+            return new Response(workingContent.content ?? "", {
+              headers: { "Content-Type": "text/plain; charset=utf-8" },
+            });
+          }
+        }
         const contentResult = getFileContent(
-          runRow.worktree_root,
-          assignment.feature_branch,
+          repoPath,
+          effectiveBranch,
           filePath
         );
         if (!contentResult.success) {
@@ -118,10 +183,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
 
       if (wantDiff && filePath) {
+        if (useMainBranch) {
+          return new Response("", {
+            headers: { "Content-Type": "text/x-diff; charset=utf-8" },
+          });
+        }
         const diffResult = getFileDiff(
-          runRow.worktree_root,
-          runRow.base_branch,
-          assignment.feature_branch,
+          repoPath,
+          effectiveRun.base_branch,
+          effectiveBranch,
           filePath
         );
         if (!diffResult.success) {
@@ -135,11 +205,49 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         });
       }
 
-      const result = getRepoFileTreeWithStatus(
-        runRow.worktree_root,
-        assignment.feature_branch,
-        runRow.base_branch
-      );
+      if (useMainBranch) {
+        const result = getRepoFileTree(repoPath, effectiveRun.base_branch);
+        if (!result.success) {
+          return json(
+            { error: result.error ?? "Failed to read repository files" },
+            500
+          );
+        }
+        return json(result.tree ?? []);
+      }
+
+      let result: { success: boolean; tree?: FileNode[]; error?: string };
+      let useWorkingTree = false;
+      try {
+        const { execSync } = await import("node:child_process");
+        const currentBranch = execSync("git rev-parse --abbrev-ref HEAD", {
+          cwd: repoPath,
+          encoding: "utf-8",
+        }).trim();
+        useWorkingTree = currentBranch === effectiveBranch;
+      } catch {
+        useWorkingTree = false;
+      }
+      if (useWorkingTree) {
+        result = getWorkingTreeFileTreeWithStatus(
+          repoPath,
+          effectiveBranch,
+          effectiveRun.base_branch
+        );
+      } else {
+        result = getRepoFileTreeWithStatus(
+          repoPath,
+          effectiveBranch,
+          effectiveRun.base_branch
+        );
+      }
+      if (!result.success && useWorkingTree) {
+        result = getRepoFileTreeWithStatus(
+          repoPath,
+          effectiveBranch,
+          effectiveRun.base_branch
+        );
+      }
       if (!result.success) {
         return json(
           { error: result.error ?? "Failed to read repository files" },

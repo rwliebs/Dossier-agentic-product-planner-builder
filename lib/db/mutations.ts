@@ -11,6 +11,7 @@ import {
   getProject,
   getWorkflowsByProject,
   getActivitiesByWorkflow,
+  getCardsByActivity,
   getCardById,
   getArtifactById,
   verifyCardInProject,
@@ -165,18 +166,20 @@ export async function applyAction(
       return applyUpdateCard(db, projectId, action);
     case "reorderCard":
       return applyReorderCard(db, projectId, action);
+    case "deleteWorkflow":
+      return applyDeleteWorkflow(db, projectId, action);
+    case "deleteActivity":
+      return applyDeleteActivity(db, projectId, action);
+    case "deleteCard":
+      return applyDeleteCard(db, projectId, action);
     case "linkContextArtifact":
       return applyLinkContextArtifact(db, projectId, action);
     case "createContextArtifact":
       return applyCreateContextArtifactAction(db, projectId, action);
     case "upsertCardPlannedFile":
       return applyUpsertCardPlannedFile(db, projectId, action);
-    case "approveCardPlannedFile":
-      return applyApproveCardPlannedFile(db, projectId, action);
     case "upsertCardKnowledgeItem":
       return applyUpsertCardKnowledgeItem(db, projectId, action);
-    case "setCardKnowledgeStatus":
-      return applySetCardKnowledgeStatus(db, projectId, action);
     default:
       return { applied: false, rejectionReason: `Unsupported action type: ${action.action_type}` };
   }
@@ -272,6 +275,19 @@ async function applyCreateActivity(
   }
 
   try {
+    // Shift activities at or after insert position to make room
+    const toShift = activities.filter((a) => (a.position as number) >= position);
+    for (const a of toShift) {
+      await db.upsertWorkflowActivity({
+        id: a.id,
+        workflow_id: workflowId,
+        title: a.title,
+        color: a.color ?? null,
+        position: (a.position as number) + 1,
+        created_at: a.created_at,
+        updated_at: new Date().toISOString(),
+      });
+    }
     await db.insertWorkflowActivity({
       id,
       workflow_id: workflowId,
@@ -326,6 +342,13 @@ async function applyCreateCard(
   }
 
   try {
+    const cards = await getCardsByActivity(db, activityId);
+    const toShift = cards.filter((c) => ((c.position as number) ?? 0) >= position);
+    for (const c of toShift) {
+      await db.updateCard(c.id as string, {
+        position: ((c.position as number) ?? 0) + 1,
+      });
+    }
     await db.insertCard({
       id,
       workflow_activity_id: activityId,
@@ -400,6 +423,83 @@ async function applyReorderCard(
 
   try {
     await db.updateCard(cardId, updates);
+  } catch (error) {
+    return { applied: false, rejectionReason: error instanceof Error ? error.message : String(error) };
+  }
+  return { applied: true };
+}
+
+async function applyDeleteCard(
+  db: DbAdapter,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const cardId = action.target_ref.card_id as string;
+  if (!cardId) {
+    return { applied: false, rejectionReason: "card_id is required in target_ref" };
+  }
+
+  const inProject = await verifyCardInProject(db, cardId, projectId);
+  if (!inProject) {
+    return { applied: false, rejectionReason: "Card not found or not in project" };
+  }
+
+  try {
+    await db.deleteCard(cardId);
+  } catch (error) {
+    return { applied: false, rejectionReason: error instanceof Error ? error.message : String(error) };
+  }
+  return { applied: true };
+}
+
+async function applyDeleteActivity(
+  db: DbAdapter,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const activityId = action.target_ref.workflow_activity_id as string;
+  if (!activityId) {
+    return { applied: false, rejectionReason: "workflow_activity_id is required in target_ref" };
+  }
+
+  const workflows = await getWorkflowsByProject(db, projectId);
+  let workflowId: string | null = null;
+  for (const wf of workflows) {
+    const activities = await getActivitiesByWorkflow(db, wf.id as string);
+    if (activities.some((a) => a.id === activityId)) {
+      workflowId = wf.id as string;
+      break;
+    }
+  }
+  if (!workflowId) {
+    return { applied: false, rejectionReason: "Workflow activity not found" };
+  }
+
+  try {
+    await db.deleteWorkflowActivity(activityId, workflowId);
+  } catch (error) {
+    return { applied: false, rejectionReason: error instanceof Error ? error.message : String(error) };
+  }
+  return { applied: true };
+}
+
+async function applyDeleteWorkflow(
+  db: DbAdapter,
+  projectId: string,
+  action: ActionInput
+): Promise<ApplyResult> {
+  const workflowId = action.target_ref.workflow_id as string;
+  if (!workflowId) {
+    return { applied: false, rejectionReason: "workflow_id is required in target_ref" };
+  }
+
+  const workflows = await getWorkflowsByProject(db, projectId);
+  if (!workflows.some((w) => w.id === workflowId)) {
+    return { applied: false, rejectionReason: "Workflow not found" };
+  }
+
+  try {
+    await db.deleteWorkflow(workflowId, projectId);
   } catch (error) {
     return { applied: false, rejectionReason: error instanceof Error ? error.message : String(error) };
   }
@@ -561,7 +661,7 @@ async function applyUpsertCardPlannedFile(
         action: fileAction,
         intent_summary: intentSummary.trim(),
         contract_notes: contractNotes,
-        status: "proposed",
+        status: "approved",
         position,
       });
     }
@@ -571,41 +671,6 @@ async function applyUpsertCardPlannedFile(
   return { applied: true };
 }
 
-async function applyApproveCardPlannedFile(
-  db: DbAdapter,
-  projectId: string,
-  action: ActionInput
-): Promise<ApplyResult> {
-  const cardId = action.target_ref.card_id as string;
-  const plannedFileId = action.payload.planned_file_id as string;
-  const status = action.payload.status as string;
-
-  if (!cardId || !plannedFileId || !status) {
-    return { applied: false, rejectionReason: "card_id, planned_file_id, and status are required" };
-  }
-
-  if (status !== "approved" && status !== "proposed") {
-    return { applied: false, rejectionReason: "status must be 'approved' or 'proposed'" };
-  }
-
-  const inProject = await verifyCardInProject(db, cardId, projectId);
-  if (!inProject) {
-    return { applied: false, rejectionReason: "Card not found or not in project" };
-  }
-
-  const files = await getCardPlannedFiles(db, cardId);
-  const file = files.find((f) => (f as { id?: string }).id === plannedFileId);
-  if (!file) {
-    return { applied: false, rejectionReason: "Planned file not found for card" };
-  }
-
-  try {
-    await db.updateCardPlannedFile(plannedFileId, cardId, { status });
-  } catch (error) {
-    return { applied: false, rejectionReason: error instanceof Error ? error.message : String(error) };
-  }
-  return { applied: true };
-}
 
 async function applyUpsertCardKnowledgeItem(
   db: DbAdapter,
@@ -680,29 +745,3 @@ async function applyUpsertCardKnowledgeItem(
   return { applied: true };
 }
 
-async function applySetCardKnowledgeStatus(
-  db: DbAdapter,
-  projectId: string,
-  action: ActionInput
-): Promise<ApplyResult> {
-  const cardId = action.target_ref.card_id as string;
-  const knowledgeItemId = action.payload.knowledge_item_id as string;
-  const status = action.payload.status as string;
-
-  if (!cardId || !knowledgeItemId || !status) {
-    return { applied: false, rejectionReason: "card_id, knowledge_item_id, and status are required" };
-  }
-
-  const validStatuses = ["draft", "approved", "rejected"];
-  if (!validStatuses.includes(status)) {
-    return { applied: false, rejectionReason: `status must be one of: ${validStatuses.join(", ")}` };
-  }
-
-  const inProject = await verifyCardInProject(db, cardId, projectId);
-  if (!inProject) {
-    return { applied: false, rejectionReason: "Card not found or not in project" };
-  }
-
-  const ok = await db.updateKnowledgeItemStatus(knowledgeItemId, cardId, status);
-  return ok ? { applied: true } : { applied: false, rejectionReason: "Knowledge item not found" };
-}

@@ -128,9 +128,6 @@ export const updatePlannedFileSchema = z.object({
   position: z.number().int().nonnegative().optional(),
 });
 
-export const approvePlannedFileSchema = z.object({
-  status: z.literal("approved"),
-});
 
 // Chat request (non-streaming; supports scaffold, populate, finalize per ADR 0009)
 export const chatRequestSchema = z
@@ -217,6 +214,12 @@ export const triggerBuildRequestSchema = z
     },
     { message: "scope=workflow requires workflow_id; scope=card requires card_id" }
   );
+
+// Orchestration: resume blocked build (POST body; project_id from params)
+export const resumeBlockedRequestSchema = z.object({
+  card_id: z.string().uuid(),
+  actor: z.string().min(1).optional(),
+});
 
 // Orchestration: create approval request (POST body)
 export const createApprovalRequestSchema = z.object({

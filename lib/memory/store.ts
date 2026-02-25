@@ -116,8 +116,7 @@ export function createMemoryStore(db: DbAdapter, ruvectorAvailable: boolean): Me
       const projectScoped = new Set(projectRels.map((r) => r.memory_unit_id as string));
 
       const units = await db.getMemoryUnitsByIds(ids);
-      const approved = units.filter((u) => u.status === "approved");
-      const inScope = approved.filter(
+      const inScope = units.filter(
         (u) => cardScoped.has(u.id as string) || projectScoped.has(u.id as string)
       );
       const cardFirst = [...inScope].sort((a, b) => {

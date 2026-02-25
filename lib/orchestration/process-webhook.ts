@@ -11,9 +11,11 @@ import {
   getAgentExecutionsByAssignment,
   getCardAssignmentsByRun,
 } from "@/lib/db/queries/orchestration";
+import { getCardById } from "@/lib/db/queries";
 import { logEvent } from "./event-logger";
 import { executeRequiredChecks } from "./execute-checks";
 import { harvestBuildLearnings } from "@/lib/memory/harvest";
+import { performAutoCommit } from "./auto-commit";
 
 export type WebhookEventType =
   | "execution_started"
@@ -218,16 +220,86 @@ export async function processWebhook(
           error: null,
         });
       }
-      await db.updateCardAssignment(assignment_id, {
-        status: "completed",
-      });
 
       const cardId = (assignment as { card_id: string }).card_id;
-      await db.updateCard(cardId, {
-        build_state: "completed",
-        last_built_at: new Date().toISOString(),
-      });
       await writeKnowledgeToCard(db, cardId, payload.knowledge);
+
+      const worktreePath = (assignment as { worktree_path?: string | null }).worktree_path;
+      const featureBranch = (assignment as { feature_branch: string }).feature_branch;
+      const allowedPaths = (assignment as { allowed_paths: string[] }).allowed_paths ?? [];
+
+      let autoCommitOk = true;
+      if (worktreePath) {
+        const card = await getCardById(db, cardId);
+        const cardTitle = (card as { title?: string } | null)?.title;
+        const autoResult = performAutoCommit({
+          worktreePath,
+          featureBranch,
+          cardTitle,
+          cardId,
+          allowedPaths,
+        });
+
+        if (autoResult.outcome === "committed") {
+          await db.insertAgentCommit({
+            assignment_id,
+            sha: autoResult.sha,
+            branch: featureBranch,
+            message: autoResult.message,
+            committed_at: new Date().toISOString(),
+          });
+          await logEvent(db, {
+            project_id: projectId,
+            run_id: runId,
+            event_type: "commit_created",
+            actor: "dossier-auto-commit",
+            payload: {
+              assignment_id,
+              commit: { sha: autoResult.sha, branch: featureBranch, message: autoResult.message },
+            },
+          });
+        } else if (autoResult.outcome === "no_changes") {
+          autoCommitOk = false;
+          await db.updateCardAssignment(assignment_id, { status: "blocked" });
+          await db.updateCard(cardId, { build_state: "blocked" });
+          await logEvent(db, {
+            project_id: projectId,
+            run_id: runId,
+            event_type: "execution_blocked",
+            actor: "dossier-auto-commit",
+            payload: {
+              assignment_id,
+              summary: autoResult.reason,
+            },
+          });
+        } else {
+          autoCommitOk = false;
+          await db.updateCardAssignment(assignment_id, { status: "failed" });
+          await db.updateCard(cardId, {
+            build_state: "failed",
+            last_build_error: autoResult.error ?? "Auto-commit failed",
+          });
+          await logEvent(db, {
+            project_id: projectId,
+            run_id: runId,
+            event_type: "execution_failed",
+            actor: "dossier-auto-commit",
+            payload: {
+              assignment_id,
+              error: autoResult.error,
+            },
+          });
+        }
+      }
+
+      if (autoCommitOk) {
+        await db.updateCardAssignment(assignment_id, { status: "completed" });
+        await db.updateCard(cardId, {
+          build_state: "completed",
+          last_built_at: new Date().toISOString(),
+          last_build_error: null,
+        });
+      }
 
       await logEvent(db, {
         project_id: projectId,
@@ -240,8 +312,10 @@ export async function processWebhook(
         },
       });
 
-      // Trigger checks on completion
-      const checkResult = await executeRequiredChecks(db, runId);
+      // Trigger checks on completion (only when auto-commit succeeded or was skipped)
+      const checkResult = autoCommitOk
+        ? await executeRequiredChecks(db, runId)
+        : { success: false, error: "Skipped: auto-commit failed or no changes" };
       if (!checkResult.success) {
         console.warn(
           `Webhook: checks failed for run ${runId}:`,
@@ -262,9 +336,10 @@ export async function processWebhook(
         });
       }
 
-      // Close run when all assignments are terminal so trigger-build lock is released
+      // Close run when all assignments are terminal so trigger-build lock is released.
+      // "blocked" is NOT terminal: blocked assignments wait for user input and can resume.
       const assignments = await getCardAssignmentsByRun(db, runId);
-      const terminalStatuses = ["completed", "failed", "blocked"];
+      const terminalStatuses = ["completed", "failed"];
       const allTerminal =
         assignments.length > 0 &&
         assignments.every((a) =>
@@ -298,7 +373,11 @@ export async function processWebhook(
       });
 
       const failedCardId = (assignment as { card_id: string }).card_id;
-      await db.updateCard(failedCardId, { build_state: "failed" });
+      const errorMsg = payload.error ?? "Build failed";
+      await db.updateCard(failedCardId, {
+        build_state: "failed",
+        last_build_error: errorMsg,
+      });
       await writeKnowledgeToCard(db, failedCardId, payload.knowledge);
 
       await logEvent(db, {

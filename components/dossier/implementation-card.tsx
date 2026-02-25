@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Edit2, Check, X, Plus } from 'lucide-react';
+import { ChevronDown, Edit2, Check, X, Plus, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +33,7 @@ export interface CodeFileForPanel {
 interface ImplementationCardProps {
   card: MapCard;
   isExpanded: boolean;
-  onExpand: (cardId: string) => void;
+  onExpand: (cardId: string | null) => void;
   onAction: (cardId: string, action: string) => void;
   onUpdateDescription: (cardId: string, description: string) => void;
   onUpdateQuickAnswer?: (cardId: string, quickAnswer: string) => void;
@@ -43,15 +43,17 @@ interface ImplementationCardProps {
   onAddPlannedFile?: (cardId: string, logicalFilePath: string) => void | Promise<void>;
   availableArtifacts?: ContextArtifact[];
   availableFilePaths?: string[];
-  onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
+  onResumeBlockedCard?: (cardId: string) => void;
+  /** When provided, shows a Review button that opens the files pane with this card's feature branch */
+  onShowCardFiles?: (cardId: string) => void;
   buildingCardId?: string | null;
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
   cardFinalizeProgress?: string;
+  /** When false, Finalize button is hidden (project must be finalized first) */
+  projectFinalized?: boolean;
   onSelectDoc?: (doc: ContextArtifact) => void;
-  onSelectFile?: (file: CodeFileForPanel) => void;
-  codeFiles?: CodeFileForPanel[];
   /** Canonical knowledge (optional; when loaded) */
   requirements?: CardRequirement[];
   contextArtifacts?: ContextArtifact[];
@@ -62,6 +64,8 @@ interface ImplementationCardProps {
   quickAnswer?: string | null;
   /** Show skeleton when expanded and knowledge/planned files are loading */
   knowledgeLoading?: boolean;
+  /** Callback when user confirms delete (no args; parent has card context) */
+  onDeleteCard?: () => void;
 }
 
 const CARD_STATUS = ['todo', 'active', 'questions', 'review', 'production'] as const;
@@ -83,33 +87,6 @@ const statusLabels: Record<CardStatusType, string> = {
   production: 'live',
 };
 
-const knowledgeBadgeClass: Record<string, string> = {
-  draft: 'bg-amber-100 text-amber-800',
-  approved: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-800',
-};
-
-const plannedFileStatusClass: Record<string, string> = {
-  proposed: 'bg-slate-100 text-slate-700',
-  user_edited: 'bg-blue-100 text-blue-700',
-  approved: 'bg-green-100 text-green-800',
-};
-
-function KnowledgeBadge({ status }: { status: string }) {
-  return (
-    <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded ${knowledgeBadgeClass[status] ?? 'bg-muted text-muted-foreground'}`}>
-      {status}
-    </span>
-  );
-}
-
-function PlannedFileStatusBadge({ status }: { status: string }) {
-  return (
-    <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded ${plannedFileStatusClass[status] ?? 'bg-muted'}`}>
-      {status}
-    </span>
-  );
-}
 
 export function ImplementationCard({
   card,
@@ -124,15 +101,15 @@ export function ImplementationCard({
   onAddPlannedFile,
   availableArtifacts = [],
   availableFilePaths = [],
-  onApprovePlannedFile,
   onBuildCard,
+  onResumeBlockedCard,
+  onShowCardFiles,
   buildingCardId,
   onFinalizeCard,
   finalizingCardId,
   cardFinalizeProgress,
+  projectFinalized = true,
   onSelectDoc,
-  onSelectFile,
-  codeFiles = [],
   requirements = [],
   contextArtifacts = [],
   plannedFiles = [],
@@ -141,6 +118,7 @@ export function ImplementationCard({
   questions = [],
   quickAnswer: quickAnswerProp,
   knowledgeLoading = false,
+  onDeleteCard,
 }: ImplementationCardProps) {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState(card.description || '');
@@ -160,6 +138,145 @@ export function ImplementationCard({
 
   const getActionButtonText = () =>
     ACTION_BUTTONS.CARD_ACTION[status as keyof typeof ACTION_BUTTONS.CARD_ACTION] ?? ACTION_BUTTONS.CARD_ACTION.todo;
+
+  /** Unified action button: single button with priority-ordered label and behavior. */
+  const getUnifiedActionState = () => {
+    const buildState = card.build_state ?? null;
+    const isBuilding = buildingCardId === card.id;
+    const isQueuedOrRunning = buildState === 'queued' || buildState === 'running';
+    const isBlocked = buildState === 'blocked';
+    const isCompleted = buildState === 'completed';
+    const isFinalized = !!card.finalized_at;
+    const canResume = isBlocked && !!onResumeBlockedCard;
+
+    if (isBuilding || isQueuedOrRunning) {
+      return {
+        label: (buildState === 'running' || isBuilding) ? ACTION_BUTTONS.UNIFIED.BUILDING : ACTION_BUTTONS.UNIFIED.QUEUED,
+        disabled: true,
+        action: null as string | null,
+        buttonClass: 'bg-amber-500 cursor-not-allowed animate-pulse',
+      };
+    }
+    if (isBlocked && canResume) {
+      return {
+        label: ACTION_BUTTONS.UNIFIED.RESUME_BUILD,
+        disabled: false,
+        action: 'resume',
+        buttonClass: 'bg-amber-600 hover:bg-amber-700',
+      };
+    }
+    if (isBlocked && !canResume) {
+      return {
+        label: ACTION_BUTTONS.CARD_ACTION.todo,
+        disabled: false,
+        action: 'build',
+        buttonClass: config.button,
+      };
+    }
+    if (isCompleted) {
+      return {
+        label: ACTION_BUTTONS.UNIFIED.MERGE_FEATURE,
+        disabled: false,
+        action: 'merge',
+        buttonClass: 'bg-emerald-600 hover:bg-emerald-700',
+      };
+    }
+    if (!isFinalized && onFinalizeCard && projectFinalized) {
+      return {
+        label: finalizingCardId === card.id ? ACTION_BUTTONS.FINALIZING_CARD : ACTION_BUTTONS.FINALIZE_CARD,
+        disabled: finalizingCardId === card.id,
+        action: 'finalize',
+        buttonClass: finalizingCardId === card.id
+          ? 'bg-indigo-400 cursor-not-allowed animate-pulse'
+          : 'bg-indigo-600 hover:bg-indigo-700',
+      };
+    }
+    if (status === 'questions') {
+      return {
+        label: ACTION_BUTTONS.CARD_ACTION.questions,
+        disabled: false,
+        action: 'reply',
+        buttonClass: config.button,
+      };
+    }
+    if (status === 'review') {
+      return {
+        label: ACTION_BUTTONS.CARD_ACTION.review,
+        disabled: false,
+        action: 'test',
+        buttonClass: config.button,
+      };
+    }
+    if (status === 'active') {
+      return {
+        label: ACTION_BUTTONS.CARD_ACTION.active,
+        disabled: false,
+        action: 'monitor',
+        buttonClass: config.button,
+      };
+    }
+    if ((status === 'todo' || status === 'production') && isFinalized && onBuildCard) {
+      return {
+        label: ACTION_BUTTONS.CARD_ACTION.todo,
+        disabled: false,
+        action: 'build',
+        buttonClass: config.button,
+      };
+    }
+    if ((status === 'todo' || status === 'production') && !isFinalized && onFinalizeCard && projectFinalized) {
+      return {
+        label: finalizingCardId === card.id ? ACTION_BUTTONS.FINALIZING_CARD : ACTION_BUTTONS.FINALIZE_CARD,
+        disabled: finalizingCardId === card.id,
+        action: 'finalize',
+        buttonClass: finalizingCardId === card.id
+          ? 'bg-indigo-400 cursor-not-allowed animate-pulse'
+          : 'bg-indigo-600 hover:bg-indigo-700',
+      };
+    }
+    return {
+      label: getActionButtonText(),
+      disabled: false,
+      action: 'build',
+      buttonClass: config.button,
+    };
+  };
+
+  const unifiedState = getUnifiedActionState();
+
+  const handleUnifiedAction = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (unifiedState.disabled) return;
+    switch (unifiedState.action) {
+      case 'resume':
+        onResumeBlockedCard?.(card.id);
+        break;
+      case 'build':
+        if (onBuildCard) {
+          onBuildCard(card.id);
+        } else {
+          onAction(card.id, 'build');
+        }
+        break;
+      case 'merge':
+        onAction(card.id, 'merge');
+        break;
+      case 'finalize':
+        onFinalizeCard?.(card.id);
+        break;
+      case 'reply':
+        onAction(card.id, 'reply');
+        break;
+      case 'test':
+        onAction(card.id, 'test');
+        break;
+      case 'monitor':
+        onAction(card.id, 'monitor');
+        break;
+      default:
+        onAction(card.id, unifiedState.action ?? 'build');
+    }
+  };
 
   const handleSaveDescription = () => {
     onUpdateDescription(card.id, editedDescription);
@@ -225,10 +342,25 @@ export function ImplementationCard({
     <div className={`border-2 rounded transition-all group ${config.bg} ${config.border}`}>
       <div className="p-3 space-y-2">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
-            <h4 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text}`}>
-              {card.title}
-            </h4>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h4 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} truncate`}>
+                {card.title}
+              </h4>
+              {onDeleteCard && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteCard();
+                  }}
+                  className="shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-opacity"
+                  aria-label={`Delete card ${card.title}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
             {isEditingDescription ? (
               <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
                 <textarea
@@ -286,6 +418,17 @@ export function ImplementationCard({
           ))}
           {sortedArtifacts.length > 2 && <span className="text-[10px] text-gray-500">+{sortedArtifacts.length - 2}</span>}
         </div>
+
+        {card.build_state === 'failed' && card.last_build_error && (
+          <div className="mt-2 rounded border border-red-200 bg-red-50 p-2">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-red-800 mb-1">
+              Failure reason
+            </p>
+            <p className="text-xs text-red-900/90 leading-relaxed break-words">
+              {card.last_build_error}
+            </p>
+          </div>
+        )}
 
         {card.build_state === 'blocked' && (
           <div className="mt-2 rounded border border-amber-300 bg-amber-50 p-2">
@@ -352,55 +495,39 @@ export function ImplementationCard({
               <ChevronDown className="h-4 w-4" /> {ACTION_BUTTONS.VIEW_DETAILS_EDIT}
             </button>
           )}
-          {onFinalizeCard && !card.finalized_at && (
-            <div className="space-y-1">
-              <button
-                type="button"
-                disabled={finalizingCardId === card.id}
-                onClick={(e) => { e.stopPropagation(); onFinalizeCard(card.id); }}
-                className={`w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold rounded transition-colors ${
-                  finalizingCardId === card.id
-                    ? 'bg-indigo-400 text-white cursor-not-allowed animate-pulse'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                }`}
-              >
-                {finalizingCardId === card.id ? 'Finalizing…' : ACTION_BUTTONS.FINALIZE_CARD}
-              </button>
-              {finalizingCardId === card.id && cardFinalizeProgress && (
-                <p className="text-[10px] font-mono text-indigo-500 truncate px-1">
-                  {cardFinalizeProgress}
-                </p>
-              )}
-            </div>
+          {finalizingCardId === card.id && cardFinalizeProgress && (
+            <p className="text-[10px] font-mono text-indigo-500 truncate px-1">
+              {cardFinalizeProgress}
+            </p>
           )}
-          {card.finalized_at && (
+          {card.finalized_at && unifiedState.action !== 'finalize' && (
             <div className="flex items-center gap-2 px-2 py-1.5 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 font-mono">
               <Check className="h-3 w-3" />
               Finalized
             </div>
           )}
-          <button
-            type="button"
-            disabled={buildingCardId === card.id || card.build_state === 'blocked'}
-            onClick={(e) => {
-              e.stopPropagation();
-              const action = status === 'active' ? 'monitor' : status === 'review' ? 'test' : 'build';
-              if (action === 'build' && onBuildCard && card.finalized_at) {
-                onBuildCard(card.id);
-              } else {
-                onAction(card.id, action);
-              }
-            }}
-            className={`w-full px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold text-white rounded transition-colors ${
-              buildingCardId === card.id
-                ? 'bg-amber-500 cursor-not-allowed animate-pulse'
-                : card.build_state === 'blocked'
-                  ? 'bg-amber-400 cursor-not-allowed opacity-60'
-                  : config.button
-            }`}
-          >
-            {buildingCardId === card.id ? 'Building…' : card.build_state === 'blocked' ? 'Blocked' : getActionButtonText()}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={unifiedState.disabled}
+              onClick={handleUnifiedAction}
+              className={`flex-1 px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-bold text-white rounded transition-colors ${unifiedState.buttonClass}`}
+            >
+              {unifiedState.label}
+            </button>
+            {onShowCardFiles && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShowCardFiles(card.id);
+                }}
+                className="px-2 py-1.5 text-xs font-mono uppercase tracking-widest font-medium text-muted-foreground hover:text-foreground border border-border rounded hover:bg-accent/50 transition-colors"
+              >
+                {ACTION_BUTTONS.REVIEW_FILES}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -438,7 +565,6 @@ export function ImplementationCard({
                       ) : (
                         <>
                           <span className="flex-1">• {req.text}</span>
-                          <KnowledgeBadge status={req.status} />
                           {onUpdateRequirement && (
                             <button type="button" onClick={(e) => { e.stopPropagation(); handleStartEditRequirement(req); }} className="opacity-0 group-hover/req:opacity-100 hover:opacity-100 p-1 hover:bg-black/5 rounded transition-opacity shrink-0" title="Edit">
                               <Edit2 className="h-3 w-3 text-gray-400" />
@@ -559,29 +685,9 @@ export function ImplementationCard({
               {plannedFiles.length > 0 ? (
                 <div className="space-y-1">
                   {plannedFiles.map((pf) => (
-                    <div key={pf.id} className="flex items-center justify-between gap-2 text-xs px-2 py-1 bg-white border border-gray-300 rounded">
+                    <div key={pf.id} className="flex items-center gap-2 text-xs px-2 py-1 bg-white border border-gray-300 rounded">
                       <span className="text-gray-700 truncate flex-1 min-w-0">{pf.logical_file_name}</span>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <PlannedFileStatusBadge status={pf.status} />
-                        {onApprovePlannedFile && pf.status !== 'approved' && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); onApprovePlannedFile(card.id, pf.id, 'approved'); }}
-                            className="px-1.5 py-0.5 text-[10px] font-mono bg-green-600 text-white rounded hover:bg-green-700"
-                          >
-                            Approve
-                          </button>
-                        )}
-                        {onApprovePlannedFile && pf.status === 'approved' && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); onApprovePlannedFile(card.id, pf.id, 'proposed'); }}
-                            className="px-1.5 py-0.5 text-[10px] font-mono bg-gray-400 text-white rounded hover:bg-gray-500"
-                          >
-                            Revert
-                          </button>
-                        )}
-                      </div>
+                      <span className="text-[10px] font-mono text-muted-foreground shrink-0">{pf.artifact_kind}</span>
                     </div>
                   ))}
                 </div>
@@ -621,93 +727,12 @@ export function ImplementationCard({
               )}
             </div>
 
-            {(card.build_state != null || card.last_built_at != null) && (
-            <>
-            <div>
-              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Known Facts</h5>
-              {facts.length > 0 ? (
-                <ul className="space-y-1">
-                  {facts.map((fact) => (
-                    <li key={fact.id} className="text-xs text-gray-600 flex items-center gap-2 flex-wrap">
-                      • {fact.text}
-                      {fact.evidence_source && <span className="text-[10px]">({fact.evidence_source})</span>}
-                      <KnowledgeBadge status={fact.status} />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">None — populated by execution agent</p>
-              )}
-            </div>
-
-            <div>
-              <h5 className={`text-xs font-mono font-bold uppercase tracking-widest ${config.text} mb-2`}>Assumptions</h5>
-              {assumptions.length > 0 ? (
-                <ul className="space-y-1">
-                  {assumptions.map((a) => (
-                    <li key={a.id} className="text-xs text-gray-600 flex items-center gap-2 flex-wrap">
-                      • {a.text}
-                      <KnowledgeBadge status={a.status} />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">None — populated by execution agent</p>
-              )}
-            </div>
-
-            <div className={card.build_state === 'blocked' ? 'rounded border-2 border-amber-400 bg-amber-50/50 p-2 -m-0.5' : ''}>
-              <h5 className="text-xs font-mono font-bold uppercase tracking-widest text-gray-700 mb-2">Questions</h5>
-              {questions.length > 0 ? (
-                <ul className="space-y-1 mb-3">
-                  {questions.map((q) => (
-                    <li key={q.id} className="text-xs text-gray-600 flex items-center gap-2 flex-wrap">
-                      • {q.text}
-                      <KnowledgeBadge status={q.status} />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-muted-foreground italic mb-3">None — populated by execution agent</p>
-              )}
-              <div className="border-t border-yellow-200 pt-2">
-                {isEditingQuickAnswer ? (
-                  <div className="space-y-2">
-                    <textarea
-                      value={editedQuickAnswer}
-                      onChange={(e) => setEditedQuickAnswer(e.target.value)}
-                      className="w-full text-xs p-2 bg-white border border-gray-300 rounded text-gray-900"
-                      placeholder="Provide an answer or clarification..."
-                      rows={2}
-                    />
-                    <div className="flex gap-2">
-                      <button type="button" onClick={handleSaveQuickAnswer} className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-green-600 text-white rounded hover:bg-green-700">
-                        <Check className="h-3 w-3" /> Save
-                      </button>
-                      <button type="button" onClick={handleCancelQuickAnswer} className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
-                        <X className="h-3 w-3" /> Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="group/answer flex items-start gap-2">
-                    <p className="text-xs text-gray-600 flex-1 leading-relaxed">{quickAnswer || 'Awaiting response...'}</p>
-                    <button type="button" onClick={() => setIsEditingQuickAnswer(true)} className="opacity-0 group-hover/answer:opacity-100 transition-opacity p-1 hover:bg-black/5 rounded">
-                      <Edit2 className="h-3 w-3 text-gray-400" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            </>
-            )}
             </>
             )}
 
             <button
               type="button"
-              onClick={() => onExpand(card.id)}
+              onClick={() => onExpand(null)}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 mt-2 text-xs font-semibold bg-secondary text-foreground rounded hover:bg-secondary/80 transition-colors border border-border"
             >
               <ChevronDown className="h-4 w-4 rotate-180" /> Collapse

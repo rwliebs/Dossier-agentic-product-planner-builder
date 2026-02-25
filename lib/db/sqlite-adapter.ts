@@ -56,6 +56,7 @@ function stringifyRow(table: string, row: DbRow): DbRow {
 
 export function createSqliteAdapter(dbPath: string | ":memory:"): DbAdapter {
   const db = new Database(dbPath);
+  db.pragma("foreign_keys = ON");
   runMigrations(db);
 
   const adapter: DbAdapter = {
@@ -152,6 +153,9 @@ export function createSqliteAdapter(dbPath: string | ":memory:"): DbAdapter {
         (r.updated_at as string) ?? new Date().toISOString()
       );
     },
+    async deleteWorkflow(id: string, projectId: string) {
+      db.prepare("DELETE FROM workflow WHERE id = ? AND project_id = ?").run(id, projectId);
+    },
 
     // --- Workflow activities ---
     async getActivitiesByWorkflow(workflowId: string) {
@@ -198,6 +202,9 @@ export function createSqliteAdapter(dbPath: string | ":memory:"): DbAdapter {
         (row.updated_at as string) ?? new Date().toISOString()
       );
     },
+    async deleteWorkflowActivity(id: string, workflowId: string) {
+      db.prepare("DELETE FROM workflow_activity WHERE id = ? AND workflow_id = ?").run(id, workflowId);
+    },
 
     // --- Cards ---
     async getCardsByActivity(activityId: string) {
@@ -237,7 +244,7 @@ export function createSqliteAdapter(dbPath: string | ":memory:"): DbAdapter {
       );
     },
     async updateCard(cardId: string, updates: DbRow) {
-      const allowed = ["title", "description", "status", "priority", "position", "quick_answer", "finalized_at", "build_state", "last_built_at", "last_build_ref"];
+      const allowed = ["title", "description", "status", "priority", "position", "quick_answer", "finalized_at", "build_state", "last_built_at", "last_build_ref", "last_build_error"];
       const set: string[] = ["updated_at = datetime('now')"];
       const vals: unknown[] = [];
       for (const [k, v] of Object.entries(updates)) {
@@ -265,6 +272,9 @@ export function createSqliteAdapter(dbPath: string | ":memory:"): DbAdapter {
         (row.created_at as string) ?? new Date().toISOString(),
         (row.updated_at as string) ?? new Date().toISOString()
       );
+    },
+    async deleteCard(id: string) {
+      db.prepare("DELETE FROM card WHERE id = ?").run(id);
     },
 
     // --- Planning actions ---

@@ -25,6 +25,15 @@ export const ACTION_BUTTONS = {
     functionality: "Functionality",
     architecture: "Architecture",
   } as const,
+  /** Review button: opens files pane with this card's feature branch */
+  REVIEW_FILES: "Review",
+  /** Unified action button labels by build/flow state */
+  UNIFIED: {
+    BUILDING: "Building…",
+    QUEUED: "Queued…",
+    RESUME_BUILD: "Resume build",
+    MERGE_FEATURE: "Merge feature",
+  } as const,
 } as const;
 
 export type CardStatusForAction = keyof typeof ACTION_BUTTONS.CARD_ACTION;

@@ -9,7 +9,6 @@ import {
 } from "@/lib/api/response-helpers";
 import {
   updatePlannedFileSchema,
-  approvePlannedFileSchema,
 } from "@/lib/validation/request-schema";
 
 type RouteParams = {
@@ -37,10 +36,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const existing = await getPlannedFile(db, cardId, fileId);
     if (!existing) return notFoundError("Planned file not found");
 
-    const parsed =
-      body.status === "approved"
-        ? approvePlannedFileSchema.safeParse(body)
-        : updatePlannedFileSchema.safeParse(body);
+    const parsed = updatePlannedFileSchema.safeParse(body);
 
     if (!parsed.success) {
       const details: Record<string, string[]> = {};

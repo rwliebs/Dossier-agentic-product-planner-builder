@@ -7,6 +7,7 @@ import {
   getCardsByProject,
 } from "@/lib/db/queries";
 import { json, notFoundError, internalError } from "@/lib/api/response-helpers";
+import { recoverStaleRuns } from "@/lib/orchestration/recover-stale-runs";
 
 type RouteParams = { params: Promise<{ projectId: string }> };
 
@@ -22,6 +23,7 @@ export interface MapCard {
   build_state: string | null;
   last_built_at: string | null;
   last_build_ref: string | null;
+  last_build_error?: string | null;
 }
 
 export interface MapActivity {
@@ -54,6 +56,7 @@ export interface MapSnapshot {
     design_inspiration: string | null;
     repo_url: string | null;
     default_branch: string;
+    finalized_at: string | null;
   };
   workflows: MapWorkflow[];
 }
@@ -63,6 +66,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { projectId } = await params;
     const db = getDb();
+
+    // Optionally recover runs stuck in "running" (DOSSIER_STALE_RUN_MINUTES > 0)
+    await recoverStaleRuns(db, projectId);
 
     const project = await getProject(db, projectId);
     if (!project) {
@@ -129,6 +135,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
         design_inspiration: (project.design_inspiration as string) ?? null,
         repo_url: (project.repo_url as string) ?? null,
         default_branch: (project.default_branch as string) ?? "main",
+        finalized_at: (project.finalized_at as string) ?? null,
       },
       workflows: workflowsWithTree.sort((a, b) => a.position - b.position),
     };
@@ -153,5 +160,6 @@ function normalizeCard(row: Record<string, unknown>): MapCard {
     build_state: (row.build_state as string) ?? null,
     last_built_at: (row.last_built_at as string) ?? null,
     last_build_ref: (row.last_build_ref as string) ?? null,
+    last_build_error: (row.last_build_error as string) ?? null,
   };
 }

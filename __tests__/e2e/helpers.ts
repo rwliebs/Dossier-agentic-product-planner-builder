@@ -1,8 +1,8 @@
 /**
  * Shared E2E test utilities.
  *
- * Centralises SSE consumption, environment checks, and constants
- * so individual E2E test files stay focused on scenario logic.
+ * Centralises SSE consumption, environment checks, seeding helpers,
+ * and constants so individual E2E test files stay focused on scenario logic.
  */
 
 export const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
@@ -15,6 +15,17 @@ export function canRunLLMTests(): boolean {
     process.env.ANTHROPIC_API_KEY &&
     process.env.NEXT_PUBLIC_PLANNING_LLM_ENABLED !== "false"
   );
+}
+
+export async function canReachServer(): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/setup/status`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function consumeSSE(
@@ -98,6 +109,13 @@ export interface PlannedFile {
   status: string;
 }
 
+export interface KnowledgeItem {
+  id: string;
+  text: string;
+  status?: string;
+  source?: string;
+}
+
 export async function fetchMapSnapshot(
   projectId: string
 ): Promise<MapSnapshot | null> {
@@ -132,4 +150,194 @@ export function getAllCards(map: MapSnapshot): MapCard[] {
 
 export function cardCount(wf: MapWorkflow): number {
   return wf.activities.reduce((sum, act) => sum + act.cards.length, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Seeding helpers — create project + map structure via API without LLM
+// ---------------------------------------------------------------------------
+
+export async function createProject(
+  name?: string
+): Promise<{ id: string; name: string }> {
+  const res = await fetch(`${BASE_URL}/api/projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: name ?? `E2E Test ${Date.now()}`,
+      description: null,
+    }),
+  });
+  if (!res.ok) throw new Error(`createProject failed: ${res.status}`);
+  return res.json();
+}
+
+function uuid(): string {
+  return crypto.randomUUID();
+}
+
+/**
+ * Seed a project with a complete map structure (workflow → activity → card)
+ * using the actions API. Returns all created IDs.
+ */
+export async function seedProjectWithMap(projectId: string): Promise<{
+  workflowId: string;
+  activityId: string;
+  cardId: string;
+}> {
+  const workflowId = uuid();
+  const activityId = uuid();
+  const cardId = uuid();
+
+  const res = await fetch(`${BASE_URL}/api/projects/${projectId}/actions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      actions: [
+        {
+          id: uuid(),
+          project_id: projectId,
+          action_type: "createWorkflow",
+          target_ref: { project_id: projectId },
+          payload: { id: workflowId, title: "Core Features", position: 0 },
+        },
+        {
+          id: uuid(),
+          project_id: projectId,
+          action_type: "createActivity",
+          target_ref: { workflow_id: workflowId },
+          payload: { id: activityId, title: "User Management", color: "blue", position: 0 },
+        },
+        {
+          id: uuid(),
+          project_id: projectId,
+          action_type: "createCard",
+          target_ref: { workflow_activity_id: activityId },
+          payload: {
+            id: cardId,
+            title: "Sign Up Form",
+            description: "User registration with email and password",
+            status: "todo",
+            priority: 1,
+            position: 0,
+          },
+        },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(`seedProjectWithMap failed: ${res.status} ${JSON.stringify(body)}`);
+  }
+  return { workflowId, activityId, cardId };
+}
+
+/**
+ * Seed a second workflow + activity + card in an existing project.
+ */
+export async function seedSecondWorkflow(projectId: string): Promise<{
+  workflowId: string;
+  activityId: string;
+  cardId: string;
+}> {
+  const workflowId = uuid();
+  const activityId = uuid();
+  const cardId = uuid();
+
+  const res = await fetch(`${BASE_URL}/api/projects/${projectId}/actions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      actions: [
+        {
+          id: uuid(),
+          project_id: projectId,
+          action_type: "createWorkflow",
+          target_ref: { project_id: projectId },
+          payload: { id: workflowId, title: "Settings & Admin", position: 1 },
+        },
+        {
+          id: uuid(),
+          project_id: projectId,
+          action_type: "createActivity",
+          target_ref: { workflow_id: workflowId },
+          payload: { id: activityId, title: "Profile Settings", color: "green", position: 0 },
+        },
+        {
+          id: uuid(),
+          project_id: projectId,
+          action_type: "createCard",
+          target_ref: { workflow_activity_id: activityId },
+          payload: {
+            id: cardId,
+            title: "Edit Profile",
+            description: "Allow users to update their profile information",
+            status: "todo",
+            priority: 1,
+            position: 0,
+          },
+        },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(`seedSecondWorkflow failed: ${res.status} ${JSON.stringify(body)}`);
+  }
+  return { workflowId, activityId, cardId };
+}
+
+/**
+ * Create a requirement on a card via the API.
+ */
+export async function createRequirement(
+  projectId: string,
+  cardId: string,
+  text: string
+): Promise<KnowledgeItem> {
+  const res = await fetch(
+    `${BASE_URL}/api/projects/${projectId}/cards/${cardId}/requirements`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, source: "user" }),
+    }
+  );
+  if (!res.ok) throw new Error(`createRequirement failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Create a planned file on a card and optionally approve it.
+ */
+export async function createAndApprovePlannedFile(
+  projectId: string,
+  cardId: string,
+  fileName: string
+): Promise<{ id: string }> {
+  const createRes = await fetch(
+    `${BASE_URL}/api/projects/${projectId}/cards/${cardId}/planned-files`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        logical_file_name: fileName,
+        artifact_kind: "component",
+        action: "create",
+        intent_summary: `Implement ${fileName}`,
+      }),
+    }
+  );
+  if (!createRes.ok) throw new Error(`createPlannedFile failed: ${createRes.status}`);
+  const file = await createRes.json();
+
+  const patchRes = await fetch(
+    `${BASE_URL}/api/projects/${projectId}/cards/${cardId}/planned-files/${file.id}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "approved" }),
+    }
+  );
+  if (!patchRes.ok) throw new Error(`approvePlannedFile failed: ${patchRes.status}`);
+  return file;
 }

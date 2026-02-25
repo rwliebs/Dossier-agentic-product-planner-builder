@@ -55,9 +55,7 @@ export function buildPreviewFromActions(
       case "updateCard":
       case "linkContextArtifact":
       case "upsertCardPlannedFile":
-      case "approveCardPlannedFile":
       case "upsertCardKnowledgeItem":
-      case "setCardKnowledgeStatus":
         for (const id of preview.updated_ids) {
           if (!modified.cards.includes(id)) modified.cards.push(id);
         }

@@ -11,11 +11,33 @@ export type StreamParseResult =
 /**
  * Normalize a raw object into a PlanningAction.
  */
-function normalizeAction(obj: Record<string, unknown>): PlanningAction {
+/**
+ * Remap any target_ref values that reference IDs the normalizer replaced.
+ * E.g. Haiku generates a fake card UUID, normalizer replaces it in createCard,
+ * then upsertCardKnowledgeItem still references the fake UUID — this fixes that.
+ */
+function remapTargetRef(
+  targetRef: Record<string, unknown>,
+  idRemap: Map<string, string>,
+): Record<string, unknown> {
+  if (idRemap.size === 0) return targetRef;
+  const remapped = { ...targetRef };
+  for (const [key, value] of Object.entries(remapped)) {
+    if (typeof value === "string" && idRemap.has(value)) {
+      remapped[key] = idRemap.get(value)!;
+    }
+  }
+  return remapped;
+}
+
+function normalizeAction(
+  obj: Record<string, unknown>,
+  idRemap: Map<string, string>,
+): PlanningAction {
   const rawId = typeof obj.id === "string" ? obj.id : undefined;
   const id = rawId && uuidValidate(rawId) ? rawId : uuidv4();
   let targetRef = (obj.target_ref ?? obj.targetRef ?? {}) as Record<string, unknown>;
-  const rawActionType = (obj.action_type ?? obj.action) as string;
+  const rawActionType = (obj.action_type ?? obj.action ?? obj.type) as string;
   const action_type = planningActionTypeSchema.safeParse(rawActionType).success
     ? (rawActionType as PlanningAction["action_type"])
     : "updateCard";
@@ -35,6 +57,9 @@ function normalizeAction(obj: Record<string, unknown>): PlanningAction {
     }
   }
 
+  // Remap target_ref values that reference replaced IDs
+  targetRef = remapTargetRef(targetRef, idRemap);
+
   const project_id =
     typeof obj.project_id === "string"
       ? obj.project_id
@@ -43,14 +68,18 @@ function normalizeAction(obj: Record<string, unknown>): PlanningAction {
         : "";
   const payload = (obj.payload ?? {}) as Record<string, unknown>;
 
-  // Ensure create* entity IDs are UUIDs so DB and downstream actions (e.g. upsertCardKnowledgeItem) use the same id
+  // Ensure create* entity IDs are UUIDs; track replacements for downstream references
   if (
     action_type === "createWorkflow" ||
     action_type === "createActivity" ||
     action_type === "createCard"
   ) {
     const rawPayloadId = typeof payload.id === "string" ? payload.id : undefined;
-    payload.id = rawPayloadId && uuidValidate(rawPayloadId) ? rawPayloadId : uuidv4();
+    const newId = rawPayloadId && uuidValidate(rawPayloadId) ? rawPayloadId : uuidv4();
+    if (rawPayloadId && rawPayloadId !== newId) {
+      idRemap.set(rawPayloadId, newId);
+    }
+    payload.id = newId;
   }
 
   return {
@@ -118,6 +147,7 @@ function extractJsonText(text: string): string {
  */
 function tryParseObject(
   text: string,
+  idRemap: Map<string, string>,
 ): { actions: PlanningAction[]; message?: string; responseType?: string } | null {
   const extracted = extractJsonText(text);
   if (!extracted) return null;
@@ -141,15 +171,12 @@ function tryParseObject(
     for (const item of obj.actions) {
       if (item && typeof item === "object") {
         try {
-          const normalized = normalizeAction(item as Record<string, unknown>);
+          const normalized = normalizeAction(item as Record<string, unknown>, idRemap);
           planningActionSchema.parse(normalized);
           actions.push(normalized);
         } catch (err) {
-          if (process.env.PLANNING_DEBUG === "1") {
-            const msg = err instanceof Error ? err.message : String(err);
-            console.warn("[stream-action-parser] Skipped invalid action:", msg, JSON.stringify(item).slice(0, 200));
-          }
-          // Skip invalid action
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn("[stream-action-parser] Skipped invalid action:", msg, JSON.stringify(item).slice(0, 200));
         }
       }
     }
@@ -159,9 +186,9 @@ function tryParseObject(
   }
 
   // Single action format (NDJSON): { "action_type": "createWorkflow", ... }
-  if ("action_type" in obj) {
+  if ("action_type" in obj || "type" in obj) {
     try {
-      const normalized = normalizeAction(obj);
+      const normalized = normalizeAction(obj, idRemap);
       planningActionSchema.parse(normalized);
       return { actions: [normalized] };
     } catch {
@@ -188,6 +215,7 @@ export async function* parseActionsFromStream(
   let buffer = "";
   let fullText = "";
   let emittedAny = false;
+  const idRemap = new Map<string, string>();
 
   try {
     while (true) {
@@ -203,7 +231,7 @@ export async function* parseActionsFromStream(
       buffer = lines.pop() ?? ""; // Keep incomplete line in buffer
 
       for (const line of lines) {
-        const result = tryParseObject(line);
+        const result = tryParseObject(line, idRemap);
         if (result) {
           emittedAny = true;
           if (result.responseType) {
@@ -221,7 +249,7 @@ export async function* parseActionsFromStream(
 
     // Try remaining buffer (single line), then full text (pretty-printed or markdown-wrapped)
     if (!emittedAny && buffer.trim()) {
-      const result = tryParseObject(buffer);
+      const result = tryParseObject(buffer, idRemap);
       if (result && result.actions.length > 0) {
         emittedAny = true;
         if (result.responseType) {
@@ -236,7 +264,7 @@ export async function* parseActionsFromStream(
       }
     }
     if (!emittedAny && fullText.trim()) {
-      const result = tryParseObject(fullText);
+      const result = tryParseObject(fullText, idRemap);
       if (result && (result.actions.length > 0 || result.responseType)) {
         emittedAny = true;
         if (result.responseType) {

@@ -1,13 +1,12 @@
 'use client';
 
 import { useMemo, useState, useRef, useCallback } from 'react';
-import { Pencil, Sparkles } from 'lucide-react';
+import { Pencil, Sparkles, ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ACTION_BUTTONS } from '@/lib/constants/action-buttons';
 import { StoryMapCanvas, type StoryMapCanvasProps } from './story-map-canvas';
 import { ArchitectureView } from './architecture-view';
-import type { MapSnapshot, MapCard, ContextArtifact, CardKnowledgeForDisplay, CodeFile } from '@/lib/types/ui';
-import type { CodeFileForPanel } from './implementation-card';
+import type { MapSnapshot, MapCard, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
 
 const EPIC_COLORS = ['yellow', 'blue', 'purple', 'green', 'orange', 'pink'] as const;
 
@@ -64,19 +63,25 @@ interface WorkflowBlockProps {
   onAddPlannedFile?: (cardId: string, logicalFilePath: string) => void | Promise<void>;
   availableArtifacts?: ContextArtifact[];
   availableFilePaths?: string[];
-  onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
+  onResumeBlockedCard?: (cardId: string) => void;
+  onShowCardFiles?: (cardId: string) => void;
   buildingCardId?: string | null;
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
   cardFinalizeProgress?: string;
   onSelectDoc?: (doc: ContextArtifact) => void;
-  onFileClick?: (file: CodeFileForPanel | CodeFile) => void;
   onUpdateFileDescription?: (fileId: string, description: string) => void;
   getCardKnowledge?: (cardId: string) => CardKnowledgeForDisplay | undefined;
   getCardKnowledgeLoading?: (cardId: string) => boolean;
   onPopulateWorkflow?: (workflowId: string, workflowTitle: string, workflowDescription: string | null) => void;
   populatingWorkflowId?: string | null;
+  onAddWorkflow?: (title: string) => void | Promise<void>;
+  onAddActivity?: (workflowId: string, title: string, position?: number) => void | Promise<void>;
+  onAddCard?: (activityId: string, title: string, position?: number, priority?: number) => void | Promise<void>;
+  onDeleteWorkflow?: (workflowId: string, workflowTitle: string, activityCount: number, cardCount: number) => void;
+  onDeleteActivity?: (activityId: string, activityTitle: string, cardCount: number) => void;
+  onDeleteCard?: (cardId: string, cardTitle: string) => void;
   onFinalizeProject?: () => void;
   finalizingProject?: boolean;
   finalizeProgress?: string;
@@ -104,19 +109,25 @@ export function WorkflowBlock({
   onAddPlannedFile,
   availableArtifacts = [],
   availableFilePaths = [],
-  onApprovePlannedFile,
   onBuildCard,
+  onResumeBlockedCard,
+  onShowCardFiles,
   buildingCardId,
   onFinalizeCard,
   finalizingCardId,
   cardFinalizeProgress,
   onSelectDoc,
-  onFileClick,
   onUpdateFileDescription,
   getCardKnowledge,
   getCardKnowledgeLoading,
   onPopulateWorkflow,
   populatingWorkflowId,
+  onAddWorkflow,
+  onAddActivity,
+  onAddCard,
+  onDeleteWorkflow,
+  onDeleteActivity,
+  onDeleteCard,
   onFinalizeProject,
   finalizingProject,
   finalizeProgress,
@@ -139,8 +150,29 @@ export function WorkflowBlock({
     tech_stack?: string | null;
     deployment?: string | null;
     design_inspiration?: string | null;
+    finalized_at?: string | null;
   };
   const [editingField, setEditingField] = useState<ProjectContextField | null>(null);
+  const [viewOnServerLoading, setViewOnServerLoading] = useState(false);
+  const handleViewOnServer = async () => {
+    setViewOnServerLoading(true);
+    try {
+      const res = await fetch('/api/dev/restart-and-open', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const { toast } = await import('sonner');
+        toast.error((data as { error?: string }).error ?? 'Failed to start server');
+        return;
+      }
+      const { toast } = await import('sonner');
+      toast.success('Starting second server and opening new tab…');
+    } catch (e) {
+      const { toast } = await import('sonner');
+      toast.error(e instanceof Error ? e.message : 'Failed to start server');
+    } finally {
+      setViewOnServerLoading(false);
+    }
+  };
   const [draftValue, setDraftValue] = useState('');
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
@@ -194,7 +226,7 @@ export function WorkflowBlock({
                 {statusCounts.review > 0 && <div className="text-blue-400"><span className="font-bold">{statusCounts.review}</span> review</div>}
                 {statusCounts.production > 0 && <div className="text-green-600"><span className="font-bold">{statusCounts.production}</span> live</div>}
                 {statusCounts.todo > 0 && <div className="text-muted-foreground"><span className="text-foreground font-bold">{statusCounts.todo}</span> pending</div>}
-                {onFinalizeProject && allCards.length > 0 && (
+                {onFinalizeProject && snapshot.workflows.length > 0 && !project.finalized_at && (
                   <div className="flex items-center gap-2 ml-2">
                     <Button
                       variant="outline"
@@ -213,6 +245,20 @@ export function WorkflowBlock({
                     )}
                   </div>
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-[11px] font-mono uppercase tracking-wider"
+                  onClick={handleViewOnServer}
+                  disabled={viewOnServerLoading}
+                >
+                  {viewOnServerLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <ExternalLink className="h-3 w-3" />
+                  )}
+                  View on server
+                </Button>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
@@ -273,10 +319,11 @@ export function WorkflowBlock({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="min-w-max overflow-x-auto">
         {viewMode === 'functionality' ? (
           <StoryMapCanvas
             workflows={snapshot.workflows}
+            projectFinalized={!!(snapshot.project as { finalized_at?: string | null }).finalized_at}
             expandedCardId={expandedCardId}
             onExpandCard={onExpandCard}
             onCardAction={onCardAction}
@@ -288,24 +335,29 @@ export function WorkflowBlock({
             onAddPlannedFile={onAddPlannedFile}
             availableArtifacts={availableArtifacts}
             availableFilePaths={availableFilePaths}
-            onApprovePlannedFile={onApprovePlannedFile}
             onBuildCard={onBuildCard}
+            onResumeBlockedCard={onResumeBlockedCard}
+            onShowCardFiles={onShowCardFiles}
             buildingCardId={buildingCardId}
             onFinalizeCard={onFinalizeCard}
             finalizingCardId={finalizingCardId}
             cardFinalizeProgress={cardFinalizeProgress}
             onSelectDoc={onSelectDoc}
-            onSelectFile={onFileClick}
             getCardKnowledge={getCardKnowledge}
             getCardKnowledgeLoading={getCardKnowledgeLoading}
             onPopulateWorkflow={onPopulateWorkflow}
             populatingWorkflowId={populatingWorkflowId}
+            onAddWorkflow={onAddWorkflow}
+            onAddActivity={onAddActivity}
+            onAddCard={onAddCard}
+            onDeleteWorkflow={onDeleteWorkflow}
+            onDeleteActivity={onDeleteActivity}
+            onDeleteCard={onDeleteCard}
           />
         ) : (
           <ArchitectureView
             snapshot={snapshot}
             onUpdateFileDescription={onUpdateFileDescription}
-            onFileClick={onFileClick}
           />
         )}
       </div>

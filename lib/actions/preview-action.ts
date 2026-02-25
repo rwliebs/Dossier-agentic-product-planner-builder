@@ -81,13 +81,6 @@ export function previewAction(
       delta.summary = `Planned file: ${action.payload.logical_file_name}`;
       break;
 
-    case "approveCardPlannedFile":
-      delta.updated_ids.push(
-        (action.target_ref as Record<string, unknown>).card_id as string,
-      );
-      delta.summary = `Approved planned file`;
-      break;
-
     case "upsertCardKnowledgeItem":
       delta.updated_ids.push(
         (action.target_ref as Record<string, unknown>).card_id as string,
@@ -95,12 +88,6 @@ export function previewAction(
       delta.summary = `${action.payload.item_type}: ${String((action.payload as { text?: string }).text ?? '').substring(0, 50)}...`;
       break;
 
-    case "setCardKnowledgeStatus":
-      delta.updated_ids.push(
-        (action.target_ref as Record<string, unknown>).card_id as string,
-      );
-      delta.summary = `Knowledge item status: ${action.payload.status}`;
-      break;
   }
 
   return delta;

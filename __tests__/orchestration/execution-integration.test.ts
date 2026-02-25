@@ -47,6 +47,22 @@ vi.mock("@/lib/db/queries", () => ({
   getArtifactById: vi.fn(),
 }));
 
+vi.mock("@/lib/feature-flags", () => ({ MEMORY_PLANE: true }));
+
+const mockRetrieveForCard = vi.fn().mockResolvedValue([] as string[]);
+vi.mock("@/lib/memory", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/lib/memory")>();
+  return {
+    ...mod,
+    getMemoryStore: vi.fn(() => ({
+      retrieveForCard: mockRetrieveForCard,
+      search: vi.fn().mockResolvedValue([]),
+      getContentByIds: vi.fn().mockResolvedValue([]),
+      logRetrieval: vi.fn().mockResolvedValue(undefined),
+    })),
+  };
+});
+
 describe("Event logger", () => {
   it("writes event to event_log", async () => {
     const mockInsertEventLog = vi.fn().mockResolvedValue({ id: "event-123" });
@@ -115,6 +131,60 @@ describe("Webhook processing", () => {
     expect(result.success).toBe(true);
   });
 
+  it("execution_completed with worktree_path runs auto-commit and inserts agent_commit", async () => {
+    const tempDir = await import("node:fs").then((fs) =>
+      import("node:path").then((path) =>
+        import("node:os").then((os) => {
+          const dir = path.join(os.tmpdir(), `dossier-auto-commit-${Date.now()}`);
+          fs.mkdirSync(dir, { recursive: true });
+          return dir;
+        })
+      )
+    );
+    const { execSync } = await import("node:child_process");
+    const pathMod = await import("node:path");
+    const fsMod = await import("node:fs");
+    execSync("git init", { cwd: tempDir, stdio: "pipe" });
+    execSync("git config user.email 'test@test.com'", { cwd: tempDir, stdio: "pipe" });
+    execSync("git config user.name 'Test'", { cwd: tempDir, stdio: "pipe" });
+    fsMod.writeFileSync(pathMod.join(tempDir, "README.md"), "# Test\n", "utf-8");
+    execSync("git add README.md", { cwd: tempDir, stdio: "pipe" });
+    execSync("git checkout -b feat/run-abc-def", { cwd: tempDir, stdio: "pipe" });
+    execSync("git commit -m 'Initial'", { cwd: tempDir, stdio: "pipe" });
+    fsMod.mkdirSync(pathMod.join(tempDir, "src"), { recursive: true });
+    fsMod.writeFileSync(pathMod.join(tempDir, "src", "index.ts"), "export {};", "utf-8");
+
+    vi.mocked(orchestrationQueries.getCardAssignment).mockResolvedValue({
+      ...mockAssignment,
+      worktree_path: tempDir,
+      feature_branch: "feat/run-abc-def",
+      allowed_paths: ["src", "app"],
+    } as never);
+    vi.mocked(queries.getCardById).mockResolvedValue({ id: cardId, title: "Add index" } as never);
+
+    const mockInsertAgentCommit = vi.fn().mockResolvedValue(undefined);
+    const mockDb = createMockDbAdapter({ insertAgentCommit: mockInsertAgentCommit });
+
+    const result = await processWebhook(mockDb, {
+      event_type: "execution_completed",
+      assignment_id: assignmentId,
+      summary: "Done",
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockInsertAgentCommit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assignment_id: assignmentId,
+        branch: "feat/run-abc-def",
+        message: "feat: Add index",
+      })
+    );
+    expect(mockInsertAgentCommit.mock.calls[0][0].sha).toBeDefined();
+    expect(mockInsertAgentCommit.mock.calls[0][0].sha.length).toBe(40);
+
+    fsMod.rmSync(tempDir, { recursive: true, force: true });
+  });
+
   it("execution_completed closes run when all assignments terminal (releases build lock)", async () => {
     const mockUpdateOrchestrationRun = vi.fn().mockResolvedValue(undefined);
     vi.mocked(orchestrationQueries.getCardAssignmentsByRun).mockResolvedValue([
@@ -139,6 +209,27 @@ describe("Webhook processing", () => {
         ended_at: expect.any(String),
       })
     );
+  });
+
+  it("execution_completed does NOT close run when any assignment is blocked (keeps run open for user input)", async () => {
+    const mockUpdateOrchestrationRun = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(orchestrationQueries.getCardAssignmentsByRun).mockResolvedValue([
+      { id: assignmentId, run_id: runId, status: "completed" },
+      { id: "other-assignment-id", run_id: runId, status: "blocked" },
+    ] as never);
+    const mockDb = createMockDbAdapter({
+      updateOrchestrationRun: mockUpdateOrchestrationRun,
+    });
+
+    const result = await processWebhook(mockDb, {
+      event_type: "execution_completed",
+      assignment_id: assignmentId,
+      run_id: runId,
+      summary: "Done",
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockUpdateOrchestrationRun).not.toHaveBeenCalled();
   });
 
   it("execution_failed updates run status", async () => {
@@ -247,7 +338,7 @@ describe("Dispatch assignment", () => {
     card_id: cardId,
     status: "queued",
     feature_branch: "feat/test",
-    worktree_path: null,
+    worktree_path: "/tmp/dossier/repos/test-project",
     allowed_paths: ["src/"],
     forbidden_paths: null,
     assignment_input_snapshot: {},
@@ -337,5 +428,38 @@ describe("Dispatch assignment", () => {
     expect(result.success).toBe(true);
     expect(result.executionId).toBeDefined();
     expect(result.agentExecutionId).toBe("agent-exec-123");
+  }, 30_000);
+
+  it("includes memory_context_refs in payload when memory store returns content", async () => {
+    mockRetrieveForCard.mockResolvedValueOnce(["Past context A", "Past context B"]);
+
+    let capturedPayload: { memory_context_refs?: string[] } | undefined;
+    const { createAgenticFlowClient } = await import("@/lib/orchestration/agentic-flow-client");
+    const originalImpl = vi.mocked(createAgenticFlowClient).getMockImplementation();
+    vi.mocked(createAgenticFlowClient).mockImplementation(() => ({
+      dispatch: vi.fn().mockImplementation((p: { memory_context_refs?: string[] }) => {
+        capturedPayload = p;
+        return Promise.resolve({ success: true, execution_id: `exec-${Date.now()}` });
+      }),
+      status: vi.fn().mockResolvedValue({ success: true, status: { status: "completed" } }),
+      cancel: vi.fn().mockResolvedValue({ success: true }),
+    }));
+
+    const mockDb = createMockDbAdapter({
+      insertAgentExecution: vi.fn().mockResolvedValue({ id: "agent-exec-mem" }),
+    });
+
+    try {
+      const result = await dispatchAssignment(mockDb, {
+        assignment_id: assignmentId,
+        actor: "user",
+      });
+
+      expect(result.success).toBe(true);
+      expect(capturedPayload).toBeDefined();
+      expect(capturedPayload?.memory_context_refs).toEqual(["Past context A", "Past context B"]);
+    } finally {
+      vi.mocked(createAgenticFlowClient).mockImplementation(originalImpl ?? (() => ({ dispatch: vi.fn(), status: vi.fn(), cancel: vi.fn() })));
+    }
   }, 30_000);
 });

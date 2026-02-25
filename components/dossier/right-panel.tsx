@@ -9,7 +9,6 @@ import {
   FileCode,
   Folder,
   FolderOpen,
-  Terminal,
   FileText,
   GitBranch,
   X,
@@ -20,7 +19,6 @@ import {
   Pencil,
 } from "lucide-react";
 import type { ContextArtifact } from "@/lib/types/ui";
-import type { CodeFileForPanel } from "./implementation-card";
 import {
   useProjectFiles,
   type FileNode,
@@ -32,9 +30,8 @@ interface RightPanelProps {
   isOpen: boolean;
   onClose: () => void;
   activeDoc: ContextArtifact | null;
-  activeFile: CodeFileForPanel | null;
-  activeTab: "files" | "terminal" | "docs" | "chat";
-  onTabChange: (tab: "files" | "terminal" | "docs" | "chat") => void;
+  activeTab: "files" | "docs" | "chat";
+  onTabChange: (tab: "files" | "docs" | "chat") => void;
   /** When set, files tab shows live project file tree from planned files */
   projectId?: string;
   /** Controlled width in pixels */
@@ -43,6 +40,12 @@ interface RightPanelProps {
   docsList?: ContextArtifact[];
   /** Called when user selects a doc from the list; pass null to clear selection */
   onSelectDoc?: (doc: ContextArtifact | null) => void;
+  /** When set, files tab shows this card's feature branch; null = main */
+  filesBranchCardId?: string | null;
+  /** Called when user switches branch context (null = main) */
+  onFilesBranchChange?: (cardId: string | null) => void;
+  /** Card title when filesBranchCardId is set (for display) */
+  filesBranchCardTitle?: string;
 }
 
 function StatusIndicator({ status }: { status?: FileNode["status"] }) {
@@ -125,15 +128,17 @@ export function RightPanel({
   isOpen,
   onClose,
   activeDoc,
-  activeFile,
   activeTab,
   onTabChange,
   projectId,
   width,
   docsList = [],
   onSelectDoc,
+  filesBranchCardId = null,
+  onFilesBranchChange,
+  filesBranchCardTitle,
 }: RightPanelProps) {
-  const [filesSource, setFilesSource] = useState<ProjectFilesSource>("planned");
+  const filesSource: ProjectFilesSource = "repo";
   const [selectedRepoFilePath, setSelectedRepoFilePath] = useState<string | null>(null);
   const [selectedRepoFileContent, setSelectedRepoFileContent] = useState<string | null>(null);
   const [repoFileLoading, setRepoFileLoading] = useState(false);
@@ -143,7 +148,7 @@ export function RightPanel({
     loading: filesLoading,
     error: filesError,
     fetchFileContent,
-  } = useProjectFiles(projectId, filesSource);
+  } = useProjectFiles(projectId, filesSource, filesBranchCardId ?? undefined);
 
   const fileTree = projectFiles && projectFiles.length > 0 ? projectFiles : [];
 
@@ -183,15 +188,6 @@ export function RightPanel({
             Files
           </Button>
           <Button
-            variant={activeTab === "terminal" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 px-2.5 text-[10px] uppercase tracking-wider"
-            onClick={() => onTabChange("terminal")}
-          >
-            <Terminal className="h-3 w-3 mr-1" />
-            Terminal
-          </Button>
-          <Button
             variant={activeTab === "docs" ? "secondary" : "ghost"}
             size="sm"
             className="h-7 px-2.5 text-[10px] uppercase tracking-wider"
@@ -211,9 +207,21 @@ export function RightPanel({
         {activeTab === "files" && (
           <div className="h-full flex flex-col overflow-hidden">
             <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                <GitBranch className="h-3 w-3" />
-                <span>{filesSource === "repo" ? "feature" : "main"}</span>
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground min-w-0">
+                <GitBranch className="h-3 w-3 flex-shrink-0" />
+                {filesBranchCardId ? (
+                  <span className="truncate flex items-center gap-1.5">
+                    <span>feature</span>
+                    {filesBranchCardTitle && (
+                      <>
+                        <span className="text-foreground/40">•</span>
+                        <span className="text-foreground truncate">{filesBranchCardTitle}</span>
+                      </>
+                    )}
+                  </span>
+                ) : (
+                  <span>main</span>
+                )}
                 {filesLoading && projectId && (
                   <>
                     <span className="text-foreground/40">•</span>
@@ -221,39 +229,15 @@ export function RightPanel({
                   </>
                 )}
               </div>
-              {projectId && (
-                <div className="flex rounded-md border border-border overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFilesSource("planned");
-                      setSelectedRepoFilePath(null);
-                      setSelectedRepoFileContent(null);
-                    }}
-                    className={`px-2 py-1 text-[10px] uppercase tracking-wider ${
-                      filesSource === "planned"
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground hover:bg-accent/50"
-                    }`}
-                  >
-                    Planned
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFilesSource("repo");
-                      setSelectedRepoFilePath(null);
-                      setSelectedRepoFileContent(null);
-                    }}
-                    className={`px-2 py-1 text-[10px] uppercase tracking-wider ${
-                      filesSource === "repo"
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground hover:bg-accent/50"
-                    }`}
-                  >
-                    Repository
-                  </button>
-                </div>
+              {filesBranchCardId && onFilesBranchChange && (
+                <button
+                  type="button"
+                  onClick={() => onFilesBranchChange(null)}
+                  className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground flex-shrink-0"
+                  aria-label="Switch to main branch"
+                >
+                  Show main
+                </button>
               )}
             </div>
             {filesError && (
@@ -302,28 +286,6 @@ export function RightPanel({
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {activeTab === "terminal" && (
-          <div className="h-full bg-[#0a0a0a] p-4 font-mono text-xs overflow-auto">
-            {activeFile && activeFile.code ? (
-              <>
-                <div className="text-green-400 mb-2">{`$ cat ${activeFile.path}`}</div>
-                <div className="space-y-1 text-gray-300 whitespace-pre-wrap break-words">
-                  {activeFile.code}
-                </div>
-                <div className="mt-4 text-green-400">$ _</div>
-              </>
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <div className="text-center text-muted-foreground">
-                  <Terminal className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-xs">Select a file to view code</p>
-                  <p className="text-[10px] mt-1 opacity-75">or run a build to see output</p>
-                </div>
-              </div>
-            )}
           </div>
         )}
 

@@ -28,58 +28,12 @@ export async function canReachServer(): Promise<boolean> {
   }
 }
 
+import { consumeSSEStream } from "@/lib/api/sse";
+
 export async function consumeSSE(
-  res: Response
+  res: Response,
 ): Promise<{ event: string; data: unknown }[]> {
-  const events: { event: string; data: unknown }[] = [];
-  const reader = res.body?.getReader();
-  if (!reader) return events;
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const blocks = buffer.split(/\n\n+/);
-    buffer = blocks.pop() ?? "";
-
-    for (const block of blocks) {
-      let eventType = "";
-      let dataStr = "";
-      for (const line of block.split("\n")) {
-        if (line.startsWith("event: ")) eventType = line.slice(7).trim();
-        if (line.startsWith("data: ")) dataStr = line.slice(6);
-      }
-      if (eventType && dataStr) {
-        try {
-          events.push({ event: eventType, data: JSON.parse(dataStr) });
-        } catch {
-          /* skip parse errors */
-        }
-      }
-    }
-  }
-
-  if (buffer.trim()) {
-    const lines = buffer.split("\n");
-    let eventType = "";
-    let dataStr = "";
-    for (const line of lines) {
-      if (line.startsWith("event: ")) eventType = line.slice(7).trim();
-      if (line.startsWith("data: ")) dataStr = line.slice(6);
-    }
-    if (eventType && dataStr) {
-      try {
-        events.push({ event: eventType, data: JSON.parse(dataStr) });
-      } catch {
-        /* skip */
-      }
-    }
-  }
-
-  return events;
+  return consumeSSEStream(res.body ?? null);
 }
 
 export interface MapCard {

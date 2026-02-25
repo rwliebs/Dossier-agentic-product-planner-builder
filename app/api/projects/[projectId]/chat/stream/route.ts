@@ -8,16 +8,14 @@ import {
 } from "@/lib/llm/planning-prompt";
 import { PLANNING_LLM } from "@/lib/feature-flags";
 import { chatStreamRequestSchema } from "@/lib/validation/request-schema";
+import { zodErrorDetails } from "@/lib/validation/zod-details";
+import { sseEvent } from "@/lib/api/sse";
 import { runLlmSubStep, type Emitter } from "@/lib/llm/run-llm-substep";
 import { runPopulateWorkflow } from "@/lib/llm/run-populate-workflow";
 import { runFinalizeMultiStep } from "@/lib/llm/run-finalize-multistep";
 import { getArtifactsByProject, getProject } from "@/lib/db/queries";
 import { parseRootFoldersFromArchitecturalSummary } from "@/lib/orchestration/parse-root-folders";
 import { ensureClone, createRootFoldersInRepo } from "@/lib/orchestration/repo-manager";
-
-function sseEvent(event: string, data: unknown): string {
-  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-}
 
 /**
  * POST /api/projects/[projectId]/chat/stream
@@ -59,14 +57,8 @@ export async function POST(
 
   const parsed = chatStreamRequestSchema.safeParse(rawBody);
   if (!parsed.success) {
-    const details: Record<string, string[]> = {};
-    parsed.error.errors.forEach((e) => {
-      const path = e.path.join(".") || "body";
-      if (!details[path]) details[path] = [];
-      details[path].push(e.message);
-    });
     return new Response(
-      JSON.stringify({ error: "Invalid request body", details }),
+      JSON.stringify({ error: "Invalid request body", details: zodErrorDetails(parsed.error) }),
       { status: 400 },
     );
   }

@@ -39,13 +39,24 @@ if (!existsSync(dbPath)) {
 const db = new Database(dbPath);
 db.pragma("foreign_keys = ON");
 
-const count = db.prepare("SELECT COUNT(*) as n FROM project").get();
-if (count.n === 0) {
-  console.log("No projects in database.");
+// Projects whose name contains "test" or "e2e" (case-insensitive)
+const select = db.prepare(
+  "SELECT id, name FROM project WHERE LOWER(name) LIKE '%test%' OR LOWER(name) LIKE '%e2e%'"
+);
+const toDelete = select.all();
+if (toDelete.length === 0) {
+  console.log("No projects with 'test' or 'e2e' in the title.");
   db.close();
   process.exit(0);
 }
 
-db.prepare("DELETE FROM project").run();
-console.log(`Deleted ${count.n} project(s) from ${dbPath}.`);
+const deleteStmt = db.prepare("DELETE FROM project WHERE id = ?");
+const run = db.transaction((rows) => {
+  for (const row of rows) {
+    deleteStmt.run(row.id);
+  }
+});
+run(toDelete);
+console.log(`Deleted ${toDelete.length} project(s) from ${dbPath}:`);
+toDelete.forEach((r) => console.log(`  - ${r.name} (${r.id})`));
 db.close();

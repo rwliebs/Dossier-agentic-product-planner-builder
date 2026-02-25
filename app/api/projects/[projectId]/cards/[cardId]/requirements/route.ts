@@ -11,6 +11,7 @@ import {
   internalError,
 } from "@/lib/api/response-helpers";
 import { createRequirementSchema } from "@/lib/validation/request-schema";
+import { zodErrorDetails } from "@/lib/validation/zod-details";
 
 type RouteParams = {
   params: Promise<{ projectId: string; cardId: string }>;
@@ -39,13 +40,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const parsed = createRequirementSchema.safeParse(body);
 
     if (!parsed.success) {
-      const details: Record<string, string[]> = {};
-      parsed.error.errors.forEach((e) => {
-        const path = e.path.join(".");
-        if (!details[path]) details[path] = [];
-        details[path].push(e.message);
-      });
-      return validationError("Invalid request body", details);
+      return validationError("Invalid request body", zodErrorDetails(parsed.error));
     }
 
     const db = getDb();

@@ -31,6 +31,9 @@ next-env.d.ts
 *.db
 .dossier/
 
+# embedding model cache (Node file cache for ruvector-onnx-embeddings-wasm)
+.cache/
+
 # local tool artifacts (Claude Code, macOS)
 .claude.json
 .claude/

@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
 import { planningActionTypeSchema, planningActionSchema } from "@/lib/schemas/slice-a";
+import { extractJsonObject, extractJsonArray } from "@/lib/llm/json-extract";
 
 export type ResponseType = "clarification" | "actions" | "mixed";
 
@@ -11,69 +12,6 @@ export interface ParseResult {
   confidence: "high" | "medium" | "low";
   rawExtract?: string;
   parseError?: string;
-}
-
-/**
- * Extract JSON array from LLM response text.
- * Handles: raw JSON, markdown code blocks, text before/after JSON.
- */
-function extractJsonArray(text: string): string | null {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-
-  // Try direct parse first (raw JSON array)
-  const directMatch = trimmed.match(/^\[[\s\S]*\]$/);
-  if (directMatch) return directMatch[0];
-
-  // Try markdown code block: ```json [...] ``` or ``` [...] ```
-  const codeBlockMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch) {
-    const inner = codeBlockMatch[1].trim();
-    if (inner.startsWith("[")) return inner;
-  }
-
-  // Try to find JSON array anywhere in the text (first [ ... ] that parses)
-  const arrayStart = trimmed.indexOf("[");
-  if (arrayStart === -1) return null;
-
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  let quoteChar = "";
-  let end = -1;
-
-  for (let i = arrayStart; i < trimmed.length; i++) {
-    const c = trimmed[i];
-
-    if (escape) {
-      escape = false;
-      continue;
-    }
-    if (inString) {
-      if (c === "\\") escape = true;
-      else if (c === quoteChar) inString = false;
-      continue;
-    }
-    if (c === '"' || c === "'") {
-      inString = true;
-      quoteChar = c;
-      continue;
-    }
-    if (c === "[") depth++;
-    else if (c === "]") {
-      depth--;
-      if (depth === 0) {
-        end = i;
-        break;
-      }
-    }
-  }
-
-  if (end !== -1) {
-    return trimmed.slice(arrayStart, end + 1);
-  }
-
-  return null;
 }
 
 /**
@@ -102,52 +40,6 @@ function normalizeAction(obj: Record<string, unknown>): PlanningAction {
     target_ref: targetRef,
     payload,
   };
-}
-
-/**
- * Extract a JSON object (not array) from LLM response text.
- * Looks for the structured response format: { "type": ..., "message": ..., "actions": [...] }
- */
-function extractJsonObject(text: string): string | null {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-
-  const directMatch = trimmed.match(/^\{[\s\S]*\}$/);
-  if (directMatch) return directMatch[0];
-
-  const codeBlockMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch) {
-    const inner = codeBlockMatch[1].trim();
-    if (inner.startsWith("{")) return inner;
-  }
-
-  const objStart = trimmed.indexOf("{");
-  if (objStart === -1) return null;
-
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  let quoteChar = "";
-  let end = -1;
-
-  for (let i = objStart; i < trimmed.length; i++) {
-    const c = trimmed[i];
-    if (escape) { escape = false; continue; }
-    if (inString) {
-      if (c === "\\") escape = true;
-      else if (c === quoteChar) inString = false;
-      continue;
-    }
-    if (c === '"' || c === "'") { inString = true; quoteChar = c; continue; }
-    if (c === "{") depth++;
-    else if (c === "}") {
-      depth--;
-      if (depth === 0) { end = i; break; }
-    }
-  }
-
-  if (end !== -1) return trimmed.slice(objStart, end + 1);
-  return null;
 }
 
 /**

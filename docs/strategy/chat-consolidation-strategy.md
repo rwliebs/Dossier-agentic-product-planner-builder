@@ -34,3 +34,20 @@ No mode parameter from the frontend. Backend decides based on map state.
 
 ## Result
 On an established map, the user can say "add a card for password reset to Login" and the full planning prompt handles it — creates cards, updates existing ones, links artifacts, etc. No more scaffold-only cage.
+
+---
+
+## Production usage: streaming vs non-streaming
+
+**Main planning (production path):** **Non-streaming** (`POST /api/projects/[id]/chat`).
+
+- Used by: `app/page.tsx` (project planning input) and `components/dossier/left-sidebar.tsx` (planning chat).
+- Single `fetch` + `response.json()`. No SSE. Backend uses `claudePlanningRequest` (one-shot) and `parsePlanningResponse`.
+
+**Streaming is used only for:**
+
+- **Populate** (add activities/cards to one workflow): `page.tsx` calls `POST .../chat/stream` with `mode=populate` and `workflow_id`.
+- **Finalize** (project-level context artifacts + per-card tests): `page.tsx` calls `POST .../chat/stream` with `mode=finalize`.
+- **Card finalize** (link docs, generate e2e test, stamp `finalized_at`): `POST .../cards/[cardId]/finalize` returns an SSE stream.
+
+So in production, the default “user types in chat” flow is non-streaming; streaming is reserved for multi-step or long-running flows (populate, finalize, card finalize).

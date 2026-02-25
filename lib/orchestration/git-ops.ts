@@ -50,10 +50,12 @@ export function getCurrentBranch(cwd: string): { success: boolean; branch?: stri
 
 /**
  * Returns porcelain status lines (XY path) for changed files.
+ * Uses --untracked-files=all so every new file in the project repo is listed
+ * (not just directory summaries), ensuring agent-created files are picked up.
  * See: git status --porcelain format.
  */
 export function getStatusPorcelain(cwd: string): { success: boolean; lines: string[]; error?: string } {
-  const r = runGit(cwd, ["status", "--porcelain", "-u"]);
+  const r = runGit(cwd, ["status", "--porcelain", "--untracked-files=all"]);
   if (!r.success) return { success: false, lines: [], error: r.error };
   const lines = r.stdout ? r.stdout.split("\n").filter(Boolean) : [];
   return { success: true, lines };

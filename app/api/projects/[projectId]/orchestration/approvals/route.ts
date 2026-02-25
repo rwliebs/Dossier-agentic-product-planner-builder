@@ -4,6 +4,7 @@ import { createApprovalRequest } from "@/lib/orchestration";
 import { getApprovalRequestsByRun } from "@/lib/db/queries/orchestration";
 import { json, validationError, notFoundError, internalError } from "@/lib/api/response-helpers";
 import { createApprovalRequestSchema } from "@/lib/validation/request-schema";
+import { zodErrorDetails } from "@/lib/validation/zod-details";
 
 export async function GET(
   request: NextRequest,
@@ -37,13 +38,7 @@ export async function POST(
     const parsed = createApprovalRequestSchema.safeParse(rawBody);
 
     if (!parsed.success) {
-      const details: Record<string, string[]> = {};
-      parsed.error.errors.forEach((e) => {
-        const path = e.path.join(".") || "body";
-        if (!details[path]) details[path] = [];
-        details[path].push(e.message);
-      });
-      return validationError("Invalid request body", details);
+      return validationError("Invalid request body", zodErrorDetails(parsed.error));
     }
 
     const db = getDb();

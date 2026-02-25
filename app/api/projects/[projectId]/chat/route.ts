@@ -22,6 +22,7 @@ import { getWorkflowActivities } from "@/lib/schemas/planning-state";
 import { json } from "@/lib/api/response-helpers";
 import { PLANNING_LLM } from "@/lib/feature-flags";
 import { chatRequestSchema } from "@/lib/validation/request-schema";
+import { zodErrorDetails } from "@/lib/validation/zod-details";
 
 // Only trigger auto-populate when user explicitly requests workflow population.
 // Avoid broad patterns: "fill in" and "add cards" match common unrelated phrases.
@@ -74,13 +75,10 @@ export async function POST(
 
   const parsed = chatRequestSchema.safeParse(rawBody);
   if (!parsed.success) {
-    const details: Record<string, string[]> = {};
-    parsed.error.errors.forEach((e) => {
-      const path = e.path.join(".") || "body";
-      if (!details[path]) details[path] = [];
-      details[path].push(e.message);
-    });
-    return json({ status: "error", message: "Invalid request body", details }, 400);
+    return json(
+      { status: "error", message: "Invalid request body", details: zodErrorDetails(parsed.error) },
+      400,
+    );
   }
 
   const { message, mock_response, mode, workflow_id } = parsed.data;

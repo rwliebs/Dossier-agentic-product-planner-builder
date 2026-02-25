@@ -498,51 +498,26 @@ export default function DossierPage() {
           toast.error(msg);
           return;
         }
-        const reader = res.body?.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
+        const { consumeSSEStream } = await import('@/lib/api/sse');
+        const events = await consumeSSEStream(res.body ?? null);
         let streamError = '';
         let testGenerated = false;
         let contextDocsGenerated = 0;
-        if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const blocks = buffer.split(/\n\n+/);
-            buffer = blocks.pop() ?? '';
-            for (const block of blocks) {
-              let eventType = '';
-              let dataStr = '';
-              for (const line of block.split('\n')) {
-                if (line.startsWith('event: ')) eventType = line.slice(7).trim();
-                if (line.startsWith('data: ')) dataStr = line.slice(6);
-              }
-              if (eventType === 'finalize_progress' && dataStr) {
-                try {
-                  const d = JSON.parse(dataStr) as { label?: string; step_index?: number; total_steps?: number };
-                  const stepLabel = d.total_steps
-                    ? `(${(d.step_index ?? 0) + 1}/${d.total_steps}) ${d.label ?? ''}`
-                    : d.label ?? '';
-                  setCardFinalizeProgress(stepLabel);
-                } catch { /* ignore */ }
-              }
-              if (eventType === 'phase_complete' && dataStr) {
-                try {
-                  const d = JSON.parse(dataStr) as { test_generated?: boolean; context_docs_generated?: number };
-                  testGenerated = d.test_generated ?? false;
-                  contextDocsGenerated = d.context_docs_generated ?? 0;
-                } catch { /* ignore */ }
-              }
-              if (eventType === 'error' && dataStr) {
-                try {
-                  const d = JSON.parse(dataStr);
-                  streamError = (d as { reason?: string }).reason ?? 'Finalize failed';
-                } catch {
-                  streamError = 'Finalize failed';
-                }
-              }
-            }
+        for (const { event: eventType, data } of events) {
+          if (eventType === 'finalize_progress' && data !== null && typeof data === 'object') {
+            const d = data as { label?: string; step_index?: number; total_steps?: number };
+            const stepLabel = d.total_steps
+              ? `(${(d.step_index ?? 0) + 1}/${d.total_steps}) ${d.label ?? ''}`
+              : d.label ?? '';
+            setCardFinalizeProgress(stepLabel);
+          }
+          if (eventType === 'phase_complete' && data !== null && typeof data === 'object') {
+            const d = data as { test_generated?: boolean; context_docs_generated?: number };
+            testGenerated = d.test_generated ?? false;
+            contextDocsGenerated = d.context_docs_generated ?? 0;
+          }
+          if (eventType === 'error' && data !== null && typeof data === 'object') {
+            streamError = (data as { reason?: string }).reason ?? 'Finalize failed';
           }
         }
         if (streamError) {

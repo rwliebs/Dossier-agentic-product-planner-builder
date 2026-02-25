@@ -20,14 +20,11 @@ import { runLlmSubStep, type Emitter } from "@/lib/llm/run-llm-substep";
 import { MEMORY_PLANE, PLANNING_LLM } from "@/lib/feature-flags";
 import { ingestCardContext } from "@/lib/memory/ingestion";
 import { json, notFoundError, validationError, internalError } from "@/lib/api/response-helpers";
+import { sseEvent } from "@/lib/api/sse";
 
 type RouteParams = {
   params: Promise<{ projectId: string; cardId: string }>;
 };
-
-function sseEvent(event: string, data: unknown): string {
-  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-}
 
 /**
  * GET /api/projects/[projectId]/cards/[cardId]/finalize

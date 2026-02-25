@@ -157,6 +157,22 @@ async function runFlow(): Promise<{
   map = await fetchMapSnapshot(projectId);
   if (!map) throw new Error("Map fetch failed after populate");
 
+  const projectFinalizeRes = await fetch(
+    `${BASE_URL}/api/projects/${projectId}/chat/stream`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "Finalize project", mode: "finalize" }),
+    }
+  );
+  if (!projectFinalizeRes.ok) {
+    const err = await projectFinalizeRes.json().catch(() => ({}));
+    throw new Error(
+      `Project finalize failed: ${projectFinalizeRes.status} ${JSON.stringify(err)}`
+    );
+  }
+  await consumeSSE(projectFinalizeRes);
+
   const cardBuildReady = new Set<string>();
   const allCards = getAllCards(map);
   let cardsFinalized = 0;

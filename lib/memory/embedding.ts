@@ -3,6 +3,10 @@
  * Uses ruvector-onnx-embeddings-wasm (RuvNet) with all-MiniLM-L6-v2 (384-dim).
  * Falls back to deterministic hash-based vectors if the model fails to load.
  *
+ * In Node (e.g. Vitest), the upstream loader only uses the browser Cache API,
+ * so it re-downloads the model every run. We use a file-based cache so the
+ * model is downloaded once and reused (see getNodeModelCacheDir).
+ *
  * @see REMAINING_WORK_PLAN.md §4 M4
  */
 
@@ -12,6 +16,21 @@ import * as path from "node:path";
 
 const DEFAULT_DIMENSIONS = 384;
 const DEFAULT_MODEL = "all-MiniLM-L6-v2";
+
+const isNode =
+  typeof process !== "undefined" &&
+  typeof process.versions?.node === "string";
+
+/** Directory for caching the embedding model in Node (avoids re-download every run). */
+function getNodeModelCacheDir(): string {
+  const base =
+    process.env.RUVECTOR_MODEL_CACHE ||
+    path.join(process.cwd(), ".cache", "ruvector-models");
+  if (!fs.existsSync(base)) {
+    fs.mkdirSync(base, { recursive: true });
+  }
+  return base;
+}
 
 /** Simple string hash (djb2). */
 function hashString(s: string): number {
@@ -78,9 +97,64 @@ function loadWasmModuleCjs(): Record<string, unknown> | null {
 async function doLoadEmbedder(): Promise<Embedder | null> {
   try {
     const wasmModule = loadWasmModuleCjs();
+    if (!wasmModule) return null;
+
+    const modelName = process.env.EMBEDDING_MODEL ?? DEFAULT_MODEL;
+
+    if (isNode) {
+      const { MODELS } = await import("ruvector-onnx-embeddings-wasm/loader.js");
+      const config = (MODELS as Record<string, { model: string; tokenizer: string; maxLength: number }>)[modelName];
+      if (!config) return null;
+
+      const cacheDir = getNodeModelCacheDir();
+      const modelPath = path.join(cacheDir, `${modelName}-model.onnx`);
+      const tokenizerPath = path.join(cacheDir, `${modelName}-tokenizer.json`);
+
+      let modelBytes: Uint8Array;
+      let tokenizerJson: string;
+
+      if (fs.existsSync(modelPath) && fs.existsSync(tokenizerPath)) {
+        const [modelBuf, tokenizerStr] = await Promise.all([
+          fs.promises.readFile(modelPath),
+          fs.promises.readFile(tokenizerPath, "utf-8"),
+        ]);
+        modelBytes = new Uint8Array(modelBuf);
+        tokenizerJson = tokenizerStr;
+      } else {
+        const [modelRes, tokenizerRes] = await Promise.all([
+          fetch(config.model),
+          fetch(config.tokenizer),
+        ]);
+        if (!modelRes.ok || !tokenizerRes.ok) return null;
+        const [modelBuf, tokenizerStr] = await Promise.all([
+          modelRes.arrayBuffer(),
+          tokenizerRes.text(),
+        ]);
+        modelBytes = new Uint8Array(modelBuf);
+        tokenizerJson = tokenizerStr;
+        await Promise.all([
+          fs.promises.writeFile(modelPath, modelBytes),
+          fs.promises.writeFile(tokenizerPath, tokenizerJson),
+        ]);
+      }
+
+      const WasmEmbedderConfig = wasmModule.WasmEmbedderConfig as new () => {
+        setMaxLength: (n: number) => unknown;
+        setNormalize: (b: boolean) => unknown;
+        setPooling: (n: number) => unknown;
+      };
+      const WasmEmbedder = wasmModule.WasmEmbedder as {
+        withConfig: (model: Uint8Array, tokenizer: string, c: unknown) => Embedder;
+      };
+      const embedderConfig = new WasmEmbedderConfig()
+        .setMaxLength(config.maxLength)
+        .setNormalize(true)
+        .setPooling(0);
+      return WasmEmbedder.withConfig(modelBytes, tokenizerJson, embedderConfig);
+    }
+
     const { createEmbedder } = await import("ruvector-onnx-embeddings-wasm/loader.js");
-    const model = process.env.EMBEDDING_MODEL ?? DEFAULT_MODEL;
-    return await createEmbedder(model, wasmModule) as Embedder;
+    return await createEmbedder(modelName, wasmModule) as Embedder;
   } catch (err) {
     console.warn(
       "[embedding] Failed to load embedding model, using hash-based fallback:",

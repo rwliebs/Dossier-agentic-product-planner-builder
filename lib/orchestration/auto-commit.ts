@@ -1,6 +1,8 @@
 /**
  * Auto-commit agent-produced files in build worktrees.
  * Runs on execution_completed, before checks.
+ * Workflow: agent creates code for the feature card in the project's repo (worktree);
+ * we must pick up all new and modified files there (including untracked).
  *
  * ARCH_REF: docs/strategy/worktree-auto-commit.md
  */
@@ -45,8 +47,8 @@ const ROOT_ALLOWLIST = [
   "vitest.config.ts",
 ];
 
-/** Directory prefix always allowed (tests). */
-const ALLOWED_DIR_PREFIXES = ["__tests__/"];
+/** Directory prefixes always allowed (tests and docs created for the card). */
+const ALLOWED_DIR_PREFIXES = ["__tests__/", "docs/"];
 
 export interface AutoCommitInput {
   worktreePath: string;

@@ -10,7 +10,7 @@
 
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import { getDataDir, ensureDataDir, readConfigFile } from "@/lib/config/data-dir";
 
 const REPOS_DIR = "repos";
@@ -207,5 +207,55 @@ export function createFeatureBranch(
       success: false,
       error: `Create branch failed: ${message}`,
     };
+  }
+}
+
+/**
+ * Pushes a branch from the project clone to origin.
+ * Uses GITHUB_TOKEN (env or config) for auth when repoUrl is provided.
+ * MVP: gets code onto GitHub so the user can open a PR there.
+ */
+export function pushBranch(
+  projectId: string,
+  branchName: string,
+  repoUrl?: string | null
+): { success: boolean; error?: string } {
+  const clonePath = getClonePath(projectId);
+  if (!fs.existsSync(clonePath)) {
+    return { success: false, error: "Clone not found. Run a build first." };
+  }
+  const gitDir = path.join(clonePath, ".git");
+  if (!fs.existsSync(gitDir)) {
+    return { success: false, error: "Not a git repository." };
+  }
+
+  try {
+    if (repoUrl && !repoUrl.trim().toLowerCase().startsWith("file://")) {
+      const token = getGitHubToken();
+      const cloneUrl = repoUrlToCloneUrl(repoUrl.trim(), token);
+      execFileSync("git", ["remote", "set-url", "origin", cloneUrl], {
+        cwd: clonePath,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    }
+    execSync(`git push -u origin "${branchName}"`, {
+      cwd: clonePath,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("could not read Username") || message.includes("Authentication failed")) {
+      return { success: false, error: "Add GITHUB_TOKEN to ~/.dossier/config or env to push." };
+    }
+    if (message.includes("403") || message.includes("Permission") && message.includes("denied")) {
+      return {
+        success: false,
+        error:
+          "Push denied: your token has no write access. Use a classic token with the 'repo' scope, or a fine-grained token with 'Contents' write access to this repository.",
+      };
+    }
+    return { success: false, error: `Push failed: ${message}` };
   }
 }

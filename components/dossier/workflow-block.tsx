@@ -155,9 +155,19 @@ export function WorkflowBlock({
   const [editingField, setEditingField] = useState<ProjectContextField | null>(null);
   const [viewOnServerLoading, setViewOnServerLoading] = useState(false);
   const handleViewOnServer = async () => {
+    const projectId = snapshot.project.id;
+    if (!projectId) {
+      const { toast } = await import('sonner');
+      toast.error('Project ID is missing');
+      return;
+    }
     setViewOnServerLoading(true);
     try {
-      const res = await fetch('/api/dev/restart-and-open', { method: 'POST' });
+      const res = await fetch('/api/dev/restart-and-open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const { toast } = await import('sonner');
@@ -165,7 +175,7 @@ export function WorkflowBlock({
         return;
       }
       const { toast } = await import('sonner');
-      toast.success('Starting second server and opening new tab…');
+      toast.success('Starting project server and opening new tab…');
     } catch (e) {
       const { toast } = await import('sonner');
       toast.error(e instanceof Error ? e.message : 'Failed to start server');

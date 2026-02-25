@@ -326,13 +326,47 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
           });
         } catch (webhookErr) {
           console.warn("Post-execution webhook processing failed:", webhookErr);
+          // Ensure card is updated when processWebhook throws (e.g. DB or auto-commit error)
+          try {
+            const { getDb } = await import("@/lib/db");
+            const { processWebhook: pw } = await import("./process-webhook");
+            const db = getDb();
+            await pw(db, {
+              event_type: "execution_failed",
+              assignment_id: payload.assignment_id,
+              execution_id: executionId,
+              ended_at: entry.endedAt ?? new Date().toISOString(),
+              summary:
+                webhookErr instanceof Error ? webhookErr.message : String(webhookErr),
+              error:
+                webhookErr instanceof Error ? webhookErr.message : String(webhookErr),
+            });
+          } catch (fallbackErr) {
+            console.error("Fallback webhook (execution_failed) also failed:", fallbackErr);
+          }
         }
       };
 
-      runExecution().catch((err) => {
+      runExecution().catch(async (err) => {
         entry.status = "failed";
         entry.endedAt = new Date().toISOString();
         entry.error = err instanceof Error ? err.message : String(err);
+        // Ensure card is updated when runExecution rejects (e.g. before/during webhook)
+        try {
+          const { getDb } = await import("@/lib/db");
+          const { processWebhook } = await import("./process-webhook");
+          const db = getDb();
+          await processWebhook(db, {
+            event_type: "execution_failed",
+            assignment_id: payload.assignment_id,
+            execution_id: executionId,
+            ended_at: entry.endedAt!,
+            summary: entry.error,
+            error: entry.error,
+          });
+        } catch (webhookErr) {
+          console.error("Post-failure webhook (execution_failed) failed:", webhookErr);
+        }
       });
 
       return { success: true, execution_id: executionId };

@@ -239,16 +239,24 @@ export default function DossierPage() {
         setExpandedCardId(cardId);
       } else if (action === 'merge') {
         const repoUrl = snapshot?.project?.repo_url;
-        if (repoUrl) {
-          window.open(repoUrl, '_blank', 'noopener,noreferrer');
-        } else {
-          import('sonner').then(({ toast }) => {
-            toast.warning('Connect a repository in project settings to open merge flow.');
-          });
-        }
+        if (!projectId) return;
+        import('sonner').then(({ toast }) => {
+          fetch(`/api/projects/${projectId}/cards/${cardId}/push`, { method: 'POST' })
+            .then(async (res) => {
+              const body = await res.json().catch(() => ({}));
+              const msg = body?.error ?? (res.ok ? '' : 'Push failed.');
+              if (res.ok) {
+                if (repoUrl) window.open(repoUrl, '_blank', 'noopener,noreferrer');
+                toast.success('Branch pushed to GitHub. Create a pull request there to merge.');
+              } else {
+                toast.error(msg || 'Push failed.');
+              }
+            })
+            .catch(() => toast.error('Push failed.'));
+        });
       }
     },
-    [snapshot?.project?.repo_url, handleBuildCard]
+    [projectId, snapshot?.project?.repo_url, handleBuildCard]
   );
 
   const [populatingWorkflowId, setPopulatingWorkflowId] = useState<string | null>(null);

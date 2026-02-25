@@ -435,6 +435,11 @@ export function ImplementationCard({
             <p className="text-[10px] font-mono uppercase tracking-wider text-amber-800 mb-1">
               Decision required
             </p>
+            {card.last_build_error && (
+              <p className="text-xs text-amber-900/90 mb-2 leading-relaxed break-words">
+                {card.last_build_error}
+              </p>
+            )}
             {isEditingQuickAnswer ? (
               <div className="space-y-2">
                 <textarea

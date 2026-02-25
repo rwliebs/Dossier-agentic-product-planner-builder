@@ -261,7 +261,10 @@ export async function processWebhook(
         } else if (autoResult.outcome === "no_changes") {
           autoCommitOk = false;
           await db.updateCardAssignment(assignment_id, { status: "blocked" });
-          await db.updateCard(cardId, { build_state: "blocked" });
+          await db.updateCard(cardId, {
+            build_state: "blocked",
+            last_build_error: autoResult.reason ?? "No changes to commit",
+          });
           await logEvent(db, {
             project_id: projectId,
             run_id: runId,

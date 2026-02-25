@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { spawn } from 'child_process';
-import path from 'path';
 import { promisify } from 'util';
 import { exec } from 'child_process';
+import fs from 'node:fs';
+import { getClonePath } from '@/lib/orchestration/repo-manager';
 
 const execAsync = promisify(exec);
 
@@ -25,18 +26,47 @@ async function findFreePort(): Promise<number | null> {
 /**
  * POST /api/dev/restart-and-open
  *
- * Starts a second dev server and opens it in a new browser tab.
- * Tries ports 3001, 3002, ... until a free port is found.
- * Does not kill or restart the primary server on 3000.
+ * Starts the project's dev server from its clone (~/.dossier/repos/<projectId>/)
+ * and opens it in a new browser tab. Tries ports 3001, 3002, ... until a free port is found.
+ * Does not kill or restart the primary Dossier server on 3000.
  * Spawns a detached child process so the API can respond immediately.
  * Dev-only: disabled in production to prevent unauthenticated DoS.
+ *
+ * Body: { projectId: string } (required).
  */
-export async function POST() {
+export async function POST(request: Request) {
   if (process.env.NODE_ENV !== "development") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const root = path.resolve(process.cwd());
+  let body: { projectId?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid JSON body. Expected { projectId: string }." },
+      { status: 400 }
+    );
+  }
+
+  const projectId = typeof body?.projectId === "string" ? body.projectId.trim() : undefined;
+  if (!projectId) {
+    return NextResponse.json(
+      { error: "projectId is required. Send { projectId: string } in the request body." },
+      { status: 400 }
+    );
+  }
+
+  const clonePath = getClonePath(projectId);
+  if (!fs.existsSync(clonePath)) {
+    return NextResponse.json(
+      {
+        error: "Project repo not cloned yet. Run a build first so the repo exists at ~/.dossier/repos/<projectId>/.",
+      },
+      { status: 409 }
+    );
+  }
+
   const port = await findFreePort();
 
   if (port === null) {
@@ -47,7 +77,7 @@ export async function POST() {
   }
 
   const script = [
-    `cd "${root}" && PORT=${port} nohup npm run dev > /tmp/dossier-view-${port}.log 2>&1 &`,
+    `cd "${clonePath}" && PORT=${port} nohup npm run dev > /tmp/dossier-view-${port}.log 2>&1 &`,
     `sleep 10`,
     `(command -v open >/dev/null 2>&1 && open "http://localhost:${port}") || (command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:${port}") || true`,
   ].join(' && ');
@@ -55,12 +85,12 @@ export async function POST() {
   const child = spawn('bash', ['-c', script], {
     detached: true,
     stdio: 'ignore',
-    cwd: root,
+    cwd: clonePath,
   });
   child.unref();
 
   return NextResponse.json({
     ok: true,
-    message: `Starting second server on port ${port} and opening new tab. Page will load in ~10 seconds.`,
+    message: `Starting project server on port ${port} and opening new tab. Page will load in ~10 seconds.`,
   });
 }

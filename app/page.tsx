@@ -498,12 +498,11 @@ export default function DossierPage() {
           toast.error(msg);
           return;
         }
-        const { consumeSSEStream } = await import('@/lib/api/sse');
-        const events = await consumeSSEStream(res.body ?? null);
+        const { streamSSEEvents } = await import('@/lib/api/sse');
         let streamError = '';
         let testGenerated = false;
         let contextDocsGenerated = 0;
-        for (const { event: eventType, data } of events) {
+        for await (const { event: eventType, data } of streamSSEEvents(res.body ?? null)) {
           if (eventType === 'finalize_progress' && data !== null && typeof data === 'object') {
             const d = data as { label?: string; step_index?: number; total_steps?: number };
             const stepLabel = d.total_steps

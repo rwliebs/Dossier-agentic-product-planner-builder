@@ -306,6 +306,15 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
           entry.endedAt = new Date().toISOString();
         }
 
+        // Delay before webhook/auto-commit so FS can flush when agent created many files (race fix).
+        const preAutoCommitMs =
+          typeof process.env.DOSSIER_PRE_AUTOCOMMIT_DELAY_MS !== "undefined"
+            ? Number(process.env.DOSSIER_PRE_AUTOCOMMIT_DELAY_MS)
+            : 2000;
+        if (eventType === "execution_completed" && preAutoCommitMs > 0) {
+          await new Promise((r) => setTimeout(r, preAutoCommitMs));
+        }
+
         try {
           const { getDb } = await import("@/lib/db");
           const { processWebhook } = await import("./process-webhook");

@@ -15,7 +15,11 @@ import { runPopulateWorkflow } from "@/lib/llm/run-populate-workflow";
 import { runFinalizeMultiStep } from "@/lib/llm/run-finalize-multistep";
 import { getArtifactsByProject, getProject } from "@/lib/db/queries";
 import { parseRootFoldersFromArchitecturalSummary } from "@/lib/orchestration/parse-root-folders";
-import { ensureClone, createRootFoldersInRepo } from "@/lib/orchestration/repo-manager";
+import {
+  ensureClone,
+  createRootFoldersInRepo,
+  pushBranch,
+} from "@/lib/orchestration/repo-manager";
 
 /**
  * POST /api/projects/[projectId]/chat/stream
@@ -119,6 +123,14 @@ export async function POST(
               );
               if (!folderResult.success) {
                 console.warn("[chat/stream] Root folder creation failed:", folderResult.error);
+              } else {
+                const pushResult = pushBranch(projectId, baseBranch, repoUrl);
+                if (!pushResult.success) {
+                  console.warn(
+                    "[chat/stream] Push main (directory structure) to origin failed:",
+                    pushResult.error
+                  );
+                }
               }
             }
           } else if (!repoUrl || repoUrl.includes("placeholder")) {

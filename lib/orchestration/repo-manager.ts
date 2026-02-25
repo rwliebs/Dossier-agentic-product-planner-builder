@@ -45,8 +45,8 @@ function isEmptyRepo(clonePath: string): boolean {
 
 /**
  * Seeds an empty repo with a local initial commit so that branch creation,
- * ls-tree, and diff all work. Does NOT push — the agent pushes when it
- * creates a PR, and the token may not have write scope yet.
+ * ls-tree, and diff all work. Caller may then push baseBranch to origin so
+ * the remote has a main branch to open PRs against.
  */
 function seedEmptyRepo(clonePath: string, baseBranch: string): void {
   runGitSync(clonePath, `checkout -b ${baseBranch}`);
@@ -123,6 +123,7 @@ export function ensureClone(
 
     if (isEmptyRepo(clonePath)) {
       seedEmptyRepo(clonePath, baseBranch);
+      // main (or base branch) is pushed during project finalization, when directory structure is committed.
     }
 
     return { success: true, clonePath };

@@ -53,7 +53,7 @@ const ALLOWED_DIR_PREFIXES = ["__tests__/", "docs/"];
 const AUTO_COMMIT_RETRY_DELAY_MS =
   typeof process.env.DOSSIER_AUTO_COMMIT_RETRY_DELAY_MS !== "undefined"
     ? Number(process.env.DOSSIER_AUTO_COMMIT_RETRY_DELAY_MS)
-    : 1000;
+    : 2000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -167,6 +167,7 @@ export async function performAutoCommit(input: AutoCommitInput): Promise<AutoCom
   const eligible = allPaths.filter((p) => isEligible(p, allowedPaths));
 
   console.warn("[auto-commit]", {
+    cardId,
     worktreePath,
     lineCount: statusResult.lines.length,
     allPathsCount: allPaths.length,
@@ -174,11 +175,14 @@ export async function performAutoCommit(input: AutoCommitInput): Promise<AutoCom
   });
 
   if (eligible.length === 0) {
+    const reason =
+      allPaths.length === 0
+        ? "No changes to commit"
+        : `No eligible files (${allPaths.length} excluded by policy)`;
+    console.warn("[auto-commit] outcome=no_changes", { cardId, reason });
     return {
       outcome: "no_changes",
-      reason: allPaths.length === 0
-        ? "No changes to commit"
-        : `No eligible files (${allPaths.length} excluded by policy)`,
+      reason,
     };
   }
 
@@ -198,6 +202,11 @@ export async function performAutoCommit(input: AutoCommitInput): Promise<AutoCom
     return { outcome: "error", error: commitResult.error ?? "Commit failed" };
   }
 
+  console.warn("[auto-commit] outcome=committed", {
+    cardId,
+    sha: commitResult.sha?.slice(0, 7),
+    message,
+  });
   return {
     outcome: "committed",
     sha: commitResult.sha ?? "",

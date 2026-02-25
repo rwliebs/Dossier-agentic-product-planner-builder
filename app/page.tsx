@@ -281,7 +281,9 @@ export default function DossierPage() {
         }
         if ((data.applied ?? 0) === 0) {
           const { toast } = await import('sonner');
-          toast.warning('No activities or cards were generated. Try again or add more context in the Agent chat.');
+          toast.warning(
+            'No activities or cards were generated. Ensure the project has a description and try again. If it persists, try adding more context in the Agent chat or use a stronger model (e.g. Sonnet).'
+          );
         }
         refetch();
       } catch (err) {
@@ -438,9 +440,15 @@ export default function DossierPage() {
           return;
         }
         const count = data.artifacts_created ?? 0;
+        const expectedCount = 5;
         if (count === 0) {
           const { toast } = await import('sonner');
           toast.warning('No context documents were generated.');
+        } else if (count < expectedCount) {
+          const { toast } = await import('sonner');
+          toast.warning(
+            `Created ${count} of ${expectedCount} documents. One may have failed (e.g. Data Contracts) — check Docs tab.`
+          );
         } else {
           const { toast } = await import('sonner');
           toast.success(`Finalized: ${count} context documents created`);
@@ -663,22 +671,6 @@ export default function DossierPage() {
       }
     },
     [projectId, refetchCardPlannedFiles]
-  );
-
-  const handleApprovePlannedFile = useCallback(
-    async (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => {
-      const result = await submitAction({
-        actions: [
-          {
-            action_type: 'approveCardPlannedFile',
-            target_ref: { card_id: cardId },
-            payload: { planned_file_id: plannedFileId, status },
-          },
-        ],
-      });
-      if (result && result.applied > 0) refetch();
-    },
-    [submitAction, refetch]
   );
 
   const handleUpdateFileDescription = useCallback((_fileId: string, _description: string) => {
@@ -981,7 +973,6 @@ export default function DossierPage() {
                     onAddPlannedFile={handleAddPlannedFile}
                     availableArtifacts={projectArtifacts ?? []}
                     availableFilePaths={availableFilePaths}
-                    onApprovePlannedFile={handleApprovePlannedFile}
                     onBuildCard={handleBuildCard}
                     onResumeBlockedCard={handleResumeBlockedCard}
                     onShowCardFiles={handleShowCardFiles}

@@ -139,6 +139,44 @@ describe("WorkflowBlock", () => {
     expect(hasGuidance).toBe(true);
   });
 
+  it("shows Finalize Project button when workflows exist and project not finalized", () => {
+    const onFinalizeProject = vi.fn();
+    render(
+      <WorkflowBlock
+        snapshot={workflowsOnlySnapshot}
+        viewMode="functionality"
+        expandedCardId={null}
+        onExpandCard={() => {}}
+        onCardAction={() => {}}
+        onFinalizeProject={onFinalizeProject}
+      />
+    );
+
+    const btn = screen.getByRole("button", { name: new RegExp(ACTION_BUTTONS.FINALIZE_PROJECT, "i") });
+    expect(btn).toBeInTheDocument();
+    btn.click();
+    expect(onFinalizeProject).toHaveBeenCalled();
+  });
+
+  it("hides Finalize Project button when project is already finalized", () => {
+    const finalizedSnapshot: MapSnapshot = {
+      ...workflowsOnlySnapshot,
+      project: { ...workflowsOnlySnapshot.project, finalized_at: "2026-01-01T00:00:00Z" },
+    };
+    render(
+      <WorkflowBlock
+        snapshot={finalizedSnapshot}
+        viewMode="functionality"
+        expandedCardId={null}
+        onExpandCard={() => {}}
+        onCardAction={() => {}}
+        onFinalizeProject={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: new RegExp(ACTION_BUTTONS.FINALIZE_PROJECT, "i") })).not.toBeInTheDocument();
+  });
+
   it("shows Populate button on each workflow when onPopulateWorkflow is provided", () => {
     const onPopulateWorkflow = vi.fn();
     render(

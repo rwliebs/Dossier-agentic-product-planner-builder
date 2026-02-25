@@ -163,12 +163,9 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   }
 
   const plannedFiles = await getCardPlannedFiles(db, cardId);
-  const approved = plannedFiles.filter(
-    (f) => (f as { status?: string }).status === "approved"
-  );
-  if (approved.length === 0) {
+  if (plannedFiles.length === 0) {
     return validationError(
-      "Card must have at least one approved planned file or folder before finalization. Add planned files/folders via chat and approve them."
+      "Card must have at least one planned file or folder before finalization."
     );
   }
 

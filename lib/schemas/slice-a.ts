@@ -41,9 +41,7 @@ export const planningActionTypeSchema = z.enum([
   "linkContextArtifact",
   "createContextArtifact",
   "upsertCardPlannedFile",
-  "approveCardPlannedFile",
   "upsertCardKnowledgeItem",
-  "setCardKnowledgeStatus",
 ]);
 
 export const projectSchema = z.object({

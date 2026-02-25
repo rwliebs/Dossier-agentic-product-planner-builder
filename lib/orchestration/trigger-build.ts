@@ -130,34 +130,6 @@ export async function triggerBuild(
     };
   }
 
-  const cardsWithoutApprovedFiles: string[] = [];
-  for (const cardId of cardIds) {
-    const plannedFiles = await getCardPlannedFiles(db, cardId);
-    const approved = plannedFiles.filter(
-      (f) => (f as { status?: string }).status === "approved"
-    );
-    if (approved.length === 0) {
-      cardsWithoutApprovedFiles.push(cardId);
-    }
-  }
-  if (cardsWithoutApprovedFiles.length > 0) {
-    return {
-      success: false,
-      error: "Card(s) must have approved planned files",
-      validationErrors: [
-        "Build requires approved planned files or folders per card. Add and approve planned files via chat before finalizing.",
-        ...(cardsWithoutApprovedFiles.length <= 3
-          ? [`Cards without approved files: ${cardsWithoutApprovedFiles.join(", ")}`]
-          : [`${cardsWithoutApprovedFiles.length} cards without approved files`]),
-      ],
-      outcomeType: "decision_required",
-      message:
-        cardsWithoutApprovedFiles.length <= 3
-          ? `Approve planned files before build. Cards: ${cardsWithoutApprovedFiles.join(", ")}`
-          : `Approve planned files for ${cardsWithoutApprovedFiles.length} cards before build.`,
-    };
-  }
-
   // Clone repo for every build so the agent always has a valid cwd (worktree_path).
   // Without this, multi-card builds left worktree_path null → agent ran in Dossier app root → exit 1.
   const cloneResult = ensureClone(input.project_id, repoUrl, null, baseBranch);
@@ -216,10 +188,7 @@ export async function triggerBuild(
 
   for (const cardId of cardIds) {
     const plannedFiles = await getCardPlannedFiles(db, cardId);
-    const approved = plannedFiles.filter(
-      (f) => (f as { status?: string }).status === "approved"
-    );
-    const allowedPaths = approved.map(
+    const allowedPaths = plannedFiles.map(
       (f) => (f as { logical_file_name: string }).logical_file_name
     );
 
@@ -258,7 +227,7 @@ export async function triggerBuild(
       forbidden_paths: null,
       assignment_input_snapshot: {
         card_id: cardId,
-        planned_file_ids: approved.map((f) => (f as { id: string }).id),
+        planned_file_ids: plannedFiles.map((f) => (f as { id: string }).id),
       },
     });
 

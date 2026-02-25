@@ -78,10 +78,6 @@ export async function dispatchAssignment(
   }
 
   const plannedFiles = await getCardPlannedFiles(db, cardId);
-  const approvedPlannedFiles = plannedFiles.filter(
-    (f) => (f as { status?: string }).status === "approved"
-  );
-  // Planned files are optional — use assignment's allowed_paths when none approved
 
   const requirements = await getCardRequirements(db, cardId);
   const acceptanceCriteria = requirements.map(
@@ -131,7 +127,7 @@ export async function dispatchAssignment(
   }
 
   // Build planned files detail (intent, contract notes, module hint)
-  const plannedFilesDetail = approvedPlannedFiles.map((pf) => ({
+  const plannedFilesDetail = plannedFiles.map((pf) => ({
     logical_file_name: (pf as { logical_file_name: string }).logical_file_name,
     action: (pf as { action?: string }).action ?? "edit",
     artifact_kind: (pf as { artifact_kind?: string }).artifact_kind ?? "component",

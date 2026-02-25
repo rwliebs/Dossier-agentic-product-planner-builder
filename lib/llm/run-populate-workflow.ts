@@ -68,39 +68,59 @@ export async function runPopulateWorkflow(opts: {
   if (!freshState) return { actionCount: totalActions };
   currentState = freshState;
 
-  const activities = getWorkflowActivities(currentState, workflowId);
+  const activities = getWorkflowActivities(currentState, workflowId)
+    .sort((a, b) => a.position - b.position);
   if (activities.length === 0) return { actionCount: totalActions };
 
-  // Phase 2: cards + requirements per activity
+  // Phase 2: cards + requirements per activity, run in parallel
   const cardFilter = (a: PlanningAction) =>
     a.action_type === "createCard" ||
-    a.action_type === "upsertCardKnowledgeItem";
+    a.action_type === "upsertCardKnowledgeItem" ||
+    a.action_type === "upsertCardPlannedFile";
 
-  for (const activity of activities) {
-    const cardsResult = await runLlmSubStep({
-      db,
-      projectId,
-      systemPrompt: buildPopulateCardsForActivityPrompt(),
-      userMessage: buildPopulateCardsForActivityUserMessage(
-        workflowId,
-        workflowTitle,
-        activity.id,
-        activity.title,
-        userRequest,
-        currentState,
-      ),
-      state: currentState,
-      emit,
-      actionFilter: cardFilter,
-      mockResponse,
-    });
+  const cardResults = await Promise.all(
+    activities.map(async (activity) => {
+      let result = await runLlmSubStep({
+        db,
+        projectId,
+        systemPrompt: buildPopulateCardsForActivityPrompt(),
+        userMessage: buildPopulateCardsForActivityUserMessage(
+          workflowId,
+          workflowTitle,
+          activity.id,
+          activity.title,
+          userRequest,
+          currentState,
+        ),
+        state: currentState,
+        emit,
+        actionFilter: cardFilter,
+        mockResponse,
+      });
+      if (result.actionCount === 0) {
+        result = await runLlmSubStep({
+          db,
+          projectId,
+          systemPrompt: buildPopulateCardsForActivityPrompt(),
+          userMessage: buildPopulateCardsForActivityUserMessage(
+            workflowId,
+            workflowTitle,
+            activity.id,
+            activity.title,
+            userRequest,
+            currentState,
+            true,
+          ),
+          state: currentState,
+          emit,
+          actionFilter: cardFilter,
+          mockResponse,
+        });
+      }
+      return result;
+    }),
+  );
 
-    totalActions += cardsResult.actionCount;
-    if (cardsResult.actionCount > 0) {
-      const nextState = await fetchMapSnapshot(db, projectId);
-      if (nextState) currentState = nextState;
-    }
-  }
-
+  totalActions += cardResults.reduce((sum, r) => sum + r.actionCount, 0);
   return { actionCount: totalActions };
 }

@@ -156,19 +156,6 @@ export const upsertCardPlannedFileTargetRefSchema = z.object({
 });
 
 // ============================================================================
-// approveCardPlannedFile: Approve or reject a planned file
-// ============================================================================
-
-export const approveCardPlannedFilePayloadSchema = z.object({
-  planned_file_id: z.string().uuid(),
-  status: z.enum(["approved", "proposed"]), // only these can be approved
-});
-
-export const approveCardPlannedFileTargetRefSchema = z.object({
-  card_id: z.string().uuid(),
-});
-
-// ============================================================================
 // upsertCardKnowledgeItem: Create or update a knowledge item (requirement, fact, assumption, question)
 // ============================================================================
 
@@ -185,18 +172,6 @@ export const upsertCardKnowledgeItemTargetRefSchema = z.object({
   card_id: z.string().uuid(),
 });
 
-// ============================================================================
-// setCardKnowledgeStatus: Change status of a knowledge item
-// ============================================================================
-
-export const setCardKnowledgeStatusPayloadSchema = z.object({
-  knowledge_item_id: z.string().uuid(),
-  status: z.enum(["draft", "approved", "rejected"]),
-});
-
-export const setCardKnowledgeStatusTargetRefSchema = z.object({
-  card_id: z.string().uuid(),
-});
 
 // ============================================================================
 // deleteWorkflow: Delete a workflow and its activities/cards (cascade)
@@ -248,9 +223,7 @@ export const payloadSchemaByActionType: Record<
   linkContextArtifact: linkContextArtifactPayloadSchema,
   createContextArtifact: createContextArtifactPayloadSchema,
   upsertCardPlannedFile: upsertCardPlannedFilePayloadSchema,
-  approveCardPlannedFile: approveCardPlannedFilePayloadSchema,
   upsertCardKnowledgeItem: upsertCardKnowledgeItemPayloadSchema,
-  setCardKnowledgeStatus: setCardKnowledgeStatusPayloadSchema,
 };
 
 export const targetRefSchemaByActionType: Record<
@@ -269,9 +242,7 @@ export const targetRefSchemaByActionType: Record<
   linkContextArtifact: linkContextArtifactTargetRefSchema,
   createContextArtifact: createContextArtifactTargetRefSchema,
   upsertCardPlannedFile: upsertCardPlannedFileTargetRefSchema,
-  approveCardPlannedFile: approveCardPlannedFileTargetRefSchema,
   upsertCardKnowledgeItem: upsertCardKnowledgeItemTargetRefSchema,
-  setCardKnowledgeStatus: setCardKnowledgeStatusTargetRefSchema,
 };
 
 // ============================================================================
@@ -291,9 +262,7 @@ export const actionPayloadsSchema = z.union([
   linkContextArtifactPayloadSchema,
   createContextArtifactPayloadSchema,
   upsertCardPlannedFilePayloadSchema,
-  approveCardPlannedFilePayloadSchema,
   upsertCardKnowledgeItemPayloadSchema,
-  setCardKnowledgeStatusPayloadSchema,
 ]);
 
 export const actionTargetRefsSchema = z.union([
@@ -309,9 +278,7 @@ export const actionTargetRefsSchema = z.union([
   linkContextArtifactTargetRefSchema,
   createContextArtifactTargetRefSchema,
   upsertCardPlannedFileTargetRefSchema,
-  approveCardPlannedFileTargetRefSchema,
   upsertCardKnowledgeItemTargetRefSchema,
-  setCardKnowledgeStatusTargetRefSchema,
 ]);
 
 // ============================================================================
@@ -343,14 +310,8 @@ export type CreateContextArtifactPayload = z.infer<
 export type UpsertCardPlannedFilePayload = z.infer<
   typeof upsertCardPlannedFilePayloadSchema
 >;
-export type ApproveCardPlannedFilePayload = z.infer<
-  typeof approveCardPlannedFilePayloadSchema
->;
 export type UpsertCardKnowledgeItemPayload = z.infer<
   typeof upsertCardKnowledgeItemPayloadSchema
->;
-export type SetCardKnowledgeStatusPayload = z.infer<
-  typeof setCardKnowledgeStatusPayloadSchema
 >;
 
 export type ValidatedPlanningAction = z.infer<

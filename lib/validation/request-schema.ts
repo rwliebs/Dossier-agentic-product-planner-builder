@@ -128,9 +128,6 @@ export const updatePlannedFileSchema = z.object({
   position: z.number().int().nonnegative().optional(),
 });
 
-export const approvePlannedFileSchema = z.object({
-  status: z.literal("approved"),
-});
 
 // Chat request (non-streaming; supports scaffold, populate, finalize per ADR 0009)
 export const chatRequestSchema = z

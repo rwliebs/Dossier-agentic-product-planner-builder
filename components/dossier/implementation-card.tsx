@@ -43,7 +43,6 @@ interface ImplementationCardProps {
   onAddPlannedFile?: (cardId: string, logicalFilePath: string) => void | Promise<void>;
   availableArtifacts?: ContextArtifact[];
   availableFilePaths?: string[];
-  onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
   onResumeBlockedCard?: (cardId: string) => void;
   /** When provided, shows a Review button that opens the files pane with this card's feature branch */
@@ -88,33 +87,6 @@ const statusLabels: Record<CardStatusType, string> = {
   production: 'live',
 };
 
-const knowledgeBadgeClass: Record<string, string> = {
-  draft: 'bg-amber-100 text-amber-800',
-  approved: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-800',
-};
-
-const plannedFileStatusClass: Record<string, string> = {
-  proposed: 'bg-slate-100 text-slate-700',
-  user_edited: 'bg-blue-100 text-blue-700',
-  approved: 'bg-green-100 text-green-800',
-};
-
-function KnowledgeBadge({ status }: { status: string }) {
-  return (
-    <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded ${knowledgeBadgeClass[status] ?? 'bg-muted text-muted-foreground'}`}>
-      {status}
-    </span>
-  );
-}
-
-function PlannedFileStatusBadge({ status }: { status: string }) {
-  return (
-    <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded ${plannedFileStatusClass[status] ?? 'bg-muted'}`}>
-      {status}
-    </span>
-  );
-}
 
 export function ImplementationCard({
   card,
@@ -129,7 +101,6 @@ export function ImplementationCard({
   onAddPlannedFile,
   availableArtifacts = [],
   availableFilePaths = [],
-  onApprovePlannedFile,
   onBuildCard,
   onResumeBlockedCard,
   onShowCardFiles,
@@ -594,7 +565,6 @@ export function ImplementationCard({
                       ) : (
                         <>
                           <span className="flex-1">• {req.text}</span>
-                          <KnowledgeBadge status={req.status} />
                           {onUpdateRequirement && (
                             <button type="button" onClick={(e) => { e.stopPropagation(); handleStartEditRequirement(req); }} className="opacity-0 group-hover/req:opacity-100 hover:opacity-100 p-1 hover:bg-black/5 rounded transition-opacity shrink-0" title="Edit">
                               <Edit2 className="h-3 w-3 text-gray-400" />
@@ -715,29 +685,9 @@ export function ImplementationCard({
               {plannedFiles.length > 0 ? (
                 <div className="space-y-1">
                   {plannedFiles.map((pf) => (
-                    <div key={pf.id} className="flex items-center justify-between gap-2 text-xs px-2 py-1 bg-white border border-gray-300 rounded">
+                    <div key={pf.id} className="flex items-center gap-2 text-xs px-2 py-1 bg-white border border-gray-300 rounded">
                       <span className="text-gray-700 truncate flex-1 min-w-0">{pf.logical_file_name}</span>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <PlannedFileStatusBadge status={pf.status} />
-                        {onApprovePlannedFile && pf.status !== 'approved' && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); onApprovePlannedFile(card.id, pf.id, 'approved'); }}
-                            className="px-1.5 py-0.5 text-[10px] font-mono bg-green-600 text-white rounded hover:bg-green-700"
-                          >
-                            Approve
-                          </button>
-                        )}
-                        {onApprovePlannedFile && pf.status === 'approved' && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); onApprovePlannedFile(card.id, pf.id, 'proposed'); }}
-                            className="px-1.5 py-0.5 text-[10px] font-mono bg-gray-400 text-white rounded hover:bg-gray-500"
-                          >
-                            Revert
-                          </button>
-                        )}
-                      </div>
+                      <span className="text-[10px] font-mono text-muted-foreground shrink-0">{pf.artifact_kind}</span>
                     </div>
                   ))}
                 </div>

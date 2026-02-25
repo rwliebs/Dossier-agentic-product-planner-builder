@@ -18,9 +18,7 @@ import type {
   LinkContextArtifactPayload,
   CreateContextArtifactPayload,
   UpsertCardPlannedFilePayload,
-  ApproveCardPlannedFilePayload,
   UpsertCardKnowledgeItemPayload,
-  SetCardKnowledgeStatusPayload,
 } from "@/lib/schemas/action-payloads";
 
 /**
@@ -89,14 +87,8 @@ export function applyAction(
       case "upsertCardPlannedFile":
         return applyUpsertCardPlannedFile(action, newState);
 
-      case "approveCardPlannedFile":
-        return applyApproveCardPlannedFile(action, newState);
-
       case "upsertCardKnowledgeItem":
         return applyUpsertCardKnowledgeItem(action, newState);
-
-      case "setCardKnowledgeStatus":
-        return applySetCardKnowledgeStatus(action, newState);
 
       default:
         return {
@@ -425,43 +417,6 @@ function applyUpsertCardPlannedFile(
   return { success: true, newState: state };
 }
 
-function applyApproveCardPlannedFile(
-  action: PlanningAction,
-  state: PlanningState,
-): MutationResult {
-  const payload = action.payload as ApproveCardPlannedFilePayload;
-  const target_ref = action.target_ref as { card_id: string };
-
-  const files = state.cardPlannedFiles.get(target_ref.card_id);
-  if (!files) {
-    return {
-      success: false,
-      error: {
-        code: "constraint_violation",
-        message: `No planned files for card ${target_ref.card_id}`,
-      },
-    };
-  }
-
-  const fileIndex = files.findIndex((f) => f.id === payload.planned_file_id);
-  if (fileIndex < 0) {
-    return {
-      success: false,
-      error: {
-        code: "constraint_violation",
-        message: `Planned file ${payload.planned_file_id} not found`,
-      },
-    };
-  }
-
-  // Immutable array update to preserve immutability contract with shallow clone
-  const updated = files.map((f, i) =>
-    i === fileIndex ? { ...f, status: payload.status } : f,
-  );
-  state.cardPlannedFiles.set(target_ref.card_id, updated);
-
-  return { success: true, newState: state };
-}
 
 function applyUpsertCardKnowledgeItem(
   action: PlanningAction,
@@ -573,73 +528,3 @@ function applyUpsertCardKnowledgeItem(
   return { success: true, newState: state };
 }
 
-function applySetCardKnowledgeStatus(
-  action: PlanningAction,
-  state: PlanningState,
-): MutationResult {
-  const payload = action.payload as SetCardKnowledgeStatusPayload;
-  const target_ref = action.target_ref as { card_id: string };
-
-  // Attempt to find and update the knowledge item in any of the lists.
-  // Use immutable array updates (new array + new object) to avoid mutating
-  // shared references from shallow clone, preserving the immutability contract.
-  for (const [cardId, requirements] of state.cardRequirements) {
-    const itemIndex = requirements.findIndex(
-      (r) => r.id === payload.knowledge_item_id,
-    );
-    if (itemIndex >= 0) {
-      const updated = requirements.map((r, i) =>
-        i === itemIndex ? { ...r, status: payload.status } : r,
-      );
-      state.cardRequirements.set(cardId, updated);
-      return { success: true, newState: state };
-    }
-  }
-
-  for (const [cardId, facts] of state.cardFacts) {
-    const itemIndex = facts.findIndex(
-      (f) => f.id === payload.knowledge_item_id,
-    );
-    if (itemIndex >= 0) {
-      const updated = facts.map((f, i) =>
-        i === itemIndex ? { ...f, status: payload.status } : f,
-      );
-      state.cardFacts.set(cardId, updated);
-      return { success: true, newState: state };
-    }
-  }
-
-  for (const [cardId, assumptions] of state.cardAssumptions) {
-    const itemIndex = assumptions.findIndex(
-      (a) => a.id === payload.knowledge_item_id,
-    );
-    if (itemIndex >= 0) {
-      const updated = assumptions.map((a, i) =>
-        i === itemIndex ? { ...a, status: payload.status } : a,
-      );
-      state.cardAssumptions.set(cardId, updated);
-      return { success: true, newState: state };
-    }
-  }
-
-  for (const [cardId, questions] of state.cardQuestions) {
-    const itemIndex = questions.findIndex(
-      (q) => q.id === payload.knowledge_item_id,
-    );
-    if (itemIndex >= 0) {
-      const updated = questions.map((q, i) =>
-        i === itemIndex ? { ...q, status: payload.status } : q,
-      );
-      state.cardQuestions.set(cardId, updated);
-      return { success: true, newState: state };
-    }
-  }
-
-  return {
-    success: false,
-    error: {
-      code: "constraint_violation",
-      message: `Knowledge item ${payload.knowledge_item_id} not found`,
-    },
-  };
-}

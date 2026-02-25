@@ -64,6 +64,6 @@ describe("RightPanel", () => {
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith("/api/projects/p1/files?source=repo");
     });
-    expect(screen.getByText("feature")).toBeInTheDocument();
+    expect(screen.getByText("main")).toBeInTheDocument();
   });
 });

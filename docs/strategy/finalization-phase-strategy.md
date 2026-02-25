@@ -59,21 +59,25 @@ Finalize mode runs multiple LLM calls in parallel (one per document). Each sub-s
 
 #### Sub-steps 1–5: Core Product Documents (1 LLM call each, run in parallel)
 
-Each document gets its own LLM call. The five categories of project-level `ContextArtifact` records:
+Each document gets its own LLM call. The five categories of project-level `ContextArtifact` records (in `FINALIZE_DOC_SPECS` order):
 
-| Document | Artifact Type | Content |
-|----------|--------------|---------|
-| Architectural Summary | `doc` | Tech stack, service topology, key patterns, deployment model; MUST include "## Root folder structure" with bullet list of paths (e.g. app/, components/, lib/) |
-| Data Contracts | `spec` | Schemas, API contracts, shared interfaces, data flow |
-| Domain Summaries | `doc` | Bounded contexts, domain models, entity relationships, glossary |
-| User Workflow Summaries | `doc` | Per-workflow: user outcomes, activity flow, card dependencies, cross-workflow connections |
-| Design System | `design` | Component palette, color tokens, typography, spacing conventions, interaction patterns |
+| # | Document | Artifact Type | Content |
+|---|----------|---------------|---------|
+| 1 | Architectural Summary | `doc` | Tech stack, service topology, key patterns, deployment model; MUST include "## Root folder structure" with bullet list of paths (e.g. app/, components/, lib/) |
+| 2 | **Data Contracts** | `spec` | Schemas, API contracts, shared interfaces, data flow |
+| 3 | Domain Summaries | `doc` | Bounded contexts, domain models, entity relationships, glossary |
+| 4 | User Workflow Summaries | `doc` | Per-workflow: user outcomes, activity flow, card dependencies, cross-workflow connections |
+| 5 | Design System | `design` | Component palette, color tokens, typography, spacing conventions, interaction patterns |
+
+If you see only 4 documents, **Data Contracts** (spec type) may have failed — check server logs for `[finalize] Doc generation failed for data-contracts`.
 
 Each document is derived from the current map state: project metadata (tech_stack, deployment, design_inspiration, customer_personas), workflow/activity titles and descriptions. Cards may be absent at this stage.
 
 #### Directory Folders
 
 After documents are created, the system parses the "## Root folder structure" section from the Architectural Summary and creates those folders in the repo (with `.gitkeep`). If no repo is connected, folder creation is skipped; folders are created when the repo is linked and project is re-finalized, or on first build.
+
+**Files pane:** When a repo is connected, the Files tab shows the clone's directory structure (including folders created by finalization) even before any build. If no repo is connected or no clone exists, it shows "No build with repository available" until a build runs.
 
 #### Progress Events
 

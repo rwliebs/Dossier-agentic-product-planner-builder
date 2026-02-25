@@ -61,6 +61,7 @@ export async function runLlmSubStep(opts: {
   for await (const result of parseActionsFromStream(llmStream)) {
     if (result.type === "response_type") {
       if (result.responseType === "clarification") {
+        console.warn("[planning] LLM returned type 'clarification' — skipping actions.");
         return { actionCount, updatedState: currentState };
       }
       continue;
@@ -111,14 +112,20 @@ export async function runLlmSubStep(opts: {
     if (newState) currentState = newState;
   }
 
-  if (!useMock && rawLlmOutput && process.env.PLANNING_DEBUG === "1") {
-    console.log(
-      "[planning] LLM sub-step raw output",
-      actionCount === 0 ? "(0 actions parsed)" : "",
-      ":\n",
-      rawLlmOutput.slice(0, 4000),
-      rawLlmOutput.length > 4000 ? "\n...(truncated)" : "",
-    );
+  if (!useMock && rawLlmOutput) {
+    if (actionCount === 0) {
+      console.warn(
+        "[planning] LLM sub-step produced 0 actions. Raw output:\n",
+        rawLlmOutput.slice(0, 4000),
+        rawLlmOutput.length > 4000 ? "\n...(truncated)" : "",
+      );
+    } else if (process.env.PLANNING_DEBUG === "1") {
+      console.log(
+        "[planning] LLM sub-step raw output:\n",
+        rawLlmOutput.slice(0, 4000),
+        rawLlmOutput.length > 4000 ? "\n...(truncated)" : "",
+      );
+    }
   }
 
   return { actionCount, updatedState: currentState };

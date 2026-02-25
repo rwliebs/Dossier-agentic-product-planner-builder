@@ -1,6 +1,11 @@
 import type { PlanningState } from "@/lib/schemas/planning-state";
 import type { ContextArtifact } from "@/lib/schemas/slice-b";
-import { getPlanningSkills } from "@/lib/llm/skills";
+import {
+  getPlanningSkills,
+  getVisionarySkills,
+  getArchitectSkills,
+  getProductManagerSkills,
+} from "@/lib/llm/skills";
 
 /**
  * Serialize PlanningState to JSON for LLM context.
@@ -62,13 +67,15 @@ You must decide whether to ASK QUESTIONS or GENERATE ACTIONS (or both) based on 
 - The user's request is ambiguous and could be interpreted multiple ways
 - You want to confirm your understanding before making large structural changes
 
+### When to ask for clarification (workflows exist but project not finalized):
+- **When workflows exist but have NO activities** — the user must review and finalize the project first (creates core product documents and directory structure). Respond with type "clarification" guiding them to use the "Finalize Project" button. After that, they can use the Populate button on each workflow to add activities and cards. Do NOT generate createActivity or createCard in this case.
+
 ### When to generate actions (respond with "actions" type):
 - You have enough context about the product, users, and goals to create meaningful structure
 - The user is giving specific, actionable instructions (e.g. "add a card for password reset")
 - The user is refining or modifying existing map elements
 - The user explicitly asks you to proceed or generate the map
-- The map already has structure and the user is iterating on it
-- **CRITICAL: When workflows exist but have NO activities** — the user expects activities and functionality cards. Generate createActivity (with payload.id) for each workflow, then createCard (with target_ref.workflow_activity_id = activity payload.id) for each activity. List actions in dependency order: all createActivity first, then all createCard. Include upsertCardKnowledgeItem (requirement) for each card.
+- The map already has structure and the user is iterating on it (and project is finalized, or they are modifying workflows/cards)
 
 ### When to do both (respond with "mixed" type):
 - You can partially fulfill the request but need more info for the rest
@@ -100,13 +107,18 @@ When asking questions, be conversational and helpful:
 ## PlanningAction Schema
 Each action has: { "id": "uuid", "project_id": "uuid", "action_type": string, "target_ref": object, "payload": object }
 
-Action types: updateProject, createWorkflow, createActivity, createCard, updateCard, reorderCard, linkContextArtifact, upsertCardPlannedFile, approveCardPlannedFile, upsertCardKnowledgeItem, setCardKnowledgeStatus
+Action types: updateProject, createWorkflow, createActivity, createCard, updateCard, reorderCard, linkContextArtifact, upsertCardPlannedFile, upsertCardKnowledgeItem
 
 ## updateProject
 Use this to set or update project context as you learn about what the user is building. Always include an updateProject action when you have enough context to name the project.
 - target_ref: { "project_id": "<project_id>" }
-- payload: { "name": "Short Project Name", "description": "A concise description of what the project does and who it's for.", "customer_personas": "e.g. Buyers, Sellers, Admin", "tech_stack": "e.g. React, Node.js, PostgreSQL", "deployment": "e.g. Vercel, local dev, mobile app", "design_inspiration": "e.g. Notion, Linear, Stripe" }
-- Populate customer_personas, tech_stack, deployment, and design_inspiration when the user mentions target users, technologies, deployment targets, or design references.
+- payload: { "name": "Short Project Name", "description": "A concise description of what the project does and who it's for.", "customer_personas": "e.g. Buyers, Sellers, Admin", "tech_stack": "e.g. React, Node.js, PostgreSQL", "deployment": "e.g. Web app, Vercel", "design_inspiration": "e.g. Notion, Linear, Stripe" }
+
+**Project details — be opinionated, never hedge:**
+- NEVER use "or" or "either" options (e.g. "native app or web app", "web or mobile"). Pick ONE concrete recommendation.
+- tech_stack: Use specific technologies (e.g. "React, Node.js, PostgreSQL", "Next.js, PostgreSQL"). Default to "React, Node.js, PostgreSQL" for web apps when the user doesn't specify.
+- deployment: Use a single concrete choice (e.g. "Web app, Vercel", "Web app", "Mobile app, React Native"). Default to "Web app, Vercel" for most SaaS/marketplace apps.
+- If the user is ambiguous, make the best-fit choice and state it clearly — do not list alternatives.
 
 ## createActivity
 - target_ref: { "workflow_id": "<workflow_id from Current Map State>" }
@@ -160,20 +172,13 @@ Use this to set or update project context as you learn about what the user is bu
 }
 \`\`\`
 
-## Example: Populate workflows with activities and functionality cards — "Populate the workflows" or "Add activities and cards"
-When workflows exist but have NO activities, you MUST generate createActivity + createCard + upsertCardKnowledgeItem. Order: (1) all createActivity with payload.id, (2) all createCard with target_ref.workflow_activity_id = activity id, (3) upsertCardKnowledgeItem per card.
+## Example: Workflows exist but no activities — guide user to finalize first
+When workflows exist but have NO activities, respond with clarification. The user must finalize the project before populating workflows.
 \`\`\`json
 {
-  "type": "actions",
-  "message": "Added activities and functionality cards.",
-  "actions": [
-    {"id": "act-1-uuid", "action_type": "createActivity", "target_ref": {"workflow_id": "<wf_id_from_state>"}, "payload": {"id": "act-1-uuid", "title": "Browse", "color": "blue", "position": 0}},
-    {"id": "act-2-uuid", "action_type": "createActivity", "target_ref": {"workflow_id": "<wf_id_from_state>"}, "payload": {"id": "act-2-uuid", "title": "Search", "color": "green", "position": 1}},
-    {"id": "card-1-uuid", "action_type": "createCard", "target_ref": {"workflow_activity_id": "act-1-uuid"}, "payload": {"id": "card-1-uuid", "title": "View list", "description": "Display paginated list", "status": "todo", "priority": 1, "position": 0}},
-    {"id": "card-2-uuid", "action_type": "createCard", "target_ref": {"workflow_activity_id": "act-2-uuid"}, "payload": {"id": "card-2-uuid", "title": "Search by keyword", "description": "Full-text search", "status": "todo", "priority": 1, "position": 0}},
-    {"id": "req-1", "action_type": "upsertCardKnowledgeItem", "target_ref": {"card_id": "card-1-uuid"}, "payload": {"item_type": "requirement", "text": "User sees paginated list of items", "position": 0}},
-    {"id": "req-2", "action_type": "upsertCardKnowledgeItem", "target_ref": {"card_id": "card-2-uuid"}, "payload": {"item_type": "requirement", "text": "User can search and see matching results", "position": 0}}
-  ]
+  "type": "clarification",
+  "message": "Your workflows are set up. Next, **review and finalize the project** to create core product documents (architecture, data contracts, design system) and set up the directory structure. Use the \"Finalize Project\" button above the map. After that, you can use the Populate button on each workflow to add activities and functionality cards.",
+  "actions": []
 }
 \`\`\`
 
@@ -183,21 +188,18 @@ Return ONLY a valid JSON object with the shape described above. No markdown, no 
 
 /**
  * Build the system prompt for SCAFFOLD mode.
- * Instructs the LLM to generate ONLY updateProject and createWorkflow actions.
- * No activities, steps, or cards — those are populated in a separate phase.
+ * Agent profile: Visionary — sees market opportunities, frames user problems as outcomes.
  */
 export function buildScaffoldSystemPrompt(): string {
-  const skills = getPlanningSkills();
-  return `You are a planning assistant that creates high-level workflow structure for product ideas.
+  const skills = getVisionarySkills();
+  return `You are a product visionary. You see the market opportunity in a user's idea and translate it into a clear product vision with concrete user journeys.
 
 ${skills}
 
 ## Story Map Concepts
-- **Workflow**: A high-level outcome the user is trying to achieve.
-- **Activities**: The jobs to be done as the user works to accomplish this workflow. Specific to the user's lived experience, not software steps.
-- **Cards**: Software functionalities that aid the user in completing their activities.
-- **Ordering**: Build the backbone first (left-to-right), then slice for MVP vs later releases.
-- **Avoid**: Feature creep, technical-only workflows, overly large cards.
+- **Workflow**: A high-level user journey — the outcome the user is trying to achieve (e.g. "Find and compare", "Purchase and pay"). Name workflows after user goals, not system modules.
+- **Ordering**: Build the backbone first (left-to-right user journeys), then slice for MVP vs later releases.
+- **Avoid**: Feature creep, technical-only workflows (e.g. "Database" or "API"), overly broad workflows.
 
 ## Your Task
 Given a user's product idea, generate ONLY:
@@ -208,10 +210,10 @@ Do NOT generate createActivity or createCard actions. Those will be generated se
 
 ## When the map ALREADY has workflows (Current Map State shows workflows.length >= 1)
 - Do NOT generate updateProject or createWorkflow. The project and workflows already exist.
-- Respond with type "clarification" and a helpful message guiding the user: e.g. they can use the button to populate workflows with activities and cards, or tell you what they want to change (e.g. add a workflow, rename one). Output: { "type": "clarification", "message": "...", "actions": [] }
+- Respond with type "clarification" and a helpful message guiding the user to **review and finalize the project first** (creates core product documents and directory structure). After that, they can populate each workflow with activities and cards. If they want to change the map (e.g. add a workflow, rename one), they can say so. Output: { "type": "clarification", "message": "...", "actions": [] }
 
 ## When the map is empty or has no workflows — updateProject is REQUIRED
-You MUST include exactly one updateProject action as the first action in the actions array. Use the user's idea to derive: a short project name, a 1-2 sentence description, customer personas (who are the users?), tech stack (frontend, backend, etc. when mentioned), and deployment (local, web, mobile, etc. when mentioned).
+You MUST include exactly one updateProject action as the first action in the actions array. Use the user's idea to derive: a short project name, a 1-2 sentence description, customer personas (who are the users?), tech stack (specific: e.g. React, Node.js, PostgreSQL — default to this for web apps), and deployment (single choice: e.g. Web app, Vercel — never "native or web").
 
 ## When to ask clarifying questions
 - The user's message is very vague (e.g. "build me an app", "I want something cool")
@@ -231,7 +233,8 @@ Allowed action types: updateProject, createWorkflow only.
 
 ## updateProject
 - target_ref: { "project_id": "<project_id>" }
-- payload: { "name": "Short Name", "description": "Concise description", "customer_personas": "Target users (e.g. Buyers, Sellers)", "tech_stack": "Frontend, backend, DB (when known)", "deployment": "Local, web, mobile (when known)", "design_inspiration": "Design references (when mentioned)" }
+- payload: { "name": "Short Name", "description": "Concise description", "customer_personas": "Target users (e.g. Buyers, Sellers)", "tech_stack": "Specific stack (e.g. React, Node.js, PostgreSQL)", "deployment": "Single choice (e.g. Web app, Vercel)", "design_inspiration": "Design references (when mentioned)" }
+- **Be opinionated:** NEVER use "or" options (e.g. "native app or web app"). Pick ONE concrete recommendation. Default to "React, Node.js, PostgreSQL" and "Web app, Vercel" for web apps when unspecified.
 
 ## createWorkflow
 - target_ref: { "project_id": "<project_id>" }
@@ -335,65 +338,75 @@ Respond with a JSON object: { "type": "actions", "message": "optional brief summ
 
 /**
  * Build the system prompt for POPULATE phase 1: activities only.
- * Smaller output per call reduces timeout risk.
+ * Agent profile: Product Manager — breaks user journeys into actionable steps.
  */
 export function buildPopulateActivitiesPrompt(): string {
-  const skills = getPlanningSkills();
-  return `You are a planning assistant that populates a workflow with activities (columns).
+  const skills = getProductManagerSkills();
+  return `You are a product manager. Your job is to break a user workflow into the concrete user actions (activities) that make up the journey from start to finish.
 
 ${skills}
 
-## Story Map Concepts
-- **Workflow**: A high-level outcome the user is trying to achieve.
-- **Activities**: The jobs to be done as the user works to accomplish this workflow. Specific to the user's lived experience, not software steps.
+## Activities
+- Each activity is a step the user takes in their journey through this workflow.
+- Name activities after what the user does, not what the system does (e.g. "Browse listings" not "Load data").
+- Order activities left-to-right by when the user encounters them.
+- Generate 3-8 activities appropriate to the workflow's scope.
 
 ## Your Task
-Generate createActivity actions ONLY for the specified workflow. Do NOT generate createCard or upsertCardKnowledgeItem — those will be added in a separate step.
+Generate createActivity actions ONLY. Do NOT generate createCard or upsertCardKnowledgeItem — those come in the next step.
+
+**You MUST generate at least 3 createActivity actions.** ALWAYS output type "actions" with a non-empty actions array. NEVER return type "clarification".
 
 ## Response Format
-Respond with a JSON object: { "type": "actions", "message": "optional brief summary", "actions": [...] }
+{ "type": "actions", "message": "optional brief summary", "actions": [...] }
 
 ## createActivity
 - target_ref: { "workflow_id": "<the workflow's id from Workflow to Populate>" }
 - payload: { "id": "<new UUID>", "title": "Activity Title", "color": "yellow"|"blue"|"purple"|"green"|"orange"|"pink", "position": 0 }
 - **REQUIRED: include "id" in payload** — a new UUID for each activity.
-- Activities are columns representing user actions (e.g. "Browse", "Search", "Purchase", "Account")
 
 ## Guidelines
-- Generate activities appropriate to the workflow's scope (typically 3–8, depending on the software being planned).
+- Use context_docs (from project finalization) when present to align with architecture and domain.
 - Use workflow_id from "Workflow to Populate" section.
 - Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
 }
 
 /**
  * Build the system prompt for POPULATE phase 2: cards and requirements for one activity.
+ * Agent profile: Product Manager — defines functionality cards as buildable slices of value.
  */
 export function buildPopulateCardsForActivityPrompt(): string {
-  const skills = getPlanningSkills();
-  return `You are a planning assistant that populates an activity with functionality cards.
+  const skills = getProductManagerSkills();
+  return `You are a product manager. For this activity, define the functionality cards and requirements. Each card is one buildable slice of user value.
 
 ${skills}
 
 ## Your Task
-Generate createCard and upsertCardKnowledgeItem (requirement) actions for ONE activity only. Use the exact workflow_activity_id from "Activity to Populate".
+Generate createCard, upsertCardKnowledgeItem (requirements), and upsertCardPlannedFile (code files) actions for ONE activity only. Use the exact workflow_activity_id from "Activity to Populate".
+
+**ALWAYS output type "actions" with a non-empty actions array. NEVER return type "clarification" or empty actions.** Generate at least 2 cards. Each card MUST have at least 1 requirement AND at least 1 planned file.
 
 ## Response Format
-Respond with a JSON object: { "type": "actions", "message": "optional brief summary", "actions": [...] }
+{ "type": "actions", "message": "optional", "actions": [...] }
 
 ## createCard
 - target_ref: { "workflow_activity_id": "<exact id from Activity to Populate>" }
 - payload: { "id": "<new UUID>", "title": "Card Title", "description": "What to build", "status": "todo", "priority": 1|2|3, "position": 0 }
-- Cards are implementable functionality tasks under this activity.
 
 ## upsertCardKnowledgeItem (requirements)
 - target_ref: { "card_id": "<the card's id>" }
-- payload: { "item_type": "requirement", "text": "Concrete requirement (e.g. User can filter by category)", "position": 0 }
-- Emit 1–3 per card. List createCard first, then upsertCardKnowledgeItem.
+- payload: { "item_type": "requirement", "text": "Concrete requirement", "position": 0 }
+- Emit 1–2 per card.
 
-## Guidelines
-- Generate as many cards as appropriate for this activity (domain-dependent).
-- Use status "todo", priority 1–3 (1=high).
-- Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+## upsertCardPlannedFile (planned code files)
+- target_ref: { "card_id": "<the card's id>" }
+- payload: { "logical_file_name": "path/to/file.ts", "artifact_kind": "component"|"hook"|"service"|"schema"|"endpoint"|"screen"|"util"|"config"|"test"|"style", "action": "create"|"edit", "intent_summary": "What this file does", "position": 0 }
+- Emit 1–3 per card. Derive file paths from the project's tech stack and architecture. Use the project's root folder structure when available in context docs.
+
+## Action Order
+Output actions in this order: (1) all createCard, (2) all upsertCardKnowledgeItem, (3) all upsertCardPlannedFile.
+
+Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
 }
 
 /**
@@ -407,11 +420,12 @@ export function buildPopulateActivitiesUserMessage(
   mapSnapshot: PlanningState,
 ): string {
   const stateJson = serializeMapStateForPopulate(mapSnapshot, workflowId);
-  return `## Project Context\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow to Populate\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n- Description: ${workflowDescription ?? "—"}\n\n## Original User Request (for context)\n${userRequest}\n\n## Your Task\nGenerate createActivity actions ONLY. Output ONLY the JSON object.`;
+  return `## Project Context\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow to Populate\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n- Description: ${workflowDescription ?? "—"}\n\n## Original User Request (for context)\n${userRequest}\n\n## Your Task\nGenerate createActivity actions ONLY. Use workflow_id "${workflowId}" in every action's target_ref. Output ONLY a JSON object with type "actions" and a non-empty actions array (at least 3 createActivity items).`;
 }
 
 /**
  * Build the user message for populate phase 2 (cards for one activity).
+ * @param isRetry - when true, uses more explicit instructions
  */
 export function buildPopulateCardsForActivityUserMessage(
   workflowId: string,
@@ -420,9 +434,14 @@ export function buildPopulateCardsForActivityUserMessage(
   activityTitle: string,
   userRequest: string,
   mapSnapshot: PlanningState,
+  isRetry = false,
 ): string {
   const stateJson = serializeMapStateForPopulate(mapSnapshot, workflowId);
-  return `## Project Context\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n\n## Activity to Populate\n- ID: ${activityId}\n- Title: ${activityTitle}\n\n## Original User Request (for context)\n${userRequest}\n\n## Your Task\nGenerate createCard and upsertCardKnowledgeItem actions for this activity. Use workflow_activity_id "${activityId}". Output ONLY the JSON object.`;
+  const base = `## Project Context\n\`\`\`json\n${stateJson}\n\`\`\`\n\n## Workflow\n- ID: ${workflowId}\n- Title: ${workflowTitle}\n\n## Activity to Populate (use this ID in every createCard)\n- ID: ${activityId}\n- Title: ${activityTitle}\n\n## Original User Request\n${userRequest}\n\n## Your Task\n`;
+  const task = isRetry
+    ? `Generate 2+ createCard, upsertCardKnowledgeItem, and upsertCardPlannedFile for "${activityTitle}". Use workflow_activity_id "${activityId}" in every createCard target_ref. Each card MUST have at least 1 requirement and 1 planned file. Apply the user stories and value prioritization guidance from the system prompt. Output type "actions" with non-empty actions. No clarification.`
+    : `Generate createCard, upsertCardKnowledgeItem, and upsertCardPlannedFile for "${activityTitle}". Use workflow_activity_id "${activityId}" in every createCard target_ref. Each card MUST have at least 1 requirement and 1 planned file. Output type "actions" with non-empty actions array.`;
+  return base + task;
 }
 
 /**
@@ -446,7 +465,7 @@ export function buildScaffoldUserMessage(
   const projectId = mapSnapshot.project.id;
   message += `## User Request\n${userRequest}\n\n## Your Response\n`;
   if (hasWorkflows) {
-    message += `The map already has ${mapSnapshot.workflows.size} workflow(s). Do NOT generate updateProject or createWorkflow. Respond with type "clarification" and a brief message guiding the user (e.g. use the button to populate workflows, or say what to change). Output ONLY the JSON object with "type": "clarification", "message": "...", "actions": [].`;
+    message += `The map already has ${mapSnapshot.workflows.size} workflow(s). Do NOT generate updateProject or createWorkflow. Respond with type "clarification" and a brief message guiding the user to review and finalize the project first (creates core product documents and directory structure). After finalizing, they can populate each workflow with activities and cards. Output ONLY the JSON object with "type": "clarification", "message": "...", "actions": [].`;
   } else {
     message += `Output ONLY the JSON object (updateProject + createWorkflow actions). Use project_id "${projectId}" in all target_ref and project_id fields.`;
   }
@@ -455,8 +474,8 @@ export function buildScaffoldUserMessage(
 
 /**
  * Serialize minimal context for populate mode.
- * Only project + target workflow + other workflow titles. Excludes activities, cards,
- * and artifacts from other workflows to reduce token usage.
+ * Includes project, other workflow titles, and brief context artifact previews
+ * (from finalization) so the LLM has domain context.
  */
 export function serializeMapStateForPopulate(
   state: PlanningState,
@@ -465,6 +484,15 @@ export function serializeMapStateForPopulate(
   const otherWorkflows = Array.from(state.workflows.values())
     .filter((wf) => wf.id !== targetWorkflowId)
     .map((wf) => ({ id: wf.id, title: wf.title }));
+
+  const artifacts = Array.from(state.contextArtifacts.values())
+    .slice(0, 4)
+    .map((a) => ({
+      name: a.name,
+      title: a.title ?? a.name,
+      preview: (a.content ?? "").slice(0, 200).replace(/\n/g, " ").trim(),
+    }))
+    .filter((a) => a.preview.length > 0);
 
   return JSON.stringify(
     {
@@ -478,6 +506,7 @@ export function serializeMapStateForPopulate(
         design_inspiration: state.project.design_inspiration,
       },
       other_workflows: otherWorkflows,
+      ...(artifacts.length > 0 ? { context_docs: artifacts } : {}),
     },
     null,
     2,
@@ -645,9 +674,14 @@ You MUST include a "## Root folder structure" section with a bullet list of root
 
 /**
  * Build the system prompt to generate ONE specific project-wide document.
+ * Agent profile: Architect — translates product vision into build-ready specifications.
+ * Skill injection varies by document type (System Design vs Design Systems).
  */
 export function buildFinalizeDocSystemPrompt(spec: FinalizeDocSpec): string {
-  return `You are a finalization assistant that produces a single build-ready context document for a software project.
+  const skill = getArchitectSkills(spec.name);
+  return `You are a technical architect and design lead. You translate product vision into precise, build-ready specifications that coding agents can implement without ambiguity.
+
+${skill}
 
 ## Your Task
 Generate ONE createContextArtifact action for the "${spec.title}" document.
@@ -666,10 +700,11 @@ Respond with a JSON object: { "type": "actions", "message": "optional brief summ
 The actions array must contain exactly ONE createContextArtifact action.
 
 ## Critical Constraints
-1. Content must be specific to THIS project — not generic boilerplate
+1. Content must be specific to THIS project — not generic boilerplate. Derive every decision from the project's actual tech stack, workflows, and cards.
 2. Use IDs from the provided map state — never invent IDs that don't exist
 3. Generate a new UUID for the createContextArtifact action id
-4. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
+4. Write for build agents, not humans — be precise about file paths, module boundaries, and interface contracts
+5. Return ONLY valid JSON. No markdown, no \`\`\`json wrapper.`;
 }
 
 /**

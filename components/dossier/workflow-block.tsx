@@ -63,7 +63,6 @@ interface WorkflowBlockProps {
   onAddPlannedFile?: (cardId: string, logicalFilePath: string) => void | Promise<void>;
   availableArtifacts?: ContextArtifact[];
   availableFilePaths?: string[];
-  onApprovePlannedFile?: (cardId: string, plannedFileId: string, status: 'approved' | 'proposed') => void;
   onBuildCard?: (cardId: string) => void;
   onResumeBlockedCard?: (cardId: string) => void;
   onShowCardFiles?: (cardId: string) => void;
@@ -110,7 +109,6 @@ export function WorkflowBlock({
   onAddPlannedFile,
   availableArtifacts = [],
   availableFilePaths = [],
-  onApprovePlannedFile,
   onBuildCard,
   onResumeBlockedCard,
   onShowCardFiles,
@@ -152,6 +150,7 @@ export function WorkflowBlock({
     tech_stack?: string | null;
     deployment?: string | null;
     design_inspiration?: string | null;
+    finalized_at?: string | null;
   };
   const [editingField, setEditingField] = useState<ProjectContextField | null>(null);
   const [viewOnServerLoading, setViewOnServerLoading] = useState(false);
@@ -227,7 +226,7 @@ export function WorkflowBlock({
                 {statusCounts.review > 0 && <div className="text-blue-400"><span className="font-bold">{statusCounts.review}</span> review</div>}
                 {statusCounts.production > 0 && <div className="text-green-600"><span className="font-bold">{statusCounts.production}</span> live</div>}
                 {statusCounts.todo > 0 && <div className="text-muted-foreground"><span className="text-foreground font-bold">{statusCounts.todo}</span> pending</div>}
-                {onFinalizeProject && allCards.length > 0 && (
+                {onFinalizeProject && snapshot.workflows.length > 0 && !project.finalized_at && (
                   <div className="flex items-center gap-2 ml-2">
                     <Button
                       variant="outline"
@@ -336,7 +335,6 @@ export function WorkflowBlock({
             onAddPlannedFile={onAddPlannedFile}
             availableArtifacts={availableArtifacts}
             availableFilePaths={availableFilePaths}
-            onApprovePlannedFile={onApprovePlannedFile}
             onBuildCard={onBuildCard}
             onResumeBlockedCard={onResumeBlockedCard}
             onShowCardFiles={onShowCardFiles}

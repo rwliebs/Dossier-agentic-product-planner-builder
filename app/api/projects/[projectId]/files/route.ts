@@ -18,6 +18,8 @@ import {
   getFileDiff,
   type FileNode,
 } from "@/lib/orchestration/repo-reader";
+import { getClonePath } from "@/lib/orchestration/repo-manager";
+import * as fs from "node:fs";
 
 export type { FileNode };
 
@@ -78,7 +80,26 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       const runWithWorktree = runs.find(
         (r) => (r as { worktree_root?: string }).worktree_root
       );
+
+      // Fallback: if no build yet but repo is connected and clone exists (e.g. after finalization),
+      // show the clone's file tree so users see the directory structure created by finalization.
       if (!runWithWorktree) {
+        const repoUrl = (project as { repo_url?: string })?.repo_url;
+        const baseBranch =
+          (project as { default_branch?: string })?.default_branch ?? "main";
+        if (
+          repoUrl &&
+          !repoUrl.includes("placeholder") &&
+          !cardId // card-specific view needs a run
+        ) {
+          const clonePath = getClonePath(projectId);
+          if (fs.existsSync(clonePath)) {
+            const result = getRepoFileTree(clonePath, baseBranch);
+            if (result.success && result.tree) {
+              return json(result.tree);
+            }
+          }
+        }
         return json(
           { error: "No build with repository available. Trigger a build first." },
           404

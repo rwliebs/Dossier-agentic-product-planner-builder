@@ -44,15 +44,27 @@ function findBalanced(
 }
 
 /**
- * Extract a JSON object from text. Tries: whole string is {...}, code block, then first balanced { ... }.
+ * Extract a JSON object from text. Tries: first balanced { ... }, whole string parse, code block, then fallback balanced.
+ * Prefers balanced-brace extraction over a greedy regex so trailing text ending with "}" (e.g. "See {Authentication}.")
+ * does not overmatch and break JSON.parse in the caller.
  */
 export function extractJsonObject(text: string): string | null {
   const trimmed = text.trim();
   if (!trimmed) return null;
 
   if (trimmed.startsWith("{")) {
-    const directMatch = trimmed.match(/^\{[\s\S]*\}$/);
-    if (directMatch) return directMatch[0];
+    const objStart = trimmed.indexOf("{");
+    const end = findBalanced(trimmed, "{", "}", objStart);
+    if (end !== null) {
+      const candidate = trimmed.slice(objStart, end + 1);
+      try {
+        const parsed = JSON.parse(candidate);
+        if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed))
+          return candidate;
+      } catch {
+        /* continue */
+      }
+    }
     try {
       const parsed = JSON.parse(trimmed);
       if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed))
@@ -76,15 +88,25 @@ export function extractJsonObject(text: string): string | null {
 }
 
 /**
- * Extract a JSON array from text. Tries: whole string is [...], code block, then first balanced [ ... ].
+ * Extract a JSON array from text. Tries: first balanced [ ... ], whole string parse, code block, then fallback balanced.
+ * Prefers balanced-bracket extraction so trailing text ending with "]" does not overmatch.
  */
 export function extractJsonArray(text: string): string | null {
   const trimmed = text.trim();
   if (!trimmed) return null;
 
   if (trimmed.startsWith("[")) {
-    const directMatch = trimmed.match(/^\[[\s\S]*\]$/);
-    if (directMatch) return directMatch[0];
+    const arrStart = trimmed.indexOf("[");
+    const end = findBalanced(trimmed, "[", "]", arrStart);
+    if (end !== null) {
+      const candidate = trimmed.slice(arrStart, end + 1);
+      try {
+        const parsed = JSON.parse(candidate);
+        if (Array.isArray(parsed)) return candidate;
+      } catch {
+        /* continue */
+      }
+    }
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) return trimmed;

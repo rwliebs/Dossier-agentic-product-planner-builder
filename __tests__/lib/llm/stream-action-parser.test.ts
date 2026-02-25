@@ -165,4 +165,19 @@ describe("parseActionsFromStream", () => {
 
     expect(results).toContain("done");
   });
+
+  it("extracts first balanced JSON when LLM appends explanation ending with } (regression: greedy regex)", async () => {
+    const pid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    const validJson = `{"type":"actions","message":"Done.","actions":[{"id":"b2c3d4e5-f6a7-8901-bcde-f12345678901","project_id":"${pid}","action_type":"createWorkflow","target_ref":{"project_id":"${pid}"},"payload":{"title":"W1","position":0}}]}`;
+    const withTrailing = validJson + ' See the {Authentication} section for details.';
+    const stream = await streamFromStrings([withTrailing]);
+
+    const actions: unknown[] = [];
+    for await (const result of parseActionsFromStream(stream)) {
+      if (result.type === "action") actions.push(result.action);
+    }
+
+    expect(actions.length).toBe(1);
+    expect((actions[0] as { action_type?: string }).action_type).toBe("createWorkflow");
+  });
 });

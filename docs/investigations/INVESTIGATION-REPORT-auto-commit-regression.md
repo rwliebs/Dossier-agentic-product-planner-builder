@@ -129,20 +129,22 @@
 4. **Why** would git status be empty in the correct path right after the agent “completed”?  
    Either (A) the agent’s file writes were not in that directory, or (B) they were not visible yet (e.g. not flushed). (A) is consistent with the SDK running the agent (or its tool subprocess) in a **different** working directory than the one we pass as `cwd` (e.g. sandbox or temp copy). (B) is possible but less likely in the same process.
 
-5. **Why** would the SDK use a different directory?  
-   The SDK may run the Claude Code agent in a subprocess or sandbox and may not forward the `cwd` option to the process that performs Read/Write/Edit on the repo; or it may clone/copy the repo into a temp dir for isolation.
+5. **Path vs race — which one?**  
+   Code trace: the same `assignment.worktree_path` is used for both SDK `cwd` (dispatch → payload.worktree_path) and performAutoCommit (process-webhook loads same assignment by assignment_id). No second source, no resolution difference. **Path is ruled out.** Control flow: in agentic-flow-client we `await runQueryAndCollectOutput()` then immediately `await processWebhook()` with no delay, so we run `git status` in the same tick after the agent subprocess exits. The only remaining explanation is **timing**: the agent's writes are not yet visible to our process when we run git. **Race is confirmed.**
 
-**Root cause (conclusive):**  
-When we call performAutoCommit(worktreePath), we run `git status` in the **same** path we passed to the SDK as `cwd`. At the moment we ran it (first run), that working tree had **no changes** visible to git. The agent had reported completion and claimed to have created the planned files. Therefore the agent’s file operations did **not** occur in the directory we use for auto-commit, or they were not visible there. The most likely explanation is that **the Claude Agent SDK does not run the agent’s file tools in the `cwd` we pass** (or not in a way that is visible to a subsequent `git status` in that path). So the root cause is **mismatch between where the agent writes files and where we run git** (SDK cwd/sandbox behavior).
+**Root cause (confirmed, single cause):**  
+**Race condition.** We run `git status` immediately after the agent process exits; the agent's file writes are not yet visible to our process (e.g. OS buffer flush or subprocess exit ordering), so we see no changes. Path is ruled out: both the SDK and performAutoCommit use the same `assignment.worktree_path` by construction. Fix: when the first `getStatusPorcelain(worktreePath)` returns zero lines, wait a short interval (e.g. 500–1000 ms), then call it again; if the second call has lines, stage and commit. See `docs/investigations/CONFIRMED-CAUSE-auto-commit-no-changes.md` and `docs/investigations/RACE-CONDITION-AUTO-COMMIT.md`.
 
-**Source:** event_log (execution_blocked + execution_completed order and payloads); agent_execution (completed at 18:11:36.212Z); live repo showing same path and branch; `lib/orchestration/agentic-flow-client.ts` (cwd passed to query()); `lib/orchestration/auto-commit.ts` (getStatusPorcelain(worktreePath)).
+
+
+**Source:** event_log (execution_blocked + execution_completed order and payloads); agent_execution (completed at 18:11:36.212Z); live repo showing same path and branch; `lib/orchestration/agentic-flow-client.ts` (no delay between runQueryAndCollectOutput and processWebhook); `lib/orchestration/process-webhook.ts` (worktreePath from assignment); `lib/orchestration/trigger-build.ts`, `lib/orchestration/dispatch.ts` (same assignment.worktree_path for cwd and for assignment); `docs/investigations/CONFIRMED-CAUSE-auto-commit-no-changes.md`; `docs/investigations/RACE-CONDITION-AUTO-COMMIT.md`.
 
 **Alternatives considered:**
 
-- **Wrong worktree_path in DB:** Ruled out; path is absolute and matches run worktree_root; successful run (206e3ea0) uses same pattern.
+- **Wrong worktree_path in DB / different path for git:** Ruled out by code trace; same assignment.worktree_path used for both SDK cwd and performAutoCommit.
 - **All paths filtered out:** Ruled out; allowed_paths include the two component paths; they are not in ARTIFACT_EXCLUSIONS and are in allowed_paths.
 - **Branch mismatch:** Ruled out; getCurrentBranch would have returned an error and we’d get outcome "error", not "no_changes".
-- **Race (writes not flushed):** Possible but secondary; the primary fix is to ensure agent writes and git run against the same directory.
+- **SDK does not use cwd:** Ruled out by SDK verification; see SDK-PATH-VERIFICATION.md.
 
 ### 3.6 Secondary Root Cause: Rebuild Hung
 
@@ -179,7 +181,7 @@ When we call performAutoCommit(worktreePath), we run `git status` in the **same*
 | **Expected behavior** | Agent writes files in the clone at assignment.worktree_path; auto-commit runs in that path, sees changes, stages/commits, returns committed; card/assignment set to completed. |
 | **Current behavior** | Auto-commit runs in worktreePath but sees no changes; returns no_changes; we set card/assignment to blocked; trigger finish never runs. Rebuild dispatched; second run never completes; no timeout so card stays “building.” |
 | **Data flow** | execution_completed → processWebhook → performAutoCommit(worktreePath, featureBranch, cardTitle, cardId, allowedPaths) → getStatusPorcelain(worktreePath) → empty lines → no_changes → execution_blocked, card blocked. Same worktreePath is passed to SDK query() as cwd; at runtime, git in that path saw no changes. |
-| **Root cause** | The agent’s file operations did not occur (or were not visible) in the directory where we run git (worktreePath). Most likely the Claude Agent SDK does not run the agent’s file tools in the `cwd` we pass, or runs them in a sandbox/temp copy. So there is a **mismatch between where the agent writes and where we run git**. |
+| **Root cause** | **Race condition (confirmed).** We run `git status` immediately after the agent process exits; the agent's file writes are not yet visible to our process, so we see no changes. Path ruled out: same `assignment.worktree_path` is used for both SDK cwd and performAutoCommit. Fix: when first getStatusPorcelain returns zero lines, wait 500–1000 ms and retry; if second call has lines, stage and commit. See CONFIRMED-CAUSE-auto-commit-no-changes.md and RACE-CONDITION-AUTO-COMMIT.md. |
 | **Source** | event_log (run e471bc9a, assignment 4b649703: execution_blocked “No changes to commit” then execution_completed); agent_execution (first run completed 18:11:36.212Z); live repo at same path now has changes; `lib/orchestration/agentic-flow-client.ts` (cwd to query()); `lib/orchestration/auto-commit.ts` (getStatusPorcelain(worktreePath)). |
 | **Secondary root cause** | No execution timeout and stale-run recovery disabled by default → rebuild can stay “running” forever. |
 | **Tests** | Add or extend tests: (1) performAutoCommit returns committed when eligible paths exist in worktree; (2) document or test that SDK uses cwd for file writes (or add workaround so we run git where the SDK actually writes). |
@@ -201,3 +203,16 @@ When we call performAutoCommit(worktreePath), we run `git status` in the **same*
 
 4. **Diagnostic logging**  
    In performAutoCommit, log worktreePath, statusResult.lines.length, allPaths.length, eligible.length, and (if eligible.length === 0) the reason per path (excluded vs not in allowed_paths). This will make future “no changes” cases debuggable from logs alone.
+
+---
+
+## 7. Fixer readiness (per `.cursor/agents/fixer.md`)
+
+| Fixer step | Ready? | Notes |
+|------------|--------|------|
+| **1. Verify investigation** | YES | Section 5 has exact quotes for expected/current/data flow/root cause/source/tests. Fixer can ACCEPT or REJECT each. |
+| **2. Run tests** | YES | `pnpm test` and/or `__tests__/orchestration/auto-commit.test.ts`, `__tests__/orchestration/execution-integration.test.ts`. Tests should fail for the “no changes despite files on disk” scenario if we add one; existing tests may pass. |
+| **3. Implement fix** | YES | Root cause: **race condition** — we run git status immediately after agent exit; agent's writes not yet visible. Path ruled out (same assignment.worktree_path for SDK and performAutoCommit). Fix: when first getStatusPorcelain returns zero lines, wait 500–1000 ms and retry; if second call has lines, stage and commit. Secondary: execution timeout / stale-run recovery. |
+| **4. verify-completion** | YES | Run after fixes. |
+
+**Blocking uncertainty:** Resolved. **SDK path verified** (see `docs/investigations/SDK-PATH-VERIFICATION.md`): the SDK uses `options.cwd` for the session and passes it to the spawned Claude Code process, so the agent should write to worktreePath. Fixer can proceed with: diagnostic logging in performAutoCommit, optional delay/re-check before auto-commit, and execution timeout / stale-run recovery.

@@ -92,7 +92,7 @@ describe("auto-commit", () => {
     }
   });
 
-  it("commits eligible files and excludes artifacts", () => {
+  it("commits eligible files and excludes artifacts", async () => {
     fs.mkdirSync(path.join(repoDir, "src"), { recursive: true });
     fs.writeFileSync(path.join(repoDir, "src", "index.ts"), "export {};", "utf-8");
     fs.mkdirSync(path.join(repoDir, "node_modules", "foo"), { recursive: true });
@@ -100,7 +100,7 @@ describe("auto-commit", () => {
     fs.mkdirSync(path.join(repoDir, ".next"), { recursive: true });
     fs.writeFileSync(path.join(repoDir, ".next", "build.js"), "x", "utf-8");
 
-    const result = performAutoCommit({
+    const result = await performAutoCommit({
       worktreePath: repoDir,
       featureBranch: "feat/run-abc-def",
       cardTitle: "Add index",
@@ -122,11 +122,11 @@ describe("auto-commit", () => {
     expect(committedFiles.some((f) => f.includes(".next"))).toBe(false);
   });
 
-  it("returns no_changes when only artifacts exist", () => {
+  it("returns no_changes when only artifacts exist", async () => {
     fs.mkdirSync(path.join(repoDir, "node_modules", "x"), { recursive: true });
     fs.writeFileSync(path.join(repoDir, "node_modules", "x", "y.js"), "x", "utf-8");
 
-    const result = performAutoCommit({
+    const result = await performAutoCommit({
       worktreePath: repoDir,
       featureBranch: "feat/run-abc-def",
       cardId: "card-456",
@@ -139,8 +139,8 @@ describe("auto-commit", () => {
     }
   });
 
-  it("returns no_changes when nothing changed", () => {
-    const result = performAutoCommit({
+  it("returns no_changes when nothing changed", async () => {
+    const result = await performAutoCommit({
       worktreePath: repoDir,
       featureBranch: "feat/run-abc-def",
       cardId: "card-789",
@@ -153,10 +153,10 @@ describe("auto-commit", () => {
     }
   });
 
-  it("allows root config files regardless of allowed_paths", () => {
+  it("allows root config files regardless of allowed_paths", async () => {
     fs.writeFileSync(path.join(repoDir, "package.json"), '{"name":"test"}', "utf-8");
 
-    const result = performAutoCommit({
+    const result = await performAutoCommit({
       worktreePath: repoDir,
       featureBranch: "feat/run-abc-def",
       cardId: "card-999",
@@ -166,11 +166,11 @@ describe("auto-commit", () => {
     expect(result.outcome).toBe("committed");
   });
 
-  it("returns error on branch mismatch", () => {
+  it("returns error on branch mismatch", async () => {
     fs.mkdirSync(path.join(repoDir, "src"), { recursive: true });
     fs.writeFileSync(path.join(repoDir, "src", "x.ts"), "x", "utf-8");
 
-    const result = performAutoCommit({
+    const result = await performAutoCommit({
       worktreePath: repoDir,
       featureBranch: "wrong-branch",
       cardId: "card-1",

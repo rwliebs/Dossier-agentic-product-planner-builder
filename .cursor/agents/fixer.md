@@ -26,6 +26,8 @@ RULE: tests MUST fail
 
 # 3. Implement fix
 
+When the investigation specifies a retry (e.g. delay then re-check), use the **documented retry strategy** (e.g. one delay + one retry). Do not implement “run until successful” or unbounded retries unless the investigation explicitly asks for it; see the fix doc (e.g. CONFIRMED-CAUSE or RACE-CONDITION) for the design rationale.
+
 ## 3.1 UNCERTAINTY REGISTER
 
 **KNOWN**: [verified facts]

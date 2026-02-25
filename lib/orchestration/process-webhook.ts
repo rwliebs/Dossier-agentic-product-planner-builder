@@ -232,7 +232,7 @@ export async function processWebhook(
       if (worktreePath) {
         const card = await getCardById(db, cardId);
         const cardTitle = (card as { title?: string } | null)?.title;
-        const autoResult = performAutoCommit({
+        const autoResult = await performAutoCommit({
           worktreePath,
           featureBranch,
           cardTitle,

@@ -32,7 +32,7 @@ function getClonePath(projectId: string): string {
   return path.join(getDataDir(), REPOS_DIR, projectId);
 }
 
-function main() {
+async function main() {
   const projectId = process.argv[2];
   if (!projectId) {
     console.error("Usage: npx tsx scripts/commit-all-to-branches.ts <projectId>");
@@ -54,7 +54,7 @@ function main() {
 
   console.log(`Committing to ${branch} in ${repoPath}\n`);
 
-  const result = performAutoCommit({
+  const result = await performAutoCommit({
     worktreePath: repoPath,
     featureBranch: branch,
     cardId: branch.replace("feat/run-", "").replace(/-/g, "").slice(0, 8),
@@ -71,4 +71,7 @@ function main() {
   }
 }
 
-main();
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

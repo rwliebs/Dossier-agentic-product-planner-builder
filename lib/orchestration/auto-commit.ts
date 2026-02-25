@@ -8,7 +8,6 @@
  */
 
 import {
-  runGit,
   getCurrentBranch,
   getStatusPorcelain,
   stagePath,
@@ -49,6 +48,16 @@ const ROOT_ALLOWLIST = [
 
 /** Directory prefixes always allowed (tests and docs created for the card). */
 const ALLOWED_DIR_PREFIXES = ["__tests__/", "docs/"];
+
+/** Delay (ms) before retrying git status when first result is empty. One retry only (race fix). */
+const AUTO_COMMIT_RETRY_DELAY_MS =
+  typeof process.env.DOSSIER_AUTO_COMMIT_RETRY_DELAY_MS !== "undefined"
+    ? Number(process.env.DOSSIER_AUTO_COMMIT_RETRY_DELAY_MS)
+    : 1000;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export interface AutoCommitInput {
   worktreePath: string;
@@ -122,8 +131,9 @@ function parsePorcelainLines(lines: string[]): string[] {
 
 /**
  * Performs auto-commit for a single assignment's worktree.
+ * When the first git status is empty (race: agent writes not yet visible), waits once then retries once.
  */
-export function performAutoCommit(input: AutoCommitInput): AutoCommitOutcome {
+export async function performAutoCommit(input: AutoCommitInput): Promise<AutoCommitOutcome> {
   const { worktreePath, featureBranch, cardTitle, cardId, allowedPaths } = input;
 
   const branchResult = getCurrentBranch(worktreePath);
@@ -137,13 +147,31 @@ export function performAutoCommit(input: AutoCommitInput): AutoCommitOutcome {
     };
   }
 
-  const statusResult = getStatusPorcelain(worktreePath);
+  let statusResult = getStatusPorcelain(worktreePath);
   if (!statusResult.success) {
     return { outcome: "error", error: statusResult.error ?? "Failed to get git status" };
   }
 
+  // Race fix: first status empty → wait once, retry once (docs/investigations/CONFIRMED-CAUSE-auto-commit-no-changes.md)
+  if (statusResult.lines.length === 0) {
+    console.warn("[auto-commit] first status empty, retrying after", AUTO_COMMIT_RETRY_DELAY_MS, "ms");
+    await delay(AUTO_COMMIT_RETRY_DELAY_MS);
+    statusResult = getStatusPorcelain(worktreePath);
+    if (!statusResult.success) {
+      return { outcome: "error", error: statusResult.error ?? "Failed to get git status on retry" };
+    }
+    console.warn("[auto-commit] after retry: lineCount =", statusResult.lines.length);
+  }
+
   const allPaths = parsePorcelainLines(statusResult.lines);
   const eligible = allPaths.filter((p) => isEligible(p, allowedPaths));
+
+  console.warn("[auto-commit]", {
+    worktreePath,
+    lineCount: statusResult.lines.length,
+    allPathsCount: allPaths.length,
+    eligibleCount: eligible.length,
+  });
 
   if (eligible.length === 0) {
     return {

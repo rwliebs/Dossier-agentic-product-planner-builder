@@ -35,8 +35,11 @@ ttl_expires_on: null
 - GitHub token (repo scope) for PR creation
 
 ### Install
+
+Use **pnpm** or **npm** to install dependencies (pnpm recommended if npm has auth/token issues):
+
 ```bash
-npm install
+pnpm install   # or: npm install
 ```
 
 ### Configuration

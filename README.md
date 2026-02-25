@@ -16,15 +16,19 @@ Start with an idea or plug in existing software. Map your users' real workflows.
 
 ### Install and Run
 
+Install **dependencies** with npm or pnpm (use pnpm if npm hits auth or token issues):
+
 ```bash
-git clone https://github.com/your-org/dossier.git
+git clone https://github.com/rwliebs/Dossier.git
 cd dossier
-npm install   # or pnpm install
-npm run build
-npm run dossier
+pnpm install   # or: npm install
+pnpm run build # or: npm run build
+pnpm run dossier   # or: npm run dossier
 ```
 
 Your browser opens to `http://localhost:3000`. On first run, you'll be guided through API key setup.
+
+From the project directory you can also run the CLI via `npx dossier` (same as `npm run dossier`).
 
 ### Development Mode
 
@@ -80,11 +84,13 @@ See [`.env.example`](.env.example) for all available options.
 
 ## CLI Options
 
+From the project directory:
+
 ```bash
-npm run dossier                  # Start on port 3000
-npm run dossier -- --port 8080   # Custom port
-npm run dossier -- --no-open     # Don't open browser
-npm run dossier -- --help        # Show help
+npx dossier                  # or: npm run dossier — start on port 3000
+npx dossier --port 8080       # Custom port
+npx dossier --no-open         # Don't open browser
+npx dossier --help            # Show help
 ```
 
 ## Development

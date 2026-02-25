@@ -321,3 +321,49 @@ function collectPathsFromTree(nodes: FileNode[]): string[] {
   for (const n of nodes) walk(n);
   return paths;
 }
+
+const REPO_CONTEXT_MAX_PATHS = 250;
+const REPO_CONTEXT_MAX_README = 3500;
+const REPO_CONTEXT_MAX_PACKAGE_JSON = 2000;
+
+/**
+ * Builds a repository context string for LLM prompts (e.g. scaffold "create map from existing repo").
+ * Includes file tree (path list) and excerpts of README and package.json when present.
+ * Returns null if clone is missing, not a git repo, or tree read fails.
+ */
+export function getRepoContextForPrompt(
+  clonePath: string,
+  branch: string
+): string | null {
+  const treeResult = getRepoFileTree(clonePath, branch);
+  if (!treeResult.success || !treeResult.tree) return null;
+
+  const paths = collectPathsFromTree(treeResult.tree);
+  const pathList =
+    paths.length > REPO_CONTEXT_MAX_PATHS
+      ? paths.slice(0, REPO_CONTEXT_MAX_PATHS).join("\n") +
+        `\n... and ${paths.length - REPO_CONTEXT_MAX_PATHS} more files`
+      : paths.join("\n");
+
+  const sections: string[] = [`## File tree (branch: ${branch})\n${pathList}`];
+
+  const readme = getFileContent(clonePath, branch, "README.md");
+  if (readme.success && readme.content) {
+    const excerpt =
+      readme.content.length > REPO_CONTEXT_MAX_README
+        ? readme.content.slice(0, REPO_CONTEXT_MAX_README) + "\n[... truncated]"
+        : readme.content;
+    sections.push(`## README (excerpt)\n${excerpt}`);
+  }
+
+  const pkg = getFileContent(clonePath, branch, "package.json");
+  if (pkg.success && pkg.content) {
+    const excerpt =
+      pkg.content.length > REPO_CONTEXT_MAX_PACKAGE_JSON
+        ? pkg.content.slice(0, REPO_CONTEXT_MAX_PACKAGE_JSON) + "\n[... truncated]"
+        : pkg.content;
+    sections.push(`## package.json (excerpt)\n${excerpt}`);
+  }
+
+  return sections.join("\n\n");
+}

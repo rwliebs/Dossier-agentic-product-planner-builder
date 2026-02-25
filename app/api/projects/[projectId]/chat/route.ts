@@ -21,6 +21,7 @@ import {
   createRootFoldersInRepo,
   pushBranch,
 } from "@/lib/orchestration/repo-manager";
+import { getRepoContextForPrompt } from "@/lib/orchestration/repo-reader";
 import type { PlanningAction } from "@/lib/schemas/slice-a";
 import { getWorkflowActivities } from "@/lib/schemas/planning-state";
 import { json } from "@/lib/api/response-helpers";
@@ -242,18 +243,32 @@ export async function POST(
   const linkedArtifacts = getLinkedArtifactsForPrompt(state, 5);
   const hasStructure = state.workflows.size >= 1;
 
+  const useScaffold = mode === "scaffold" || !hasStructure;
+  let repoContext: string | null = null;
+  if (useScaffold) {
+    const repoUrl = (state.project as { repo_url?: string | null }).repo_url;
+    const baseBranch =
+      (state.project as { default_branch?: string }).default_branch ?? "main";
+    if (repoUrl && typeof repoUrl === "string" && !repoUrl.includes("placeholder")) {
+      const cloneResult = ensureClone(projectId, repoUrl, null, baseBranch);
+      if (cloneResult.success && cloneResult.clonePath) {
+        repoContext = getRepoContextForPrompt(cloneResult.clonePath, baseBranch);
+      }
+    }
+  }
+
   let systemPrompt: string;
   let userMessage: string;
 
   if (mode === "scaffold") {
     systemPrompt = buildScaffoldSystemPrompt();
-    userMessage = buildScaffoldUserMessage(message, state, linkedArtifacts);
+    userMessage = buildScaffoldUserMessage(message, state, linkedArtifacts, repoContext);
   } else if (hasStructure) {
     systemPrompt = buildPlanningSystemPrompt();
     userMessage = buildPlanningUserMessage(message, state, linkedArtifacts);
   } else {
     systemPrompt = buildScaffoldSystemPrompt();
-    userMessage = buildScaffoldUserMessage(message, state, linkedArtifacts);
+    userMessage = buildScaffoldUserMessage(message, state, linkedArtifacts, repoContext);
   }
 
   // --- LLM call ---

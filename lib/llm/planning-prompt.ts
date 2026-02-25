@@ -220,6 +220,11 @@ You MUST include exactly one updateProject action as the first action in the act
 - Critical info missing: who are the users? what's the core value?
 - Respond with: { "type": "clarification", "message": "Your questions...", "actions": [] }
 
+## When the user message includes "Repository context (existing codebase)"
+- The project is linked to a GitHub repo and we have provided file tree, README, and/or package.json.
+- Use that content to infer: project name, description, tech_stack, customer_personas, and workflows. Create the map from the existing codebase; do NOT say you don't have access to the repo.
+- Derive workflows from the app structure (e.g. routes, features) and README/product description.
+
 ## When to generate workflows (prefer this when the idea is clear)
 - The user describes a product with domain (e.g. trading cards, MTG, marketplace) and users (buyers, sellers) — generate workflows
 - You can identify 3-8 major workflows from the description
@@ -446,15 +451,21 @@ export function buildPopulateCardsForActivityUserMessage(
 
 /**
  * Build the user message for scaffold mode.
+ * When repoContext is provided, the user has linked a repo and we've injected its file tree + README/package.json
+ * so the LLM can create the map from the existing codebase.
  */
 export function buildScaffoldUserMessage(
   userRequest: string,
   mapSnapshot: PlanningState,
   linkedArtifacts: ContextArtifact[],
+  repoContext?: string | null,
 ): string {
   const stateJson = serializeMapStateForPrompt(mapSnapshot);
   const hasWorkflows = mapSnapshot.workflows.size >= 1;
   let message = `## Current Map State\n\`\`\`json\n${stateJson}\n\`\`\`\n\n`;
+  if (repoContext && repoContext.trim().length > 0) {
+    message += `## Repository context (existing codebase)\nThe project is linked to a GitHub repository. Use this to infer project name, description, tech stack, and user workflows.\n\n${repoContext}\n\n`;
+  }
   if (linkedArtifacts.length > 0) {
     message += `## Linked Context\n`;
     for (const a of linkedArtifacts.slice(0, 3)) {

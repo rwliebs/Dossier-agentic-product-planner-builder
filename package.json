@@ -1,7 +1,10 @@
 {
-  "name": "dossier-agentic-product-planner-builder",
+  "name": "@rwliebs/dossier-agentic-product-planner-builder",
   "version": "0.5.0",
   "repository": "https://github.com/rwliebs/Dossier",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
   "description": "AI-native product craft platform — plan workflows, orchestrate multi-agent builds, ship iteratively",
   "bin": {
     "dossier": "./bin/dossier.mjs"
@@ -36,7 +39,7 @@
     "commit-all-to-branches": "tsx scripts/commit-all-to-branches.ts",
     "start": "next start",
     "dossier": "node bin/dossier.mjs",
-    "release:alpha": "pnpm run build && pnpm publish --tag alpha",
+    "release:alpha": "pnpm run build && pnpm publish --tag alpha --no-git-checks",
     "prepare": "husky"
   },
   "dependencies": {

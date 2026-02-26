@@ -474,6 +474,6 @@ These are the extension points that enable hosted/team deployment later without 
 | `ClaudeFlowClient` | Local programmatic API | HTTP/MCP client (deferred) |
 | Auth middleware | None (single user) | NextAuth, Supabase Auth, or Clerk |
 | Realtime | Not needed | Supabase Realtime or Yjs/CRDT layer |
-| Deployment | `npx dossier` / Tauri desktop | Vercel / Docker / any Node.js host |
+| Deployment | `npx dossier-agentic-product-planner-builder` | Vercel / Docker / any Node.js host |
 | Monitoring | Console logs | Sentry + Vercel Analytics |
 | Config switch | `DB_DRIVER=sqlite` | `DB_DRIVER=postgres` + `DATABASE_URL` |

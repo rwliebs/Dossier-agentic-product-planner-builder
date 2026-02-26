@@ -4,9 +4,9 @@
  * Dossier CLI entry point.
  *
  * Usage:
- *   npx dossier            — start on default port 3000
- *   npx dossier --port 8080
- *   npx dossier --no-open  — don't open browser
+ *   npx dossier-agentic-product-planner-builder            — start on default port 3000
+ *   npx dossier-agentic-product-planner-builder --port 8080
+ *   npx dossier-agentic-product-planner-builder --no-open  — don't open browser
  */
 
 import { existsSync, readFileSync, mkdirSync } from "node:fs";
@@ -34,7 +34,7 @@ for (let i = 0; i < args.length; i++) {
   Dossier — AI-native product craft platform
 
   Usage:
-    npx dossier [options]
+    npx dossier-agentic-product-planner-builder [options]
 
   Options:
     --port, -p <number>   Port to listen on (default: 3000)

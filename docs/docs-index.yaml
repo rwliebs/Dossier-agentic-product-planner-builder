@@ -169,3 +169,15 @@ docs_index:
           summary: "CJS copy workaround for ruvector-onnx-embeddings-wasm ESM bug"
       depends_on: [doc.system-architecture]
       last_verified: "2026-02-19"
+
+    - id: doc.releases-installability
+      path: strategy/releases-and-installability-strategy.md
+      tokens_estimate: 1100
+      tags: [releases, packaging, installability, npm, github]
+      anchors:
+        - id: summary
+          summary: "GitHub Release now (pre-release); npm alpha now; installability now"
+        - id: checklist
+          summary: "Tag, release notes, publish --tag alpha, README caveats"
+      depends_on: []
+      last_verified: "2026-02-26"

@@ -115,6 +115,12 @@ Product
 
 ## Quickstart
 
+**One-shot run (Node 18+):**
+```bash
+npx dossier-agentic-product-planner-builder
+```
+
+**Or from source:**
 ```bash
 git clone https://github.com/rwliebs/Dossier.git
 cd Dossier
@@ -123,7 +129,7 @@ pnpm run build
 pnpm run dossier
 ```
 
-Your browser will open to **http://localhost:3000**.
+Your browser will open to **http://localhost:3000**. First run creates `~/.dossier`.
 
 On first run you'll be guided through API key setup, or navigate directly to `/setup`.
 

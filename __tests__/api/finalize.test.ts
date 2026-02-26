@@ -3,9 +3,9 @@
  * Covers GET (assemble package) and POST (confirm finalization) per Workflow E.
  *
  * Product outcomes (user-workflows-reference.md):
- * - Project must be finalized before cards can be finalized
+ * - Project must be approved before cards can be approved
  * - Build trigger requires finalized_at and approved planned files/folders
- * - POST finalize validates: project finalized, requirements, approved planned files/folders
+ * - POST finalize validates: project approved, requirements, approved planned files/folders
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -240,11 +240,11 @@ describe("Card finalize API", () => {
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.message).toMatch(/project must be finalized/i);
+    expect(body.message).toMatch(/project must be approved/i);
     expect(mockDb.updateCard).not.toHaveBeenCalled();
   });
 
-  it("POST returns 400 when card is already finalized", async () => {
+  it("POST returns 400 when card is already approved", async () => {
     vi.mocked(mockDb.getCardById).mockResolvedValue({
       id: cardId,
       title: "Test Card",

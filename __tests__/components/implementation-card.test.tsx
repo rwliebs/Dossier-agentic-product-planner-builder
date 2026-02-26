@@ -117,7 +117,7 @@ describe("ImplementationCard", () => {
     expect(onAction).not.toHaveBeenCalled();
   });
 
-  it("Finalize button shown when unfinalized todo and onFinalizeCard and projectFinalized provided", () => {
+  it("Approve button shown when unapproved todo and onFinalizeCard and projectFinalized provided", () => {
     const onFinalizeCard = vi.fn();
     const unfinalizedCard: MapCard = {
       ...baseCard,
@@ -141,7 +141,7 @@ describe("ImplementationCard", () => {
     expect(onFinalizeCard).toHaveBeenCalledWith("card-1");
   });
 
-  it("Finalize button hidden when projectFinalized is false", () => {
+  it("Approve button hidden when projectFinalized is false", () => {
     const onFinalizeCard = vi.fn();
     const unfinalizedCard: MapCard = {
       ...baseCard,

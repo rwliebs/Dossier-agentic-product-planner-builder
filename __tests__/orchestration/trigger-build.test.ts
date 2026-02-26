@@ -172,9 +172,9 @@ describe("Trigger build - single-build lock (O10.6)", () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Card(s) not finalized");
+    expect(result.error).toBe("Card(s) not approved");
     expect(result.validationErrors).toContain(
-      "Build requires finalized cards. Finalize each card (review context and confirm) before triggering build."
+      "Build requires approved cards. Approve each card (review context and confirm) before triggering build."
     );
   });
 

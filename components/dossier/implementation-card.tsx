@@ -51,7 +51,7 @@ interface ImplementationCardProps {
   onFinalizeCard?: (cardId: string) => void;
   finalizingCardId?: string | null;
   cardFinalizeProgress?: string;
-  /** When false, Finalize button is hidden (project must be finalized first) */
+  /** When false, Approve button is hidden (project must be approved first) */
   projectFinalized?: boolean;
   onSelectDoc?: (doc: ContextArtifact) => void;
   /** Canonical knowledge (optional; when loaded) */
@@ -508,7 +508,7 @@ export function ImplementationCard({
           {card.finalized_at && unifiedState.action !== 'finalize' && (
             <div className="flex items-center gap-2 px-2 py-1.5 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 font-mono">
               <Check className="h-3 w-3" />
-              Finalized
+              Approved
             </div>
           )}
           <div className="flex items-center gap-2">

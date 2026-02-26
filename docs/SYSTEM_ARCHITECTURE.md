@@ -87,7 +87,7 @@ User chat → Planning LLM → stream-action-parser → PlanningAction[]
 ### Map Snapshot Path
 ```
 GET /api/projects/[id]/map → DbAdapter queries → build map tree
-  → Project + Workflow[] + Activity[] + Step[] + Card[]
+  → Project + Workflow[] + Activity[] + Card[]
 ```
 
 ### Build Path

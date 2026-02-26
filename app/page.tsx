@@ -428,7 +428,7 @@ export default function DossierPage() {
     async () => {
       if (!projectId) return;
       setFinalizingProject(true);
-      setFinalizeProgress('Finalizing…');
+      setFinalizeProgress('Approving…');
       try {
         const res = await fetch(`/api/projects/${projectId}/chat`, {
           method: 'POST',
@@ -442,7 +442,7 @@ export default function DossierPage() {
           error?: string;
         };
         if (!res.ok) {
-          const msg = data.message ?? data.error ?? `Finalize failed (${res.status})`;
+          const msg = data.message ?? data.error ?? `Approve failed (${res.status})`;
           const { toast } = await import('sonner');
           toast.error(msg);
           return;
@@ -459,12 +459,12 @@ export default function DossierPage() {
           );
         } else {
           const { toast } = await import('sonner');
-          toast.success(`Finalized: ${count} context documents created`);
+          toast.success(`Approved: ${count} context documents created`);
         }
         refetch();
         refetchArtifacts();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Finalize failed';
+        const msg = err instanceof Error ? err.message : 'Approve failed';
         const { toast } = await import('sonner');
         toast.error(msg);
       } finally {
@@ -483,7 +483,7 @@ export default function DossierPage() {
         return;
       }
       setFinalizingCardId(cardId);
-      setCardFinalizeProgress('Starting card finalization…');
+      setCardFinalizeProgress('Starting card approval…');
       try {
         const res = await fetch(`/api/projects/${projectId}/cards/${cardId}/finalize`, {
           method: 'POST',
@@ -493,7 +493,7 @@ export default function DossierPage() {
           const err = await res.json().catch(() => ({}));
           const msg = (err as { message?: string }).message
             ?? (err as { error?: string }).error
-            ?? `Finalize failed (${res.status})`;
+            ?? `Approve failed (${res.status})`;
           const { toast } = await import('sonner');
           toast.error(msg);
           return;
@@ -516,7 +516,7 @@ export default function DossierPage() {
             contextDocsGenerated = d.context_docs_generated ?? 0;
           }
           if (eventType === 'error' && data !== null && typeof data === 'object') {
-            streamError = (data as { reason?: string }).reason ?? 'Finalize failed';
+            streamError = (data as { reason?: string }).reason ?? 'Approve failed';
           }
         }
         if (streamError) {
@@ -524,7 +524,7 @@ export default function DossierPage() {
           toast.error(streamError);
         } else {
           const { toast } = await import('sonner');
-          const parts = ['Card finalized'];
+          const parts = ['Card approved'];
           if (testGenerated) parts.push('e2e test generated');
           if (contextDocsGenerated > 0) parts.push(`${contextDocsGenerated} context doc(s) generated`);
           toast.success(parts.join(' — '));
@@ -534,7 +534,7 @@ export default function DossierPage() {
         refetchCardContextArtifacts();
         refetchCardPlannedFiles();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Finalize failed';
+        const msg = err instanceof Error ? err.message : 'Approve failed';
         const { toast } = await import('sonner');
         toast.error(msg);
       } finally {

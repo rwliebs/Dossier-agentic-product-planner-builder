@@ -115,18 +115,18 @@ export async function triggerBuild(
   if (cardsWithoutFinalized.length > 0) {
     return {
       success: false,
-      error: "Card(s) not finalized",
+      error: "Card(s) not approved",
       validationErrors: [
-        "Build requires finalized cards. Finalize each card (review context and confirm) before triggering build.",
+        "Build requires approved cards. Approve each card (review context and confirm) before triggering build.",
         ...(cardsWithoutFinalized.length <= 3
-          ? [`Cards not finalized: ${cardsWithoutFinalized.join(", ")}`]
-          : [`${cardsWithoutFinalized.length} cards not finalized`]),
+          ? [`Cards not approved: ${cardsWithoutFinalized.join(", ")}`]
+          : [`${cardsWithoutFinalized.length} cards not approved`]),
       ],
       outcomeType: "decision_required",
       message:
         cardsWithoutFinalized.length <= 3
-          ? `Finalize required before build. Cards: ${cardsWithoutFinalized.join(", ")}`
-          : `Finalize required before build for ${cardsWithoutFinalized.length} cards.`,
+          ? `Approval required before build. Cards: ${cardsWithoutFinalized.join(", ")}`
+          : `Approval required before build for ${cardsWithoutFinalized.length} cards.`,
     };
   }
 

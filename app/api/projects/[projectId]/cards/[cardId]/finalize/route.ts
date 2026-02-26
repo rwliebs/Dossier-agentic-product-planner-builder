@@ -145,24 +145,24 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
   const cardRow = card as Record<string, unknown>;
   if (cardRow.finalized_at) {
-    return validationError("Card is already finalized");
+    return validationError("Card is already approved");
   }
 
   const project = await getProject(db, projectId);
   const projectFinalizedAt = (project as { finalized_at?: string | null })?.finalized_at;
   if (!projectFinalizedAt) {
-    return validationError("Project must be finalized before cards can be finalized");
+    return validationError("Project must be approved before cards can be approved");
   }
 
   const requirements = await getCardRequirements(db, cardId);
   if (requirements.length === 0) {
-    return validationError("Card must have at least one requirement before finalization");
+    return validationError("Card must have at least one requirement before approval");
   }
 
   const plannedFiles = await getCardPlannedFiles(db, cardId);
   if (plannedFiles.length === 0) {
     return validationError(
-      "Card must have at least one planned file or folder before finalization."
+      "Card must have at least one planned file or folder before approval."
     );
   }
 
@@ -293,7 +293,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           step_index: 2,
           total_steps: totalSteps,
           status: "generating",
-          label: "Confirming finalization",
+          label: "Confirming approval",
         });
 
         const now = new Date().toISOString();
@@ -312,7 +312,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           step_index: 2,
           total_steps: totalSteps,
           status: "complete",
-          label: "Card finalized",
+          label: "Card approved",
         });
 
         emit("phase_complete", {

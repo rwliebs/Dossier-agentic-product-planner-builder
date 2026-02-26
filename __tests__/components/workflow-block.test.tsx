@@ -139,7 +139,7 @@ describe("WorkflowBlock", () => {
     expect(hasGuidance).toBe(true);
   });
 
-  it("shows Finalize Project button when workflows exist and project not finalized", () => {
+  it("shows Approve Project button when workflows exist and project not approved", () => {
     const onFinalizeProject = vi.fn();
     render(
       <WorkflowBlock
@@ -158,7 +158,7 @@ describe("WorkflowBlock", () => {
     expect(onFinalizeProject).toHaveBeenCalled();
   });
 
-  it("hides Finalize Project button when project is already finalized", () => {
+  it("hides Approve Project button when project is already approved", () => {
     const finalizedSnapshot: MapSnapshot = {
       ...workflowsOnlySnapshot,
       project: { ...workflowsOnlySnapshot.project, finalized_at: "2026-01-01T00:00:00Z" },

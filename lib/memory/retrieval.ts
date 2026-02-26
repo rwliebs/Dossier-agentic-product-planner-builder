@@ -1,7 +1,7 @@
 /**
  * Retrieval policy (M5).
  * Query RuVector for semantic matches → get memory_unit_ids → fetch content from DbAdapter.
- * Card-scoped approved first → project-scoped → never rejected. Log retrieval.
+ * Card-scoped first → project-scoped. Log retrieval.
  *
  * @see REMAINING_WORK_PLAN.md §4 M5
  * @see docs/SECTION_4_MEMORY_COORDINATION_PROMPT.md
@@ -12,7 +12,7 @@ import { getMemoryStore } from "./index";
 
 /**
  * Retrieve memory for a card. Uses MemoryStore (real or mock based on RuVector availability).
- * Policy: card-scoped approved first, then project-scoped. Never rejected.
+ * Policy: card-scoped first, then project-scoped. Artifacts are canonical when created.
  * Returns content strings suitable for swarm context injection.
  */
 export async function retrieveForCard(

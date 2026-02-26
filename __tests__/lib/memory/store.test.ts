@@ -166,47 +166,5 @@ describe("MemoryStore (M8)", () => {
       insertSpy.mockRestore();
     }, 30_000);
 
-    it("rejected items are excluded from results", async () => {
-      const cardId = "store-rejected-card";
-      const projectId = "store-rejected-project";
-
-      const idApproved = await ingestMemoryUnit(
-        sqliteDb,
-        { contentText: "Approved content", title: "Approved" },
-        { cardId, projectId }
-      );
-      if (idApproved) insertedIds.push(idApproved);
-
-      const vec = await import("@/lib/memory/embedding").then((m) => m.embedText("Rejected content"));
-      const client = getRuvectorClient();
-      const rejectedId = crypto.randomUUID();
-      await client!.insert({ id: rejectedId, vector: vec });
-      insertedIds.push(rejectedId);
-
-      await sqliteDb.insertMemoryUnit({
-        id: rejectedId,
-        content_type: "inline",
-        content_text: "Rejected content",
-        title: "Rejected",
-        status: "rejected",
-        embedding_ref: rejectedId,
-      });
-      await sqliteDb.insertMemoryUnitRelation({
-        memory_unit_id: rejectedId,
-        entity_type: "card",
-        entity_id: cardId,
-        relation_role: "source",
-      });
-      await sqliteDb.insertMemoryUnitRelation({
-        memory_unit_id: rejectedId,
-        entity_type: "project",
-        entity_id: projectId,
-        relation_role: "supports",
-      });
-
-      const store = createMemoryStore(sqliteDb, true);
-      const ids = await store.search("content", { cardId, projectId }, { limit: 10 });
-      expect(ids).not.toContain(rejectedId);
-    }, 30_000);
   });
 });

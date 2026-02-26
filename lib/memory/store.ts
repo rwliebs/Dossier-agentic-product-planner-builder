@@ -33,7 +33,7 @@ export interface RetrievalScope {
 export interface MemoryStore {
   /**
    * Semantic search: returns memory unit IDs ranked by relevance.
-   * Card-scoped approved first, then project-scoped. Never rejected.
+   * Card-scoped first, then project-scoped. Artifacts are canonical when created (no approval/rejection filtering).
    */
   search(
     queryText: string,

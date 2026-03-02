@@ -40,5 +40,6 @@ jobs:
         run: pnpm run build
 
       - name: Publish to npm
-        run: npm publish --tag alpha --no-git-checks
-        # OIDC auth is used automatically when this workflow is registered as a Trusted Publisher
+        run: npm publish --no-git-checks
+        # Publishes to 'latest' so `npm i dossier-agentic-product-planner-builder` gets this version.
+        # OIDC auth when this workflow is registered as a Trusted Publisher on npm.

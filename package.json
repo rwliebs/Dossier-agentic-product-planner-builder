@@ -1,6 +1,6 @@
 {
   "name": "dossier-agentic-product-planner-builder",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "repository": "https://github.com/rwliebs/Dossier",
   "description": "AI-native product craft platform — plan workflows, orchestrate multi-agent builds, ship iteratively",
   "bin": {

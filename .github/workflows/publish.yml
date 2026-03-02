@@ -1,0 +1,44 @@
+# Publish to npm when a version tag is pushed.
+# Requires Trusted Publisher to be configured on npmjs.com for this repo and workflow filename.
+# See: https://docs.npmjs.com/trusted-publishers
+
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write   # Required for npm OIDC (Trusted Publishers)
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install npm CLI for Trusted Publishing
+        run: npm install -g npm@latest
+        # Trusted publishing requires npm 11.5.1+ and Node 22.14+
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Publish to npm
+        run: npm publish --tag alpha --no-git-checks
+        # OIDC auth is used automatically when this workflow is registered as a Trusted Publisher

@@ -115,14 +115,13 @@ Product
 
 ## Quickstart
 
-**One-shot run (Node 18+):**
-
+**One-shot run (Node 18+):**  
+Package is published to NPM:
 ```bash
-npx dossier-agentic-product-planner-builder
+npx @rwliebs/dossier-agentic-product-planner-builder
 ```
 
 **Or from source:**
-
 ```bash
 git clone https://github.com/rwliebs/Dossier.git
 cd Dossier

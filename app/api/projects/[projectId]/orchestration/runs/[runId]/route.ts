@@ -44,7 +44,7 @@ export async function PATCH(
     const parsed = updateOrchestrationRunStatusSchema.safeParse(body);
     if (!parsed.success) {
       return validationError(
-        parsed.error.errors.map((e) => e.message).join("; ") ?? "Invalid payload"
+        parsed.error.issues.map((e) => e.message).join("; ") ?? "Invalid payload"
       );
     }
 

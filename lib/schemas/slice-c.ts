@@ -54,15 +54,15 @@ export const approvalTypeSchema = z.enum(["create_pr", "merge_pr"]);
 // ============================================================================
 
 export const systemPolicyProfileSchema = z.object({
-  id: z.string().uuid(),
-  project_id: z.string().uuid(),
+  id: z.string().guid(),
+  project_id: z.string().guid(),
   required_checks: z.array(runCheckTypeSchema),
   protected_paths: z.array(z.string()).nullable().optional(),
   forbidden_paths: z.array(z.string()).nullable().optional(),
-  dependency_policy: z.record(z.unknown()),
-  security_policy: z.record(z.unknown()),
-  architecture_policy: z.record(z.unknown()),
-  approval_policy: z.record(z.unknown()),
+  dependency_policy: z.record(z.string(), z.unknown()),
+  security_policy: z.record(z.string(), z.unknown()),
+  architecture_policy: z.record(z.string(), z.unknown()),
+  approval_policy: z.record(z.string(), z.unknown()),
   updated_at: z.string().datetime(),
 });
 
@@ -71,19 +71,19 @@ export const systemPolicyProfileSchema = z.object({
 // ============================================================================
 
 const orchestrationRunBaseSchema = z.object({
-  id: z.string().uuid(),
-  project_id: z.string().uuid(),
+  id: z.string().guid(),
+  project_id: z.string().guid(),
   scope: buildScopeSchema,
-  workflow_id: z.string().uuid().nullable().optional(),
-  card_id: z.string().uuid().nullable().optional(),
+  workflow_id: z.string().guid().nullable().optional(),
+  card_id: z.string().guid().nullable().optional(),
   trigger_type: triggerTypeSchema,
   status: runStatusSchema,
   initiated_by: z.string().min(1),
   repo_url: z.string().url(),
   base_branch: z.string().min(1),
-  system_policy_profile_id: z.string().uuid(),
-  system_policy_snapshot: z.record(z.unknown()),
-  run_input_snapshot: z.record(z.unknown()),
+  system_policy_profile_id: z.string().guid(),
+  system_policy_snapshot: z.record(z.string(), z.unknown()),
+  run_input_snapshot: z.record(z.string(), z.unknown()),
   worktree_root: z.string().nullable().optional(),
   started_at: z.string().datetime().nullable().optional(),
   ended_at: z.string().datetime().nullable().optional(),
@@ -112,16 +112,16 @@ export const orchestrationRunSchema = orchestrationRunBaseSchema.refine(
 // ============================================================================
 
 export const cardAssignmentSchema = z.object({
-  id: z.string().uuid(),
-  run_id: z.string().uuid(),
-  card_id: z.string().uuid(),
+  id: z.string().guid(),
+  run_id: z.string().guid(),
+  card_id: z.string().guid(),
   agent_role: agentRoleSchema,
   agent_profile: z.string().min(1),
   feature_branch: z.string().min(1),
   worktree_path: z.string().nullable().optional(),
   allowed_paths: z.array(z.string()).min(1),
   forbidden_paths: z.array(z.string()).nullable().optional(),
-  assignment_input_snapshot: z.record(z.unknown()),
+  assignment_input_snapshot: z.record(z.string(), z.unknown()),
   status: runStatusSchema,
   created_at: z.string().datetime().optional(),
   updated_at: z.string().datetime().optional(),
@@ -132,8 +132,8 @@ export const cardAssignmentSchema = z.object({
 // ============================================================================
 
 export const agentExecutionSchema = z.object({
-  id: z.string().uuid(),
-  assignment_id: z.string().uuid(),
+  id: z.string().guid(),
+  assignment_id: z.string().guid(),
   status: runStatusSchema,
   started_at: z.string().datetime().nullable().optional(),
   ended_at: z.string().datetime().nullable().optional(),
@@ -146,8 +146,8 @@ export const agentExecutionSchema = z.object({
 // ============================================================================
 
 export const agentCommitSchema = z.object({
-  id: z.string().uuid(),
-  assignment_id: z.string().uuid(),
+  id: z.string().guid(),
+  assignment_id: z.string().guid(),
   sha: z.string().min(1),
   branch: z.string().min(1),
   message: z.string().min(1),
@@ -159,8 +159,8 @@ export const agentCommitSchema = z.object({
 // ============================================================================
 
 export const runCheckSchema = z.object({
-  id: z.string().uuid(),
-  run_id: z.string().uuid(),
+  id: z.string().guid(),
+  run_id: z.string().guid(),
   check_type: runCheckTypeSchema,
   status: checkStatusSchema,
   output: z.string().nullable().optional(),
@@ -173,8 +173,8 @@ export const runCheckSchema = z.object({
 // ============================================================================
 
 export const pullRequestCandidateSchema = z.object({
-  id: z.string().uuid(),
-  run_id: z.string().uuid(),
+  id: z.string().guid(),
+  run_id: z.string().guid(),
   base_branch: z.string().min(1),
   head_branch: z.string().min(1),
   title: z.string().min(1),
@@ -190,8 +190,8 @@ export const pullRequestCandidateSchema = z.object({
 // ============================================================================
 
 export const approvalRequestSchema = z.object({
-  id: z.string().uuid(),
-  run_id: z.string().uuid(),
+  id: z.string().guid(),
+  run_id: z.string().guid(),
   approval_type: approvalTypeSchema,
   status: approvalStatusSchema,
   requested_by: z.string().min(1),
@@ -208,12 +208,12 @@ export const approvalRequestSchema = z.object({
 // ============================================================================
 
 export const eventLogSchema = z.object({
-  id: z.string().uuid(),
-  project_id: z.string().uuid(),
-  run_id: z.string().uuid().nullable().optional(),
+  id: z.string().guid(),
+  project_id: z.string().guid(),
+  run_id: z.string().guid().nullable().optional(),
   event_type: z.string().min(1),
   actor: z.string().min(1),
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
   created_at: z.string().datetime(),
 });
 
@@ -224,7 +224,7 @@ export const eventLogSchema = z.object({
 export const createSystemPolicyProfileInputSchema = systemPolicyProfileSchema
   .omit({ id: true })
   .extend({
-    id: z.string().uuid().optional(),
+    id: z.string().guid().optional(),
   });
 
 export const createOrchestrationRunInputSchema = orchestrationRunBaseSchema

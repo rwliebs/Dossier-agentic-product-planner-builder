@@ -177,7 +177,7 @@ When workflows exist but have NO activities, respond with clarification. The use
 \`\`\`json
 {
   "type": "clarification",
-  "message": "Your workflows are set up. Next, **review and finalize the project** to create core product documents (architecture, data contracts, design system) and set up the directory structure. Use the \"Finalize Project\" button above the map. After that, you can use the Populate button on each workflow to add activities and functionality cards.",
+  "message": "Your workflows are set up. Next, **review and finalize the project** to create core product documents (architecture, data contracts, design system) and set up the directory structure. Use the ${'"'}Finalize Project${'"'} button above the map. After that, you can use the Populate button on each workflow to add activities and functionality cards.",
   "actions": []
 }
 \`\`\`

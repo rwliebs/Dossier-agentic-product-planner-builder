@@ -68,8 +68,8 @@ export const knowledgeItemSourceSchema = z.enum([
 // ============================================================================
 
 export const contextArtifactSchema = z.object({
-  id: z.string().uuid(),
-  project_id: z.string().uuid(),
+  id: z.string().guid(),
+  project_id: z.string().guid(),
   name: z.string().min(1),
   type: artifactTypeSchema,
   title: z.string().nullable().optional(),
@@ -77,7 +77,7 @@ export const contextArtifactSchema = z.object({
   uri: z.string().nullable().optional(), // URL/path/identifier
   locator: z.string().nullable().optional(), // pointer like endpoint path, command, skill id
   mime_type: z.string().nullable().optional(),
-  integration_ref: z.record(z.unknown()).nullable().optional(), // provider-specific handle
+  integration_ref: z.record(z.string(), z.unknown()).nullable().optional(), // provider-specific handle
   checksum: z.string().nullable().optional(),
   created_at: z.string().datetime().optional(),
   updated_at: z.string().datetime().optional(),
@@ -98,8 +98,8 @@ export const contextArtifactValidated = contextArtifactSchema.refine(
 // ============================================================================
 
 export const cardContextArtifactSchema = z.object({
-  card_id: z.string().uuid(),
-  context_artifact_id: z.string().uuid(),
+  card_id: z.string().guid(),
+  context_artifact_id: z.string().guid(),
   linked_by: z.string().nullable().optional(),
   usage_hint: z.string().nullable().optional(),
 });
@@ -109,8 +109,8 @@ export const cardContextArtifactSchema = z.object({
 // ============================================================================
 
 export const cardRequirementSchema = z.object({
-  id: z.string().uuid(),
-  card_id: z.string().uuid(),
+  id: z.string().guid(),
+  card_id: z.string().guid(),
   text: z.string().min(1),
   status: knowledgeItemStatusSchema,
   source: knowledgeItemSourceSchema,
@@ -125,8 +125,8 @@ export const cardRequirementSchema = z.object({
 // ============================================================================
 
 export const cardKnownFactSchema = z.object({
-  id: z.string().uuid(),
-  card_id: z.string().uuid(),
+  id: z.string().guid(),
+  card_id: z.string().guid(),
   text: z.string().min(1),
   evidence_source: z.string().nullable().optional(),
   status: knowledgeItemStatusSchema,
@@ -142,8 +142,8 @@ export const cardKnownFactSchema = z.object({
 // ============================================================================
 
 export const cardAssumptionSchema = z.object({
-  id: z.string().uuid(),
-  card_id: z.string().uuid(),
+  id: z.string().guid(),
+  card_id: z.string().guid(),
   text: z.string().min(1),
   status: knowledgeItemStatusSchema,
   source: knowledgeItemSourceSchema,
@@ -158,8 +158,8 @@ export const cardAssumptionSchema = z.object({
 // ============================================================================
 
 export const cardQuestionSchema = z.object({
-  id: z.string().uuid(),
-  card_id: z.string().uuid(),
+  id: z.string().guid(),
+  card_id: z.string().guid(),
   text: z.string().min(1),
   status: knowledgeItemStatusSchema,
   source: knowledgeItemSourceSchema,
@@ -174,8 +174,8 @@ export const cardQuestionSchema = z.object({
 // ============================================================================
 
 export const cardPlannedFileSchema = z.object({
-  id: z.string().uuid(),
-  card_id: z.string().uuid(),
+  id: z.string().guid(),
+  card_id: z.string().guid(),
   logical_file_name: z.string().min(1),
   module_hint: z.string().nullable().optional(),
   artifact_kind: plannedFileKindSchema,
@@ -194,7 +194,7 @@ export const cardPlannedFileSchema = z.object({
 
 // Card with all its knowledge items and planned files loaded
 export const cardWithContextSchema = z.object({
-  card_id: z.string().uuid(),
+  card_id: z.string().guid(),
   requirements: z.array(cardRequirementSchema),
   facts: z.array(cardKnownFactSchema),
   assumptions: z.array(cardAssumptionSchema),

@@ -62,7 +62,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
       const files: ProducedFile[] = (result.files ?? [])
         .filter((f: ChangedFile) => f.status === "added" || f.status === "modified")
-        .map((f: ChangedFile) => ({ path: f.path, status: f.status }));
+        .map((f: ChangedFile) => ({ path: f.path, status: f.status as "added" | "modified" }));
 
       return json(files);
     }

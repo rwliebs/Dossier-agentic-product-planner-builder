@@ -72,7 +72,7 @@ export function writeConfigFile(updates: Record<string, string>): void {
   ensureDataDir();
   const configPath = getConfigPath();
 
-  let lines: string[] = [];
+  const lines: string[] = [];
   const seen = new Set<string>();
 
   if (fs.existsSync(configPath)) {

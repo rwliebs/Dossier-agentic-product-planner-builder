@@ -663,7 +663,7 @@ export default function DossierPage() {
     entityType: 'workflow' | 'activity' | 'card';
     entityName: string;
     cascadeMessage?: string;
-    onConfirm: () => void | Promise<void>;
+    onConfirm: () => boolean | Promise<boolean>;
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -848,7 +848,7 @@ export default function DossierPage() {
       {deleteDialog && (
         <ConfirmDeleteDialog
           open={true}
-          onOpenChange={(open) => !open && setDeleteDialog(null)}
+          onOpenChange={(open) => { if (!open) setDeleteDialog(null); }}
           entityType={deleteDialog.entityType}
           entityName={deleteDialog.entityName}
           cascadeMessage={deleteDialog.cascadeMessage}

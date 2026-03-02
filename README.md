@@ -115,14 +115,14 @@ Product
 
 ## Quickstart
 
-**One-shot run (Node 18+):**  
-Package is published to GitHub Packages. First time only: ensure `@rwliebs` points at GitHub’s registry (this repo’s `.npmrc` does that if you clone it) and [authenticate](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry#authenticating-to-github-packages) with a GitHub PAT that has `read:packages`. Then:
+**One-shot run (Node 18+):**
 
 ```bash
-npx @rwliebs/dossier-agentic-product-planner-builder
+npx dossier-agentic-product-planner-builder
 ```
 
 **Or from source:**
+
 ```bash
 git clone https://github.com/rwliebs/Dossier.git
 cd Dossier

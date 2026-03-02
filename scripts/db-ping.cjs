@@ -16,7 +16,7 @@ let parsedHost = null;
 try {
   const u = new URL(DATABASE_URL.replace(/^postgresql:/, "https:"));
   parsedHost = u.hostname;
-} catch (_) {}
+} catch (_) { /* ignore URL parse */ }
 
 async function ping() {
   const postgres = require("postgres");

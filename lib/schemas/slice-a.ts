@@ -45,7 +45,7 @@ export const planningActionTypeSchema = z.enum([
 ]);
 
 export const projectSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string().min(1),
   description: z.string().nullable().optional(),
   customer_personas: z.string().nullable().optional(),
@@ -57,8 +57,8 @@ export const projectSchema = z.object({
 });
 
 export const workflowSchema = z.object({
-  id: z.string().uuid(),
-  project_id: z.string().uuid(),
+  id: z.string().guid(),
+  project_id: z.string().guid(),
   title: z.string().min(1),
   description: z.string().nullable().optional(),
   build_state: runStatusSchema.nullable().optional(),
@@ -66,16 +66,16 @@ export const workflowSchema = z.object({
 });
 
 export const workflowActivitySchema = z.object({
-  id: z.string().uuid(),
-  workflow_id: z.string().uuid(),
+  id: z.string().guid(),
+  workflow_id: z.string().guid(),
   title: z.string().min(1),
   color: activityColorSchema.nullable().optional(),
   position: z.number().int(),
 });
 
 export const cardSchema = z.object({
-  id: z.string().uuid(),
-  workflow_activity_id: z.string().uuid(),
+  id: z.string().guid(),
+  workflow_activity_id: z.string().guid(),
   title: z.string().min(1),
   description: z.string().nullable().optional(),
   status: cardStatusSchema,
@@ -86,11 +86,11 @@ export const cardSchema = z.object({
 });
 
 export const planningActionSchema = z.object({
-  id: z.string().uuid(),
-  project_id: z.union([z.string().uuid(), z.literal("")]).optional(),
+  id: z.string().guid(),
+  project_id: z.union([z.string().guid(), z.literal("")]).optional(),
   action_type: planningActionTypeSchema,
-  target_ref: z.record(z.unknown()),
-  payload: z.record(z.unknown()),
+  target_ref: z.record(z.string(), z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
 });
 
 export type Project = z.infer<typeof projectSchema>;

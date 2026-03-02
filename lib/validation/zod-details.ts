@@ -7,7 +7,7 @@ import type { ZodError } from "zod";
 
 export function zodErrorDetails(error: ZodError): Record<string, string[]> {
   const details: Record<string, string[]> = {};
-  for (const e of error.errors) {
+  for (const e of error.issues) {
     const path = e.path.join(".") || "body";
     if (!details[path]) details[path] = [];
     details[path].push(e.message);

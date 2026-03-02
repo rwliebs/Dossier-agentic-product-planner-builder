@@ -63,7 +63,7 @@ async function main() {
             if (eventType === 'action') actionCount++;
             if (eventType === 'message') console.log('  LLM message:', data.message);
             if (eventType === 'phase_complete') console.log('  phase_complete:', JSON.stringify(data));
-          } catch {}
+          } catch { /* ignore parse */ }
         }
       }
     }

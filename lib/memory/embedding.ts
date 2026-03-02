@@ -138,13 +138,14 @@ async function doLoadEmbedder(): Promise<Embedder | null> {
         ]);
       }
 
-      const WasmEmbedderConfig = wasmModule.WasmEmbedderConfig as new () => {
-        setMaxLength: (n: number) => unknown;
-        setNormalize: (b: boolean) => unknown;
-        setPooling: (n: number) => unknown;
+      type WasmConfigInstance = {
+        setMaxLength: (n: number) => WasmConfigInstance;
+        setNormalize: (b: boolean) => WasmConfigInstance;
+        setPooling: (n: number) => WasmConfigInstance;
       };
+      const WasmEmbedderConfig = wasmModule.WasmEmbedderConfig as new () => WasmConfigInstance;
       const WasmEmbedder = wasmModule.WasmEmbedder as {
-        withConfig: (model: Uint8Array, tokenizer: string, c: unknown) => Embedder;
+        withConfig: (model: Uint8Array, tokenizer: string, c: WasmConfigInstance) => Embedder;
       };
       const embedderConfig = new WasmEmbedderConfig()
         .setMaxLength(config.maxLength)

@@ -92,8 +92,7 @@ describe("ImplementationCard", () => {
     expect(onAction).not.toHaveBeenCalled();
   });
 
-  it("Build button calls onBuildCard when provided (even if card not finalized)", () => {
-    const onAction = vi.fn();
+  it("unfinalized todo card shows Approve (disabled when no handler), not Build", () => {
     const onBuildCard = vi.fn();
     const unfinalizedCard: MapCard = {
       ...baseCard,
@@ -106,15 +105,17 @@ describe("ImplementationCard", () => {
         card={unfinalizedCard}
         isExpanded={false}
         onExpand={() => {}}
-        onAction={onAction}
+        onAction={() => {}}
         onBuildCard={onBuildCard}
         onUpdateDescription={() => {}}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: new RegExp(ACTION_BUTTONS.CARD_ACTION.todo, "i") }));
-    expect(onBuildCard).toHaveBeenCalledWith("card-1");
-    expect(onAction).not.toHaveBeenCalled();
+    // Unfinalized card shows Approve (disabled when no onFinalizeCard) — never actionable Build
+    const approveBtn = screen.getByRole("button", { name: new RegExp(ACTION_BUTTONS.FINALIZE_CARD, "i") });
+    expect(approveBtn).toBeInTheDocument();
+    expect(approveBtn).toBeDisabled();
+    expect(onBuildCard).not.toHaveBeenCalled();
   });
 
   it("Approve button shown when unapproved todo and onFinalizeCard and projectFinalized provided", () => {
@@ -141,7 +142,7 @@ describe("ImplementationCard", () => {
     expect(onFinalizeCard).toHaveBeenCalledWith("card-1");
   });
 
-  it("Approve button hidden when projectFinalized is false", () => {
+  it("Approve project first shown and disabled when projectFinalized is false", () => {
     const onFinalizeCard = vi.fn();
     const unfinalizedCard: MapCard = {
       ...baseCard,
@@ -161,7 +162,10 @@ describe("ImplementationCard", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: new RegExp(ACTION_BUTTONS.FINALIZE_CARD, "i") })).not.toBeInTheDocument();
+    const btn = screen.getByRole("button", { name: /Approve project first/i });
+    expect(btn).toBeInTheDocument();
+    expect(btn).toBeDisabled();
+    fireEvent.click(btn);
     expect(onFinalizeCard).not.toHaveBeenCalled();
   });
 

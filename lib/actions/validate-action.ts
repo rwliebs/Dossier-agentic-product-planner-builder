@@ -126,7 +126,7 @@ export function validateReferentialIntegrity(
       }
       break;
 
-    case "linkContextArtifact":
+    case "linkContextArtifact": {
       if (target_ref.card_id && !cardExists(state, target_ref.card_id)) {
         errors.push({
           code: "referential_integrity",
@@ -147,6 +147,7 @@ export function validateReferentialIntegrity(
         });
       }
       break;
+    }
 
     case "createContextArtifact":
       // project_id in target_ref; optional card_id in payload

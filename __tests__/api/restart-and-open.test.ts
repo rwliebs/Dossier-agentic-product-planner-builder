@@ -6,15 +6,16 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 
-const originalNodeEnv = process.env.NODE_ENV;
+const env = process.env as { NODE_ENV?: string };
+const originalNodeEnv = env.NODE_ENV;
 
 describe("POST /api/dev/restart-and-open", () => {
   afterEach(() => {
-    process.env.NODE_ENV = originalNodeEnv;
+    env.NODE_ENV = originalNodeEnv;
   });
 
   it("returns 404 when NODE_ENV is not development", async () => {
-    process.env.NODE_ENV = "production";
+    env.NODE_ENV = "production";
     const { POST } = await import("@/app/api/dev/restart-and-open/route");
     const req = new Request("http://localhost/api/dev/restart-and-open", {
       method: "POST",
@@ -28,7 +29,7 @@ describe("POST /api/dev/restart-and-open", () => {
   });
 
   it("returns 400 when body is missing or invalid JSON", async () => {
-    process.env.NODE_ENV = "development";
+    env.NODE_ENV = "development";
     const { POST } = await import("@/app/api/dev/restart-and-open/route");
     const req = new Request("http://localhost/api/dev/restart-and-open", {
       method: "POST",
@@ -43,7 +44,7 @@ describe("POST /api/dev/restart-and-open", () => {
   });
 
   it("returns 400 when projectId is missing", async () => {
-    process.env.NODE_ENV = "development";
+    env.NODE_ENV = "development";
     const { POST } = await import("@/app/api/dev/restart-and-open/route");
     const req = new Request("http://localhost/api/dev/restart-and-open", {
       method: "POST",
@@ -58,7 +59,7 @@ describe("POST /api/dev/restart-and-open", () => {
   });
 
   it("returns 409 when clone path does not exist", async () => {
-    process.env.NODE_ENV = "development";
+    env.NODE_ENV = "development";
     const { POST } = await import("@/app/api/dev/restart-and-open/route");
     const req = new Request("http://localhost/api/dev/restart-and-open", {
       method: "POST",

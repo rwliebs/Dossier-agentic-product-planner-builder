@@ -223,14 +223,20 @@ export function ImplementationCard({
         buttonClass: config.button,
       };
     }
-    if ((status === 'todo' || status === 'production') && !isFinalized && onFinalizeCard && projectFinalized) {
+    // Unfinalized todo/production: never show Build (backend requires approval first). Show Approve or "Approve project first".
+    if ((status === 'todo' || status === 'production') && !isFinalized) {
+      const canFinalize = !!onFinalizeCard && projectFinalized;
       return {
-        label: finalizingCardId === card.id ? ACTION_BUTTONS.FINALIZING_CARD : ACTION_BUTTONS.FINALIZE_CARD,
-        disabled: finalizingCardId === card.id,
+        label: !projectFinalized
+          ? 'Approve project first'
+          : (finalizingCardId === card.id ? ACTION_BUTTONS.FINALIZING_CARD : ACTION_BUTTONS.FINALIZE_CARD),
+        disabled: !canFinalize || finalizingCardId === card.id,
         action: 'finalize',
-        buttonClass: finalizingCardId === card.id
-          ? 'bg-indigo-400 cursor-not-allowed animate-pulse'
-          : 'bg-indigo-600 hover:bg-indigo-700',
+        buttonClass: !canFinalize
+          ? 'bg-gray-400 cursor-not-allowed'
+          : finalizingCardId === card.id
+            ? 'bg-indigo-400 cursor-not-allowed animate-pulse'
+            : 'bg-indigo-600 hover:bg-indigo-700',
       };
     }
     return {

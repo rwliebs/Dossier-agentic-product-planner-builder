@@ -42,10 +42,10 @@ export const updateProjectSchema = z.object({
 // Action submission
 export const submitActionsSchema = z.object({
   actions: z.array(z.object({
-    id: z.string().uuid().optional(),
+    id: z.string().guid().optional(),
     action_type: planningActionTypeSchema,
-    target_ref: z.record(z.unknown()).default({}),
-    payload: z.record(z.unknown()).default({}),
+    target_ref: z.record(z.string(), z.unknown()).default({}),
+    payload: z.record(z.string(), z.unknown()).default({}),
   })),
 });
 
@@ -58,7 +58,7 @@ export const createArtifactSchema = z.object({
   uri: z.string().nullable().optional(),
   locator: z.string().nullable().optional(),
   mime_type: z.string().nullable().optional(),
-  integration_ref: z.record(z.unknown()).nullable().optional(),
+  integration_ref: z.record(z.string(), z.unknown()).nullable().optional(),
 }).refine(
   (d) => d.content || d.uri || d.integration_ref,
   { message: "At least one of content, uri, or integration_ref is required" }
@@ -72,12 +72,12 @@ export const updateArtifactSchema = z.object({
   uri: z.string().nullable().optional(),
   locator: z.string().nullable().optional(),
   mime_type: z.string().nullable().optional(),
-  integration_ref: z.record(z.unknown()).nullable().optional(),
+  integration_ref: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 // Link artifact to card
 export const linkArtifactSchema = z.object({
-  context_artifact_id: z.string().uuid(),
+  context_artifact_id: z.string().guid(),
   usage_hint: z.string().nullable().optional(),
 });
 
@@ -143,7 +143,7 @@ export const chatRequestSchema = z
       .optional()
       .default([]),
     mode: z.enum(["scaffold", "populate", "finalize"]).optional(),
-    workflow_id: z.string().uuid().optional(),
+    workflow_id: z.string().guid().optional(),
     /** Test-only: mock LLM response. Only used when PLANNING_MOCK_ALLOWED=1 */
     mock_response: z.string().optional(),
   })
@@ -155,7 +155,7 @@ export const chatRequestSchema = z
 export const chatStreamRequestSchema = z.object({
   message: z.string().min(1, "Message is required").transform((s) => s.trim()),
   mode: z.enum(["scaffold", "populate", "finalize"]).optional().default("scaffold"),
-  workflow_id: z.string().uuid().optional(),
+  workflow_id: z.string().guid().optional(),
   /** Test-only: mock LLM response. Only used when PLANNING_MOCK_ALLOWED=1 */
   mock_response: z.string().optional(),
 }).refine(
@@ -167,13 +167,13 @@ export const chatStreamRequestSchema = z.object({
 export const createRunRequestSchema = z
   .object({
     scope: z.enum(["workflow", "card"]),
-    workflow_id: z.string().uuid().nullable().optional(),
-    card_id: z.string().uuid().nullable().optional(),
+    workflow_id: z.string().guid().nullable().optional(),
+    card_id: z.string().guid().nullable().optional(),
     trigger_type: z.enum(["card", "workflow", "manual"]).optional(),
     initiated_by: z.string().min(1),
     repo_url: z.string().url(),
     base_branch: z.string().min(1),
-    run_input_snapshot: z.record(z.unknown()),
+    run_input_snapshot: z.record(z.string(), z.unknown()),
     worktree_root: z.string().nullable().optional(),
   })
   .refine(
@@ -187,22 +187,22 @@ export const createRunRequestSchema = z
 
 // Orchestration: create assignment (POST body; run_id from params)
 export const createAssignmentRequestSchema = z.object({
-  card_id: z.string().uuid(),
+  card_id: z.string().guid(),
   agent_role: z.enum(["planner", "coder", "reviewer", "integrator", "tester"]),
   agent_profile: z.string().min(1),
   feature_branch: z.string().min(1),
   worktree_path: z.string().nullable().optional(),
   allowed_paths: z.array(z.string()).min(1),
   forbidden_paths: z.array(z.string()).nullable().optional(),
-  assignment_input_snapshot: z.record(z.unknown()).optional(),
+  assignment_input_snapshot: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Orchestration: trigger build (POST body; project_id from params)
 export const triggerBuildRequestSchema = z
   .object({
     scope: z.enum(["workflow", "card"]),
-    workflow_id: z.string().uuid().nullable().optional(),
-    card_id: z.string().uuid().nullable().optional(),
+    workflow_id: z.string().guid().nullable().optional(),
+    card_id: z.string().guid().nullable().optional(),
     trigger_type: z.enum(["card", "workflow", "manual"]).optional(),
     initiated_by: z.string().min(1),
   })
@@ -217,13 +217,13 @@ export const triggerBuildRequestSchema = z
 
 // Orchestration: resume blocked build (POST body; project_id from params)
 export const resumeBlockedRequestSchema = z.object({
-  card_id: z.string().uuid(),
+  card_id: z.string().guid(),
   actor: z.string().min(1).optional(),
 });
 
 // Orchestration: create approval request (POST body)
 export const createApprovalRequestSchema = z.object({
-  run_id: z.string().uuid(),
+  run_id: z.string().guid(),
   approval_type: z.enum(["create_pr", "merge_pr"]),
   requested_by: z.string().min(1),
 });

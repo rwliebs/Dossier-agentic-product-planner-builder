@@ -25,7 +25,7 @@ export const updateProjectPayloadSchema = z.object({
 });
 
 export const updateProjectTargetRefSchema = z.object({
-  project_id: z.string().uuid(),
+  project_id: z.string().guid(),
 });
 
 // ============================================================================
@@ -39,7 +39,7 @@ export const createWorkflowPayloadSchema = z.object({
 });
 
 export const createWorkflowTargetRefSchema = z.object({
-  project_id: z.string().uuid(),
+  project_id: z.string().guid(),
 });
 
 // ============================================================================
@@ -47,7 +47,7 @@ export const createWorkflowTargetRefSchema = z.object({
 // ============================================================================
 
 export const createActivityPayloadSchema = z.object({
-  id: z.string().uuid().optional(), // When provided, createCard can reference this in target_ref.workflow_activity_id
+  id: z.string().guid().optional(), // When provided, createCard can reference this in target_ref.workflow_activity_id
   title: z.string().min(1),
   color: z
     .enum(["yellow", "blue", "purple", "green", "orange", "pink"])
@@ -57,7 +57,7 @@ export const createActivityPayloadSchema = z.object({
 });
 
 export const createActivityTargetRefSchema = z.object({
-  workflow_id: z.string().uuid(),
+  workflow_id: z.string().guid(),
 });
 
 // ============================================================================
@@ -65,7 +65,7 @@ export const createActivityTargetRefSchema = z.object({
 // ============================================================================
 
 export const createCardPayloadSchema = z.object({
-  id: z.string().uuid().optional(), // when provided, used as card id so upsertCardKnowledgeItem can target this card
+  id: z.string().guid().optional(), // when provided, used as card id so upsertCardKnowledgeItem can target this card
   title: z.string().min(1),
   description: z.string().nullable().optional(),
   status: cardStatusSchema,
@@ -74,7 +74,7 @@ export const createCardPayloadSchema = z.object({
 });
 
 export const createCardTargetRefSchema = z.object({
-  workflow_activity_id: z.string().uuid(),
+  workflow_activity_id: z.string().guid(),
 });
 
 // ============================================================================
@@ -91,7 +91,7 @@ export const updateCardPayloadSchema = z.object({
 });
 
 export const updateCardTargetRefSchema = z.object({
-  card_id: z.string().uuid(),
+  card_id: z.string().guid(),
 });
 
 // ============================================================================
@@ -103,7 +103,7 @@ export const reorderCardPayloadSchema = z.object({
 });
 
 export const reorderCardTargetRefSchema = z.object({
-  card_id: z.string().uuid(),
+  card_id: z.string().guid(),
 });
 
 // ============================================================================
@@ -111,13 +111,13 @@ export const reorderCardTargetRefSchema = z.object({
 // ============================================================================
 
 export const linkContextArtifactPayloadSchema = z.object({
-  context_artifact_id: z.string().uuid(),
+  context_artifact_id: z.string().guid(),
   linked_by: z.string().nullable().optional(),
   usage_hint: z.string().nullable().optional(),
 });
 
 export const linkContextArtifactTargetRefSchema = z.object({
-  card_id: z.string().uuid(),
+  card_id: z.string().guid(),
 });
 
 // ============================================================================
@@ -129,11 +129,11 @@ export const createContextArtifactPayloadSchema = z.object({
   type: artifactTypeSchema,
   title: z.string().nullable().optional(),
   content: z.string().min(1),
-  card_id: z.string().uuid().nullable().optional(),
+  card_id: z.string().guid().nullable().optional(),
 });
 
 export const createContextArtifactTargetRefSchema = z.object({
-  project_id: z.string().uuid(),
+  project_id: z.string().guid(),
 });
 
 // ============================================================================
@@ -148,11 +148,11 @@ export const upsertCardPlannedFilePayloadSchema = z.object({
   intent_summary: z.string().min(1),
   contract_notes: z.string().nullable().optional(),
   position: z.number().int().nonnegative(),
-  planned_file_id: z.string().uuid().nullable().optional(), // if null, insert; else update
+  planned_file_id: z.string().guid().nullable().optional(), // if null, insert; else update
 });
 
 export const upsertCardPlannedFileTargetRefSchema = z.object({
-  card_id: z.string().uuid(),
+  card_id: z.string().guid(),
 });
 
 // ============================================================================
@@ -165,11 +165,11 @@ export const upsertCardKnowledgeItemPayloadSchema = z.object({
   evidence_source: z.string().nullable().optional(), // for facts
   confidence: z.number().min(0).max(1).nullable().optional(),
   position: z.number().int().nonnegative(),
-  knowledge_item_id: z.string().uuid().nullable().optional(), // if null, insert; else update
+  knowledge_item_id: z.string().guid().nullable().optional(), // if null, insert; else update
 });
 
 export const upsertCardKnowledgeItemTargetRefSchema = z.object({
-  card_id: z.string().uuid(),
+  card_id: z.string().guid(),
 });
 
 
@@ -180,7 +180,7 @@ export const upsertCardKnowledgeItemTargetRefSchema = z.object({
 export const deleteWorkflowPayloadSchema = z.object({});
 
 export const deleteWorkflowTargetRefSchema = z.object({
-  workflow_id: z.string().uuid(),
+  workflow_id: z.string().guid(),
 });
 
 // ============================================================================
@@ -190,7 +190,7 @@ export const deleteWorkflowTargetRefSchema = z.object({
 export const deleteActivityPayloadSchema = z.object({});
 
 export const deleteActivityTargetRefSchema = z.object({
-  workflow_activity_id: z.string().uuid(),
+  workflow_activity_id: z.string().guid(),
 });
 
 // ============================================================================
@@ -200,7 +200,7 @@ export const deleteActivityTargetRefSchema = z.object({
 export const deleteCardPayloadSchema = z.object({});
 
 export const deleteCardTargetRefSchema = z.object({
-  card_id: z.string().uuid(),
+  card_id: z.string().guid(),
 });
 
 // ============================================================================

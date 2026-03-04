@@ -13,6 +13,7 @@ import {
   repoUrlToCloneUrl,
   ensureClone,
   createFeatureBranch,
+  writeScaffoldFilesToRepo,
 } from "@/lib/orchestration/repo-manager";
 
 describe("repo-manager", () => {
@@ -105,6 +106,47 @@ describe("repo-manager", () => {
         encoding: "utf-8",
       }).trim();
       expect(branch).toBe("feat/test");
+    });
+  });
+
+  describe("writeScaffoldFilesToRepo", () => {
+    it("writes files and commits on base branch", () => {
+      const clonePath = path.join(tempDir, "clone-scaffold");
+      execSync(`git clone "${remoteDir}" "${clonePath}"`, { stdio: "pipe" });
+      const files = [
+        { path: "package.json", content: '{"name":"app"}' },
+        { path: "src/app/page.tsx", content: "export default function Page() {}" },
+      ];
+      const result = writeScaffoldFilesToRepo(clonePath, files, "main");
+      expect(result.success).toBe(true);
+      expect(fs.existsSync(path.join(clonePath, "package.json"))).toBe(true);
+      expect(fs.readFileSync(path.join(clonePath, "package.json"), "utf-8")).toBe('{"name":"app"}');
+      expect(fs.existsSync(path.join(clonePath, "src/app/page.tsx"))).toBe(true);
+      const log = execSync("git log -1 --oneline", { cwd: clonePath, encoding: "utf-8" }).trim();
+      expect(log).toContain("project scaffold");
+    });
+
+    it("skips files that already exist", () => {
+      const clonePath = path.join(tempDir, "clone-skip");
+      execSync(`git clone "${remoteDir}" "${clonePath}"`, { stdio: "pipe" });
+      fs.writeFileSync(path.join(clonePath, "package.json"), '{"existing":true}', "utf-8");
+      execSync("git add package.json", { cwd: clonePath, stdio: "pipe" });
+      execSync("git commit -m 'existing'", { cwd: clonePath, stdio: "pipe" });
+      const files = [
+        { path: "package.json", content: '{"overwrite":false}' },
+        { path: "new.txt", content: "new" },
+      ];
+      const result = writeScaffoldFilesToRepo(clonePath, files, "main");
+      expect(result.success).toBe(true);
+      expect(fs.readFileSync(path.join(clonePath, "package.json"), "utf-8")).toBe('{"existing":true}');
+      expect(fs.readFileSync(path.join(clonePath, "new.txt"), "utf-8")).toBe("new");
+    });
+
+    it("returns success when files array is empty", () => {
+      const clonePath = path.join(tempDir, "clone-empty");
+      execSync(`git clone "${remoteDir}" "${clonePath}"`, { stdio: "pipe" });
+      const result = writeScaffoldFilesToRepo(clonePath, [], "main");
+      expect(result.success).toBe(true);
     });
   });
 });

@@ -616,7 +616,7 @@ export function serializeMapStateForFinalize(state: PlanningState): string {
  */
 export interface FinalizeDocSpec {
   name: string;
-  type: "doc" | "spec" | "design";
+  type: "doc" | "spec" | "design" | "scaffold";
   title: string;
   label: string;
   contentGuidelines: string;
@@ -680,6 +680,36 @@ You MUST include a "## Root folder structure" section with a bullet list of root
 - Layout patterns and spacing
 - Interaction patterns (forms, navigation, feedback)
 - Derived from: project design_inspiration, card planned files of kind component/hook`,
+  },
+  {
+    name: "project-scaffold",
+    type: "scaffold",
+    title: "Project Scaffold",
+    label: "Project Scaffold",
+    contentGuidelines: `Generate the minimal set of root configuration and entry-point files that make this project runnable with a single install + dev command.
+
+## Output format (REQUIRED)
+For EACH file, use this exact format:
+### FILE: <relative-path>
+\`\`\`
+<file contents>
+\`\`\`
+
+## What to generate
+Based on the project's tech_stack and deployment:
+- Package manager config (package.json with name, scripts: dev/build/start, dependencies with exact versions)
+- Framework config (e.g. next.config.js, vite.config.ts, tsconfig.json)
+- CSS/styling setup (e.g. tailwind.config.js, postcss.config.js, globals.css)
+- Minimal app entry point (e.g. src/app/layout.tsx + src/app/page.tsx for Next.js, or src/main.tsx for Vite)
+- .gitignore appropriate for the stack
+
+## Rules
+- Use the root folder structure from the architectural summary
+- Include ONLY files needed to make \`npm run dev\` (or equivalent) work
+- Use specific dependency versions, not "latest"
+- The app entry should render a placeholder page, not real features (cards will add those)
+- Do NOT generate feature code, tests, or documentation
+- For web apps: include TypeScript config and Tailwind CSS by default unless tech_stack says otherwise`,
   },
 ];
 

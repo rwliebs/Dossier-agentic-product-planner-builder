@@ -16,9 +16,11 @@ import { runPopulateWorkflow } from "@/lib/llm/run-populate-workflow";
 import { runFinalizeMultiStep } from "@/lib/llm/run-finalize-multistep";
 import { getArtifactsByProject, getProject } from "@/lib/db/queries";
 import { parseRootFoldersFromArchitecturalSummary } from "@/lib/orchestration/parse-root-folders";
+import { parseScaffoldFiles } from "@/lib/orchestration/parse-scaffold-files";
 import {
   ensureClone,
   createRootFoldersInRepo,
+  writeScaffoldFilesToRepo,
   pushBranch,
 } from "@/lib/orchestration/repo-manager";
 import { getRepoContextForPrompt } from "@/lib/orchestration/repo-reader";
@@ -137,28 +139,37 @@ export async function POST(
       const project = await getProject(db, projectId);
       const repoUrl = (project as { repo_url?: string })?.repo_url;
       const baseBranch = (project as { default_branch?: string })?.default_branch ?? "main";
-      if (repoUrl && !repoUrl.includes("placeholder") && rootFolders.length > 0) {
+      if (repoUrl && !repoUrl.includes("placeholder")) {
         const cloneResult = ensureClone(projectId, repoUrl, null, baseBranch);
         if (cloneResult.success && cloneResult.clonePath) {
-          const folderResult = createRootFoldersInRepo(
-            cloneResult.clonePath,
-            rootFolders,
-            baseBranch
-          );
-          if (!folderResult.success) {
-            console.warn("[chat] Root folder creation failed:", folderResult.error);
-          } else {
-            const pushResult = pushBranch(projectId, baseBranch, repoUrl);
-            if (!pushResult.success) {
-              console.warn(
-                "[chat] Push main (directory structure) to origin failed:",
-                pushResult.error
-              );
+          const clonePath = cloneResult.clonePath;
+          if (rootFolders.length > 0) {
+            const folderResult = createRootFoldersInRepo(clonePath, rootFolders, baseBranch);
+            if (!folderResult.success) {
+              console.warn("[chat] Root folder creation failed:", folderResult.error);
             }
+          }
+          const scaffoldArtifact = artifacts.find(
+            (a: Record<string, unknown>) => (a.name as string) === "project-scaffold"
+          );
+          const scaffoldContent = (scaffoldArtifact as { content?: string } | undefined)?.content ?? "";
+          const scaffoldFiles = parseScaffoldFiles(scaffoldContent);
+          if (scaffoldFiles.length > 0) {
+            const scaffoldResult = writeScaffoldFilesToRepo(clonePath, scaffoldFiles, baseBranch);
+            if (!scaffoldResult.success) {
+              console.warn("[chat] Project scaffold write failed:", scaffoldResult.error);
+            }
+          }
+          const pushResult = pushBranch(projectId, baseBranch, repoUrl);
+          if (!pushResult.success) {
+            console.warn(
+              "[chat] Push main (directory structure) to origin failed:",
+              pushResult.error
+            );
           }
         }
       } else if (!repoUrl || repoUrl.includes("placeholder")) {
-        console.warn("[chat] No repo connected; skipping root folder creation");
+        console.warn("[chat] No repo connected; skipping root folder and scaffold creation");
       }
 
       const now = new Date().toISOString();

@@ -12,6 +12,7 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import { execSync, execFileSync } from "node:child_process";
 import { getDataDir, ensureDataDir, readConfigFile } from "@/lib/config/data-dir";
+import type { ScaffoldFile } from "./parse-scaffold-files";
 
 const REPOS_DIR = "repos";
 
@@ -138,7 +139,10 @@ export function ensureClone(
 
 /**
  * Creates root folders in the repo and commits them.
- * Used after project finalization to establish folder structure.
+ * Used after project finalization to establish folder structure from the
+ * architectural summary (## Root folder structure). Only creates directories
+ * and .gitkeep; does NOT write scaffold files (package.json, configs, app entry).
+ * Scaffold file contents are handled separately by writeScaffoldFilesToRepo.
  * Idempotent: skips commit if nothing to add.
  */
 export function createRootFoldersInRepo(
@@ -176,6 +180,52 @@ export function createRootFoldersInRepo(
     return {
       success: false,
       error: `Create root folders failed: ${message}`,
+    };
+  }
+}
+
+/**
+ * Writes scaffold file contents to the repo and commits them.
+ * Used after project finalization (after createRootFoldersInRepo). Only writes
+ * files (package.json, configs, app entry); folder structure is createRootFoldersInRepo only.
+ * Skips files that already exist. Single commit: "chore: add project scaffold (Dossier finalization)".
+ */
+export function writeScaffoldFilesToRepo(
+  clonePath: string,
+  files: ScaffoldFile[],
+  baseBranch: string
+): { success: boolean; error?: string } {
+  if (files.length === 0) return { success: true };
+
+  try {
+    runGitSync(clonePath, `checkout ${baseBranch}`);
+
+    let written = 0;
+    for (const { path: filePath, content } of files) {
+      const fullPath = path.join(clonePath, filePath);
+      if (fs.existsSync(fullPath)) continue;
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      fs.writeFileSync(fullPath, content, "utf-8");
+      written++;
+    }
+
+    if (written === 0) return { success: true };
+
+    runGitSync(clonePath, "add -A");
+    const status = runGitSync(clonePath, "status --porcelain");
+    if (status) {
+      runGitSync(
+        clonePath,
+        'commit -m "chore: add project scaffold (Dossier finalization)" --author="Dossier <noreply@dossier.dev>"'
+      );
+    }
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      error: `Write scaffold files failed: ${message}`,
     };
   }
 }

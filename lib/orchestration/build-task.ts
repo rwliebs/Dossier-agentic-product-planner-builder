@@ -173,6 +173,9 @@ export function buildTaskFromPayload(payload: DispatchPayload): BuildTaskOutput 
   // Phase 2: Implementation
   sections.push(`## Phase 2: IMPLEMENTATION`);
 
+  sections.push(`### Runnable project root
+The repository has a runnable scaffold (package.json, framework config, app entry) from project finalization. Preserve it. Add your card's code into the existing structure. Do not delete or overwrite root config files.`);
+
   const worktreeSection =
     payload.worktree_path
       ? `CRITICAL: Your working directory is set to the target repository.

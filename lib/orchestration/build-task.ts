@@ -154,13 +154,12 @@ export function buildTaskFromPayload(payload: DispatchPayload): BuildTaskOutput 
 
   const sections: string[] = [];
 
-  // Phase 1: Process Check
+  // Phase 1: Process Check (required before implementation — rules, architecture, requirements, TDD)
   sections.push(`# Card: ${cardTitle}`);
   if (cardDescription) {
     sections.push(`Description: ${cardDescription}`);
   }
-  // TEMPORARY: skip Phase 1 process check to see if build succeeds faster
-  // sections.push(PROCESS_CHECK_SCRIPT);
+  sections.push(PROCESS_CHECK_SCRIPT);
 
   // Context artifacts (test files, docs, specs)
   if (contextArtifacts.length > 0) {

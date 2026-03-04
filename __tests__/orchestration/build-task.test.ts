@@ -79,4 +79,25 @@ describe("Build task from payload (O10.5)", () => {
     expect(result.taskDescription).toContain("feat/run-abc-card-1");
     expect(result.taskDescription).toContain("/tmp/dossier/repos/project-123");
   });
+
+  it("includes Phase 1 Process Check (rules, architecture, requirements, TDD) before implementation", () => {
+    const payload: DispatchPayload = {
+      run_id: "run-1",
+      assignment_id: "assign-1",
+      card_id: "card-1",
+      feature_branch: "feat/test",
+      allowed_paths: ["src/"],
+      assignment_input_snapshot: {},
+    };
+
+    const result = buildTaskFromPayload(payload);
+
+    expect(result.taskDescription).toContain("Phase 1: PROCESS CHECK");
+    expect(result.taskDescription).toContain("RULES AUDIT");
+    expect(result.taskDescription).toContain("ARCHITECTURE AUDIT");
+    expect(result.taskDescription).toContain("REQUIREMENTS AUDIT");
+    expect(result.taskDescription).toContain("TDD VERIFICATION");
+    expect(result.taskDescription).toContain("PROCEED");
+    expect(result.taskDescription).toContain("Phase 2: IMPLEMENTATION");
+  });
 });

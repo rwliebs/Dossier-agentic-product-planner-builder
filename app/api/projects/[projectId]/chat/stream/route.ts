@@ -96,13 +96,27 @@ export async function POST(
 
       try {
         if (mode === "finalize") {
-          const totalActions = await runFinalizeMultiStep({
+          const finalizeResult = await runFinalizeMultiStep({
             db,
             projectId,
             state,
             emit,
             mockResponse: mock_response,
           });
+          if (finalizeResult.failedDocs.length > 0 || finalizeResult.artifactsCreated < finalizeResult.totalDocs) {
+            emit("error", {
+              reason: `Finalize failed: required context documents were not created (${finalizeResult.failedDocs.join(", ") || "unknown"}).`,
+              artifacts_created: finalizeResult.artifactsCreated,
+              failed_docs: finalizeResult.failedDocs,
+            });
+            emit("phase_complete", {
+              responseType: "finalize_failed",
+              artifacts_created: finalizeResult.artifactsCreated,
+              failed_docs: finalizeResult.failedDocs,
+            });
+            emit("done", {});
+            return;
+          }
 
           const artifacts = await getArtifactsByProject(db, projectId);
           const archSummary = artifacts.find(
@@ -143,7 +157,7 @@ export async function POST(
 
           emit("phase_complete", {
             responseType: "finalize_complete",
-            artifacts_created: totalActions,
+            artifacts_created: finalizeResult.artifactsCreated,
           });
           emit("done", {});
           return;

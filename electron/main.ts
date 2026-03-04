@@ -8,11 +8,17 @@ import { spawn, ChildProcess } from "node:child_process";
 import { existsSync, readFileSync, mkdirSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { getDataDir, resolveNodeExecutable } from "./runtime";
+import { handleActivateWindow } from "./window-lifecycle";
 
 let serverProcess: ChildProcess | null = null;
 let mainWindow: BrowserWindow | null = null;
 let serverPort = 3000;
 let logPath: string | null = null;
+let isServerReady = false;
+
+function getServerUrl(): string {
+  return `http://localhost:${serverPort}`;
+}
 
 // ---------------------------------------------------------------------------
 // Data directory & config (mirrors bin/dossier.mjs)
@@ -99,6 +105,12 @@ function createWindow(): void {
   });
 }
 
+function loadAppUrlIfReady(window: BrowserWindow | null): void {
+  if (!window || !isServerReady) return;
+  log(`Loading app URL into window: ${getServerUrl()}`);
+  window.loadURL(getServerUrl());
+}
+
 async function startNextServer(appPath: string): Promise<void> {
   let standaloneDir: string;
   if (app.isPackaged) {
@@ -158,6 +170,7 @@ async function startNextServer(appPath: string): Promise<void> {
     waitForServer(`http://127.0.0.1:${serverPort}`),
     startupFailure,
   ]);
+  isServerReady = true;
 }
 
 function killServer(): void {
@@ -165,6 +178,7 @@ function killServer(): void {
     serverProcess.kill("SIGTERM");
     serverProcess = null;
   }
+  isServerReady = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,9 +223,7 @@ async function main(): Promise<void> {
     dialog.showErrorBox("Dossier startup error", `${message}\n\nLogs: ${join(dataDir, "logs", "electron-main.log")}`);
     return;
   }
-  if (mainWindow) {
-    mainWindow.loadURL(`http://localhost:${serverPort}`);
-  }
+  loadAppUrlIfReady(mainWindow);
 
   app.on("window-all-closed", () => {
     killServer();
@@ -223,9 +235,12 @@ async function main(): Promise<void> {
   });
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+    handleActivateWindow({
+      windowCount: BrowserWindow.getAllWindows().length,
+      isServerReady,
+      createWindow,
+      loadAppUrl: () => loadAppUrlIfReady(mainWindow),
+    });
   });
 }
 

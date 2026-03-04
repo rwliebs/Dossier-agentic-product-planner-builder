@@ -73,7 +73,7 @@ Add or keep these points in the main README:
 
 ---
 
-## 6. Checklist
+## 7. Checklist
 
 **Before first GitHub release**
 
@@ -96,7 +96,7 @@ Add or keep these points in the main README:
 
 ---
 
-## 7. References
+## 8. References
 
 - [ADR 0007 — Production release gate (auth + RLS)](../adr/0007-release-gate-auth-rls-required.md)
 - [ADR 0004 — No-auth-first MVP](../adr/0004-no-auth-first-mvp.md)

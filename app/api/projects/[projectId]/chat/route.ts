@@ -104,13 +104,28 @@ export async function POST(
 
   if (mode === "finalize") {
     try {
-      const artifactsCreated = await runFinalizeMultiStep({
+      const finalizeResult = await runFinalizeMultiStep({
         db,
         projectId,
         state,
         emit: noopEmit,
         mockResponse: mock_response,
       });
+      if (finalizeResult.failedDocs.length > 0 || finalizeResult.artifactsCreated < finalizeResult.totalDocs) {
+        const failed =
+          finalizeResult.failedDocs.length > 0
+            ? finalizeResult.failedDocs.join(", ")
+            : "unknown";
+        return json(
+          {
+            status: "error",
+            message: `Finalize failed: required context documents were not created (${failed}).`,
+            artifacts_created: finalizeResult.artifactsCreated,
+            failed_docs: finalizeResult.failedDocs,
+          },
+          502,
+        );
+      }
 
       const artifacts = await getArtifactsByProject(db, projectId);
       const archSummary = artifacts.find(
@@ -151,10 +166,10 @@ export async function POST(
       return json({
         status: "success",
         responseType: "actions" as const,
-        message: `Created ${artifactsCreated} context artifact(s).`,
-        applied: artifactsCreated,
+        message: `Created ${finalizeResult.artifactsCreated} context artifact(s).`,
+        applied: finalizeResult.artifactsCreated,
         workflow_ids_created: [],
-        artifacts_created: artifactsCreated,
+        artifacts_created: finalizeResult.artifactsCreated,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Finalize failed";

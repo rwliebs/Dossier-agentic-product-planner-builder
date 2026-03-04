@@ -78,6 +78,38 @@ describe("pipelineApply", () => {
     expect(result.failedAt).toBe(1);
     expect(result.rejectionReason).toBeDefined();
   });
+
+  it("appends new workflow after highest existing position when positions have gaps", async () => {
+    const insertWorkflow = vi.fn().mockResolvedValue(undefined);
+    const db = createMockDbAdapter({
+      getProject: vi.fn().mockResolvedValue({ id: projectId, name: "Test" }),
+      getWorkflowsByProject: vi.fn().mockResolvedValue([
+        { id: "wf-a", project_id: projectId, title: "A", position: 3 },
+        { id: "wf-b", project_id: projectId, title: "B", position: 7 },
+      ]),
+      insertWorkflow,
+    });
+
+    const actions: ActionInput[] = [
+      {
+        action_type: "createWorkflow",
+        target_ref: { project_id: projectId },
+        payload: { id: workflowId, title: "Core" },
+      },
+    ];
+
+    const result = await pipelineApply(db, projectId, actions);
+
+    expect(result.applied).toBe(1);
+    expect(insertWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: workflowId,
+        project_id: projectId,
+        title: "Core",
+        position: 8,
+      })
+    );
+  });
 });
 
 describe("preview/apply match", () => {

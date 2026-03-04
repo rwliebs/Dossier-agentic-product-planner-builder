@@ -430,7 +430,7 @@ Dossier currently requires Supabase cloud + Vercel to run. For self-deploy, it n
 - [x] Browser opens to `http://localhost:3000`
 - [x] Default project created on first run
 - [x] Setup flow saves to `~/.dossier/config` — no restart required
-- [x] Config location is Tauri-compatible (user data dir, not app bundle)
+- [x] Config location is Electron-compatible (user data dir, not app bundle)
 - [x] Works on macOS and Linux (Windows via WSL)
 
 ---

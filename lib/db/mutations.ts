@@ -229,7 +229,11 @@ async function applyCreateWorkflow(
   const title = action.payload.title as string;
   const description = (action.payload.description as string) ?? null;
   const workflows = await getWorkflowsByProject(db, projectId);
-  const position = (action.payload.position as number) ?? workflows.length;
+  const fallbackPosition = workflows.reduce(
+    (max, workflow) => Math.max(max, ((workflow.position as number) ?? -1)),
+    -1
+  ) + 1;
+  const position = (action.payload.position as number) ?? fallbackPosition;
 
   if (!title || typeof title !== "string" || title.trim().length === 0) {
     return { applied: false, rejectionReason: "Workflow title is required" };

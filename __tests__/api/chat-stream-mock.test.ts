@@ -270,4 +270,58 @@ describe("chat/stream with mock", () => {
     // Split populate runs cards per activity; mock returns same card for each, so count may be 1 or 2
     expect(createCard.length).toBeGreaterThanOrEqual(1);
   });
+
+  it("finalize does not stamp project when required docs are missing", async () => {
+    let pid: string;
+    try {
+      pid = await createTestProject();
+    } catch {
+      return;
+    }
+
+    const mockNoActions = JSON.stringify({
+      type: "clarification",
+      message: "Need more context before generating artifacts.",
+      actions: [],
+    });
+
+    const req = new NextRequest(
+      `http://localhost/api/projects/${pid}/chat/stream`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Finalize project",
+          mode: "finalize",
+          mock_response: mockNoActions,
+        }),
+      },
+    );
+
+    const res = await POST(req, { params: Promise.resolve({ projectId: pid }) });
+    expect(res.status).toBe(200);
+
+    const events = await consumeSSE(res);
+    const errorEvent = [...events]
+      .reverse()
+      .find(
+        (e) =>
+          e.event === "error" &&
+          /required context documents were not created/i.test(
+            String((e.data as { reason?: string } | undefined)?.reason ?? ""),
+          ),
+      );
+    expect(errorEvent).toBeTruthy();
+    const errReason = (errorEvent?.data as { reason?: string } | undefined)?.reason ?? "";
+    expect(errReason).toMatch(/required context documents were not created/i);
+
+    const phaseComplete = events.find((e) => e.event === "phase_complete");
+    expect((phaseComplete?.data as { responseType?: string } | undefined)?.responseType).toBe(
+      "finalize_failed",
+    );
+
+    const db = getDb();
+    const project = await db.getProject(pid);
+    expect((project as { finalized_at?: string | null } | null)?.finalized_at ?? null).toBeNull();
+  });
 });

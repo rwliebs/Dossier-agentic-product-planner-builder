@@ -1,7 +1,7 @@
 /**
  * Migration runner for SQLite.
  * Tracks applied migrations in _migrations table.
- * Migrations are embedded as strings for standalone/Tauri compatibility.
+ * Migrations are embedded as strings for standalone/Electron compatibility.
  */
 
 import * as crypto from "node:crypto";

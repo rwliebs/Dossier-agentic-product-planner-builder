@@ -197,13 +197,28 @@ ${worktreeSection}`);
       if (pf.module_hint) line += `\n  Module hint: ${pf.module_hint}`;
       sections.push(line);
     }
-    sections.push(`Only modify files within the allowed paths above. Paths ending with / or without file extensions are folder scopes — create or edit files under that path.`);
+    sections.push(`Paths ending with / or without file extensions are folder scopes — create or edit files under that path.`);
   } else if (allowedPaths.length > 0) {
     sections.push(`## Planned files
 Create or edit files under these allowed paths:
 ${allowedPaths.map((p) => `- \`${p}\``).join("\n")}
 
-You MUST implement the card scope by creating or editing concrete code files (e.g. components, API routes, lib modules, pages) under the paths above. Do not deliver only a README or documentation — deliver working code that fulfills the card description and acceptance criteria. Only modify files within the allowed paths above.`);
+You MUST implement the card scope by creating or editing concrete code files (e.g. components, API routes, lib modules, pages) under the paths above. Do not deliver only a README or documentation — deliver working code that fulfills the card description and acceptance criteria.`);
+  }
+
+  // Explicit scope constraint so the agent does not implement outside allowed paths.
+  // Going outside scope causes auto-commit to find "no eligible files" and the card is blocked.
+  if (allowedPaths.length > 0) {
+    sections.push(`## SCOPE CONSTRAINT — ALLOWED FILES ONLY
+
+You may ONLY create or modify files that are in the planned/allowed list above. A path like \`src/components/DoseCard.tsx\` means that file only; a path like \`src/hooks/\` (or a path without an extension) means that file or any file under that directory.
+
+- Do NOT create or modify files outside this set (e.g. do not add new components, hooks, or lib files unless they are under an allowed path).
+- If you need a new file to implement the card, it MUST be one of the planned files above or live under an allowed path (e.g. under an allowed directory).
+- If the planned paths are too narrow for the implementation you have in mind, implement only within the allowed paths and in your summary note which additional paths would be needed — do not implement outside scope. Any file you create or modify outside the allowed list will not be committed; the build will be marked "Blocked" and require a human to add paths and resume.
+
+Allowed paths for this card:
+${allowedPaths.map((p) => `- \`${p}\``).join("\n")}`);
   }
 
   if (forbiddenPaths.length > 0) {

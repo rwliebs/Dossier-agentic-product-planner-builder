@@ -169,7 +169,8 @@ export async function performAutoCommit(input: AutoCommitInput): Promise<AutoCom
   }
 
   const allPaths = parsePorcelainLines(statusResult.lines);
-  const eligible = allPaths.filter((p) => isEligible(p, allowedPaths));
+  // Policy relaxed: commit all non-excluded files; user review catches scope drift (scope solution TBD).
+  const eligible = allPaths.filter((p) => isEligible(p, []));
 
   console.warn("[auto-commit]", {
     cardId,
@@ -180,10 +181,7 @@ export async function performAutoCommit(input: AutoCommitInput): Promise<AutoCom
   });
 
   if (eligible.length === 0) {
-    const reason =
-      allPaths.length === 0
-        ? "No changes to commit"
-        : `No eligible files (${allPaths.length} excluded by policy)`;
+    const reason = "No changes to commit";
     console.warn("[auto-commit] outcome=no_changes", { cardId, reason });
     return {
       outcome: "no_changes",

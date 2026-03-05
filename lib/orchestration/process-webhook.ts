@@ -49,6 +49,8 @@ export interface WebhookPayload {
   };
   /** Completion verification evidence (when execution_completed) */
   completion_evidence?: string;
+  /** SDK session ID for resumable blocked runs (when persistSession is enabled) */
+  session_id?: string;
 }
 
 export interface ProcessWebhookResult {
@@ -260,7 +262,10 @@ export async function processWebhook(
           });
         } else if (autoResult.outcome === "no_changes") {
           autoCommitOk = false;
-          await db.updateCardAssignment(assignment_id, { status: "blocked" });
+          await db.updateCardAssignment(assignment_id, {
+            status: "blocked",
+            ...(payload.session_id != null && payload.session_id !== "" && { session_id: payload.session_id }),
+          });
           await db.updateCard(cardId, {
             build_state: "blocked",
             last_build_error: autoResult.reason ?? "No changes to commit",
@@ -376,7 +381,7 @@ export async function processWebhook(
       });
 
       const failedCardId = (assignment as { card_id: string }).card_id;
-      const errorMsg = payload.error ?? "Build failed";
+      const errorMsg = payload.summary ?? payload.error ?? "Build failed";
       await db.updateCard(failedCardId, {
         build_state: "failed",
         last_build_error: errorMsg,
@@ -412,10 +417,15 @@ export async function processWebhook(
       }
       await db.updateCardAssignment(assignment_id, {
         status: "blocked",
+        ...(payload.session_id != null && payload.session_id !== "" && { session_id: payload.session_id }),
       });
 
       const blockedCardId = (assignment as { card_id: string }).card_id;
-      await db.updateCard(blockedCardId, { build_state: "blocked" });
+      const blockedMsg = payload.summary ?? "Needs decision";
+      await db.updateCard(blockedCardId, {
+        build_state: "blocked",
+        last_build_error: blockedMsg,
+      });
       await writeKnowledgeToCard(db, blockedCardId, payload.knowledge);
 
       await logEvent(db, {

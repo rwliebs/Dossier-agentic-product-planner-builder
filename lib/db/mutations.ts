@@ -574,7 +574,7 @@ async function applyCreateContextArtifactAction(
 
   const validTypes = [
     "doc", "design", "code", "research", "link", "image",
-    "skill", "mcp", "cli", "api", "prompt", "spec", "runbook", "test",
+    "skill", "mcp", "cli", "api", "prompt", "spec", "runbook", "test", "scaffold",
   ];
   if (!validTypes.includes(type)) {
     return { applied: false, rejectionReason: `Invalid artifact type: ${type}` };

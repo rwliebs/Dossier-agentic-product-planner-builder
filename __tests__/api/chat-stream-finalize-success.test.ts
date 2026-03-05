@@ -14,11 +14,14 @@ import { getDb } from "@/lib/db";
 import { getClonePath } from "@/lib/orchestration/repo-manager";
 import { FINALIZE_DOC_SPECS } from "@/lib/llm/planning-prompt";
 
+// Hoisted so the mock factory can use it (vi.mock runs before imports).
+const FINALIZE_DOC_COUNT = vi.hoisted(() => 6);
+
 vi.mock("@/lib/llm/run-finalize-multistep", () => ({
   runFinalizeMultiStep: vi.fn().mockResolvedValue({
-    artifactsCreated: FINALIZE_DOC_SPECS.length,
+    artifactsCreated: FINALIZE_DOC_COUNT,
     failedDocs: [] as string[],
-    totalDocs: FINALIZE_DOC_SPECS.length,
+    totalDocs: FINALIZE_DOC_COUNT,
   }),
 }));
 

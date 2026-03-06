@@ -1,0 +1,8 @@
+{
+  "identifier": "default",
+  "description": "Default capability for WYR app",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}

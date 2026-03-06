@@ -42,6 +42,12 @@ next-env.d.ts
 .claude/
 .DS_Store
 
+# Rust build artifacts
+wyr/target/
+
+# Tauri auto-generated schemas
+wyr/wyr-app/gen/
+
 # marketing / download site (website/)
 website/node_modules
 website/dist

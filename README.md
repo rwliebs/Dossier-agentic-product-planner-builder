@@ -113,10 +113,38 @@ Product
 
 ---
 
-## Quickstart
+## Desktop app
 
-**One-shot run (Node 18+):**  
-Package is published to NPM:
+Dossier is available as a native desktop app for Windows and macOS. No terminal needed — just download, install, and open.
+
+### Download
+
+Go to the [Releases](https://github.com/rwliebs/Dossier/releases) page and grab the installer for your system:
+
+| Platform | File | What to do |
+|----------|------|------------|
+| **Windows** | `Dossier-Desktop_x.x.x_x64-setup.exe` | Run the installer, then open "Dossier Desktop" from your Start menu |
+| **macOS** | `Dossier-Desktop_x.x.x_x64.dmg` | Open the `.dmg`, drag Dossier to Applications, then launch it |
+| **macOS (Apple Silicon)** | `Dossier-Desktop_x.x.x_aarch64.dmg` | Same as above — this one is for M1/M2/M3/M4 Macs |
+
+> **Note:** The desktop app requires [Node.js 18+](https://nodejs.org/) to be installed on your machine. The app uses it behind the scenes to run the Dossier server locally.
+
+### How to use it
+
+1. **Install and open** the app. You'll see a loading screen for a few seconds while the local server starts.
+2. **The full Dossier UI** appears — the same product map, context cards, agent panel, and project management you get in the browser.
+3. **Set up your API key** on first launch (or go to `/setup`). You need an [Anthropic API key](https://console.anthropic.com/) for the AI features.
+4. **Start planning.** Create a project, add workflows and feature cards, and let your agents build.
+
+Everything runs locally on your machine. Your data stays in `~/.dossier/` — nothing leaves your computer except API calls to Anthropic (and GitHub, if you connect a repo).
+
+---
+
+## Run in the browser
+
+If you prefer to run Dossier in your browser instead of the desktop app:
+
+**One-shot run (Node 18+):**
 ```bash
 npx @rwliebs/dossier-agentic-product-planner-builder
 ```

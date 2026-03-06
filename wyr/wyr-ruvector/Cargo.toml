@@ -1,0 +1,12 @@
+[package]
+name = "wyr-ruvector"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Native Rust RuVector primitives: HNSW index, vector embeddings, similarity search"
+
+[dependencies]
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

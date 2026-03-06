@@ -23,3 +23,5 @@ This directory stores Architecture Decision Records (ADRs) for Dossier.
 - [0007 - Production Release Gate Requires Auth and RLS](./0007-release-gate-auth-rls-required.md)
 - [0008 - Build Orchestration via Agentic-Flow](./0008-agentic-flow-execution-plane.md)
 - [0009 - Planning Non-Streaming](./0009-planning-non-streaming.md)
+- [0010 - WYR Rust Application with RuVector](./0010-wyr-rust-ruvector.md)
+- [0011 - RVF Package Structure for Self-Contained Agents](./0011-rvf-agent-packages.md)

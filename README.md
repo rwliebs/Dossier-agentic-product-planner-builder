@@ -126,7 +126,8 @@ Go to the **[latest release](https://github.com/ruvnet/Dossier/releases/tag/v0.1
 | **Windows** | [`Dossier-Desktop_0.1.0_x64-setup.exe`](https://github.com/ruvnet/Dossier/releases/download/v0.1.0-desktop/Dossier-Desktop_0.1.0_x64-setup.exe) | 2.5 MB | Run the installer, then open "Dossier Desktop" from your Start menu |
 | **Windows (MSI)** | [`Dossier-Desktop_0.1.0_x64.msi`](https://github.com/ruvnet/Dossier/releases/download/v0.1.0-desktop/Dossier-Desktop_0.1.0_x64.msi) | 3.7 MB | MSI installer for enterprise/GPO deployment |
 | **Windows (Portable)** | [`Dossier-Desktop_0.1.0_x64.exe`](https://github.com/ruvnet/Dossier/releases/download/v0.1.0-desktop/Dossier-Desktop_0.1.0_x64.exe) | 11 MB | No install needed — just download and run |
-| **macOS** | Coming soon | — | `.dmg` for Intel and Apple Silicon (M1–M4) |
+| **macOS (Apple Silicon)** | [`Dossier-Desktop_0.1.0_aarch64.dmg`](https://github.com/ruvnet/Dossier/releases/download/v0.1.0-desktop/Dossier.Desktop_0.1.0_aarch64.dmg) | 3.6 MB | For M1, M2, M3, M4 Macs — open the `.dmg`, drag to Applications |
+| **macOS (Intel)** | [`Dossier-Desktop_0.1.0_x64.dmg`](https://github.com/ruvnet/Dossier/releases/download/v0.1.0-desktop/Dossier.Desktop_0.1.0_x64.dmg) | 3.7 MB | For older Intel Macs — open the `.dmg`, drag to Applications |
 
 > **Note:** The desktop app requires [Node.js 18+](https://nodejs.org/) to be installed on your machine. The app uses it behind the scenes to run the Dossier server locally.
 

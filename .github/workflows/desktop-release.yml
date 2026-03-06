@@ -53,11 +53,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Next.js standalone
+        shell: bash
         run: |
-          pnpm run build
-          # postbuild: copy static assets into standalone
+          npx next build
+          # Copy static assets into standalone (use rsync-style to avoid exists errors)
           cp -r .next/static .next/standalone/.next/static
-          cp -r public .next/standalone/public
+          mkdir -p .next/standalone/public
+          cp -r public/* .next/standalone/public/
 
       # ── Rust toolchain ──────────────────────────────────
       - uses: dtolnay/rust-toolchain@stable
@@ -85,9 +87,8 @@ jobs:
       # ── Build Tauri app ─────────────────────────────────
       - name: Build Tauri desktop app
         working-directory: wyr/wyr-app
+        shell: bash
         run: npx @tauri-apps/cli build --target ${{ matrix.target }}
-        env:
-          RUSTFLAGS: '-C target-feature=+crt-static'
 
       # ── Collect artifacts ───────────────────────────────
       - name: Collect Windows artifacts
@@ -103,6 +104,7 @@ jobs:
 
       - name: Collect macOS artifacts
         if: runner.os == 'macOS'
+        shell: bash
         run: |
           mkdir -p dist
           cp "wyr/target/${{ matrix.target }}/release/bundle/dmg/"*.dmg dist/ 2>/dev/null || true
@@ -111,6 +113,7 @@ jobs:
 
       - name: Collect Linux artifacts
         if: runner.os == 'Linux'
+        shell: bash
         run: |
           mkdir -p dist
           cp "wyr/target/${{ matrix.target }}/release/bundle/deb/"*.deb dist/ 2>/dev/null || true
@@ -130,7 +133,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/desktop-v') || github.event.inputs.tag != ''
+    if: ${{ !failure() && (startsWith(github.ref, 'refs/tags/desktop-v') || github.event.inputs.tag != '') }}
 
     steps:
       - name: Download all artifacts

@@ -13,6 +13,8 @@ module.exports = {
       // Always include package.json and electron compiled output
       if (filePath === "/package.json") return false;
       if (filePath.startsWith("/electron")) return false;
+      // Explicitly exclude marketing/download site (deployed separately, not in DMG)
+      if (filePath.startsWith("/website")) return true;
       // Exclude everything else (node_modules, .next, app/, lib/, docs/, etc.)
       return true;
     },

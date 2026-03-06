@@ -112,3 +112,4 @@ To verify that memory is actually being stored:
 
 ## Related
 - [orchestration-reference.md](orchestration-reference.md)
+- [Memory System Improvements](../Feature%20Plans/memory-system-improvements.md) — 8 proposed improvements (GNN learning, observability, decay, graph queries, model upgrade, SONA, attention, cross-project)

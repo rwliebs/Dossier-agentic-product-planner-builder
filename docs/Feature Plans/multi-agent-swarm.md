@@ -50,6 +50,7 @@ Build execution currently uses a single coder agent per card via `@anthropic-ai/
 - GNN self-learning weights in RuVector (refine retrieval ranking over time)
 - Historical card snapshots (append-only, learn from build outcomes)
 - fastembed for local embedding generation (no external API cost)
+- See [memory-system-improvements.md](memory-system-improvements.md) for full improvement catalogue
 
 ## Impact
 - Files: `lib/orchestration/dispatch.ts`, `agentic-flow-client.ts`, `build-task.ts`, potentially new agent definitions

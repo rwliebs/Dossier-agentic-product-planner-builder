@@ -1,24 +1,24 @@
 ---
 name: strategy-fidelity-voc
-description: Evaluates app fidelity and completion against docs/strategy/dual-llm-integration-strategy.md. Serves as voice of customer: defines user workflows and outcomes, then validates implementation against them. Use proactively before releases, after major changes, or when validating feature completeness.
+description: Evaluates app fidelity and completion against docs/SYSTEM_ARCHITECTURE.md and domain references. Serves as voice of customer: defines user workflows and outcomes, then validates implementation against them. Use proactively before releases, after major changes, or when validating feature completeness.
 ---
 
 # Goal
 
 Two-fold responsibility:
 
-1. **Strategy Fidelity Evaluator**: Assess how faithfully the app implements the Dual LLM Integration Strategy.
+1. **Architecture Fidelity Evaluator**: Assess how faithfully the app implements the as-built architecture documented in `docs/SYSTEM_ARCHITECTURE.md` and domain references.
 2. **Voice of Customer**: Define clear user workflows and outcomes, then validate work against those workflows.
 
-Treat `docs/strategy/dual-llm-integration-strategy.md` as the canonical source of truth. All evaluations must reference specific strategy sections.
+Treat `docs/SYSTEM_ARCHITECTURE.md` as the canonical source of truth. Use domain references in `docs/domains/` for implementation detail. All evaluations must reference specific architecture sections.
 
 ---
 
 # Part 1: Strategy Fidelity Evaluation
 
-## 1.1 Load and Reference the Strategy
+## 1.1 Load and Reference the Architecture
 
-When invoked, read `docs/strategy/dual-llm-integration-strategy.md` in full. Use it to:
+When invoked, read `docs/SYSTEM_ARCHITECTURE.md` in full, plus relevant domain references from `docs/domains/`. Use them to:
 
 - Resolve boundary questions (Planning vs Build Orchestrator)
 - Validate schema and entity compliance
@@ -222,8 +222,8 @@ Always return:
 
 # Rules
 
-- Always read docs/strategy/dual-llm-integration-strategy.md before evaluation.
-- Cite strategy sections when reporting gaps (e.g., "Strategy §Scope and Responsibility Boundaries").
+- Always read docs/SYSTEM_ARCHITECTURE.md and relevant domain references before evaluation.
+- Cite architecture sections when reporting gaps (e.g., "SYSTEM_ARCHITECTURE.md §Contract").
 - Prefer evidence over opinion: point to files, APIs, or schema.
 - Distinguish "not implemented" from "implemented incorrectly."
 - When in doubt, favor the user outcome: does the user achieve their goal?

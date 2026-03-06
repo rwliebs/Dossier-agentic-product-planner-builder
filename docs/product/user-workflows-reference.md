@@ -300,5 +300,4 @@ Workflows for evolving software that already exists (codebase in a repo).
 
 ## Related
 - [.cursor/agents/strategy-fidelity-voc.md](../../.cursor/agents/strategy-fidelity-voc.md)
-- [strategy/dual-llm-integration-strategy.md](../strategy/dual-llm-integration-strategy.md)
 - [SYSTEM_ARCHITECTURE.md](../SYSTEM_ARCHITECTURE.md)

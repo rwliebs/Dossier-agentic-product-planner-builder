@@ -4,7 +4,7 @@
  * Workflow: agent creates code for the feature card in the project's repo (worktree);
  * we must pick up all new and modified files there (including untracked).
  *
- * ARCH_REF: docs/strategy/worktree-auto-commit.md
+ * @see docs/adr/0012-worktree-auto-commit.md
  */
 
 import {

@@ -11,7 +11,7 @@
  * little value. Direct SDK usage gives us concurrent-safe CWD and access to
  * options like persistSession: false for ephemeral builds.
  *
- * @see REMAINING_WORK_PLAN.md §5 O10
+ * @see docs/domains/orchestration-reference.md
  * @see docs/adr/0008-agentic-flow-execution-plane.md
  * @see docs/investigations/investigation-build-only-readme.md
  */

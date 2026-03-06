@@ -187,12 +187,55 @@ describe("chat/stream with mock", () => {
     expect(workflowIds.length).toBe(2);
   });
 
+  it("populate returns error when project plan is not approved", async () => {
+    let pid: string;
+    let workflowId: string;
+    try {
+      pid = await createTestProject();
+      const db = getDb();
+      workflowId = crypto.randomUUID();
+      await db.insertWorkflow({
+        id: workflowId,
+        project_id: pid,
+        title: "User Management",
+        description: "User registration and auth",
+        position: 0,
+      });
+      // Do NOT set project.finalized_at — project plan not approved
+    } catch {
+      return;
+    }
+
+    const req = new NextRequest(
+      `http://localhost/api/projects/${pid}/chat/stream`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Add activities and cards",
+          mode: "populate",
+          workflow_id: workflowId,
+        }),
+      },
+    );
+
+    const res = await POST(req, { params: Promise.resolve({ projectId: pid }) });
+    expect(res.status).toBe(200);
+
+    const events = await consumeSSE(res);
+    const errorEvent = events.find((e) => e.event === "error");
+    expect(errorEvent).toBeTruthy();
+    const reason = (errorEvent?.data as { reason?: string })?.reason ?? "";
+    expect(reason).toMatch(/project plan must be approved|approve the project/i);
+  });
+
   it("populate with mock_response produces createActivity and createCard actions", async () => {
     let pid: string;
     let workflowId: string;
     try {
       pid = await createTestProject();
       const db = getDb();
+      await db.updateProject(pid, { finalized_at: new Date().toISOString() } as never);
       workflowId = crypto.randomUUID();
       await db.insertWorkflow({
         id: workflowId,

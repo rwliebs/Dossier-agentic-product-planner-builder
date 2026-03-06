@@ -68,6 +68,5 @@ Section 4 is **not blocked** on Section 3. Proceed in parallel using these coord
 
 ### Reference Docs
 
-- [remaining-work-plan.md](../plans/remaining-work-plan.md) §4
-- [dual-llm-integration-strategy.md](../strategy/dual-llm-integration-strategy.md) §Memory and Retrieval, §Storage Architecture
+- [memory-reference.md](../domains/memory-reference.md) §contract
 - `lib/db/adapter.ts` — DbAdapter interface (memory methods at bottom)

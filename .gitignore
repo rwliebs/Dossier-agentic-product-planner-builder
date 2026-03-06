@@ -42,6 +42,10 @@ next-env.d.ts
 .claude/
 .DS_Store
 
+# Electron compiled JS output (source is .ts)
+electron/*.js
+electron/bin/
+
 # marketing / download site (website/)
 website/node_modules
 website/dist

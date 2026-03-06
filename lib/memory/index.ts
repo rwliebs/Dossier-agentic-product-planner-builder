@@ -2,7 +2,7 @@
  * Memory Plane exports.
  * getMemoryStore returns real or mock based on RuVector availability.
  *
- * @see REMAINING_WORK_PLAN.md §4 Memory Plane
+ * @see docs/domains/memory-reference.md
  */
 
 import type { DbAdapter } from "@/lib/db/adapter";

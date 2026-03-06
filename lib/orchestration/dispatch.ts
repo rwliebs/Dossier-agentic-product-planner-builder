@@ -3,7 +3,7 @@
  * retrieve memory, build payload, dispatch to agentic-flow,
  * create AgentExecution, update status, log event.
  *
- * @see docs/strategy/worktree-management-flow.md
+ * @see docs/adr/0013-single-card-build-with-clone.md
  */
 
 import type { DbAdapter } from "@/lib/db/adapter";

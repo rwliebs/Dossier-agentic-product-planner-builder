@@ -2,7 +2,7 @@
  * Parse scaffold file path + content pairs from the project-scaffold artifact.
  * Expects markdown with "### FILE: <relative-path>" followed by a fenced code block.
  *
- * @see docs/strategy/runnable-project-scaffold.md
+ * @see docs/adr/0015-runnable-project-scaffold.md
  */
 
 const FILE_HEADER_PREFIX = "### FILE:";

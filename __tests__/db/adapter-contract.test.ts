@@ -1,5 +1,5 @@
 /**
- * Adapter contract tests (REMAINING_WORK_PLAN §3 Task D9).
+ * Adapter contract tests.
  * Verifies DbAdapter CRUD and transaction behavior against SQLite in-memory.
  * Requires: pnpm rebuild better-sqlite3 (or pnpm approve-builds) - native module must be built.
  * If better-sqlite3 bindings are missing, run: pnpm rebuild better-sqlite3

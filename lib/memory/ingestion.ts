@@ -3,7 +3,7 @@
  * Converts card + context artifacts + approved knowledge to MemoryUnit entries.
  * Generates embedding via local RuVector, saves content to DbAdapter, vector to RuVector.
  *
- * @see REMAINING_WORK_PLAN.md §4 M4
+ * @see docs/domains/memory-reference.md
  * @see docs/SECTION_4_MEMORY_COORDINATION_PROMPT.md
  */
 

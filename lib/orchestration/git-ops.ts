@@ -2,7 +2,7 @@
  * Git operations for build worktrees.
  * Uses spawnSync with argument arrays (no shell string concatenation) for safety.
  *
- * ARCH_REF: docs/strategy/worktree-auto-commit.md
+ * @see docs/adr/0012-worktree-auto-commit.md
  */
 
 import { spawnSync } from "node:child_process";

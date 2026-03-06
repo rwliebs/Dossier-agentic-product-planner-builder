@@ -3,7 +3,7 @@
  * Query RuVector for semantic matches → get memory_unit_ids → fetch content from DbAdapter.
  * Card-scoped first → project-scoped. Log retrieval.
  *
- * @see REMAINING_WORK_PLAN.md §4 M5
+ * @see docs/domains/memory-reference.md
  * @see docs/SECTION_4_MEMORY_COORDINATION_PROMPT.md
  */
 

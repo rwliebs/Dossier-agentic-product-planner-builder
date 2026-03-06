@@ -1,5 +1,5 @@
 /**
- * Integration tests for mutation pipeline hardening (REMAINING_WORK_PLAN §2)
+ * Integration tests for mutation pipeline hardening
  * Tests: pipelineApply, preview/apply match, idempotency, state reconstruction.
  */
 

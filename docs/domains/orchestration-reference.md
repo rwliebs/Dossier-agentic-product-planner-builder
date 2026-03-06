@@ -1,7 +1,7 @@
 ---
 document_id: doc.orchestration
-last_verified: 2026-02-18
-tokens_estimate: 750
+last_verified: 2026-03-06
+tokens_estimate: 950
 tags:
   - orchestration
   - build
@@ -54,6 +54,24 @@ User trigger (card | workflow)
 - `scope=workflow` → workflow_id required, card_id null
 - `scope=card` → card_id required
 
+### Dispatch → Agent Connection
+
+Build agents run **in-process** via `@anthropic-ai/claude-agent-sdk` `query()`. There is no external agentic-flow HTTP service or webhook-based connection.
+
+```
+dispatch.ts → createAgenticFlowClient() → SDK query()
+  → async iterator (streaming): for await (const msg of result)
+  → agent uses tools: Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch
+  → agent commits to feature branch (cwd = worktree_path)
+  → execution completes → in-process callback to processWebhook()
+```
+
+- **Agent definitions**: loaded from agentic-flow's `getAgent("coder")` (system prompt only)
+- **Execution**: SDK `query()` with `permissionMode: "bypassPermissions"`, `persistSession: false`
+- **Model**: `claude-sonnet-4-5-20250929` (configurable via `COMPLETION_MODEL`)
+- **Retry**: 2 retries with exponential backoff
+- **Lifecycle**: fire-and-forget async; tracked in in-memory `executionRegistry`; result posted via `processWebhook()` internally
+
 ### Key Files
 | File | Purpose |
 |------|---------|
@@ -82,5 +100,4 @@ User trigger (card | workflow)
 - [ ] No approval request without required checks completed
 
 ## Related
-- [worktree-management-flow.md](../strategy/worktree-management-flow.md)
 - [memory-reference.md](memory-reference.md)

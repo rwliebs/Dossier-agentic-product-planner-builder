@@ -1,7 +1,7 @@
 ---
 document_id: doc.planning
-last_verified: 2026-02-18
-tokens_estimate: 700
+last_verified: 2026-03-06
+tokens_estimate: 750
 tags:
   - planning
   - llm
@@ -89,5 +89,4 @@ User clicks "Finalize" on card → POST /cards/[cardId]/finalize
 - [ ] User actions follow-up after populate (agent prompts for View Details, Build, etc.)
 
 ## Related
-- [dual-llm-integration-strategy.md](../strategy/dual-llm-integration-strategy.md)
 - [mutation-reference.md](mutation-reference.md)

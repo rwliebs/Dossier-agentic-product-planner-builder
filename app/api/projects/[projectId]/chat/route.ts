@@ -190,6 +190,17 @@ export async function POST(
   }
 
   if (mode === "populate" && workflow_id) {
+    const projectFinalizedAt = (state.project as { finalized_at?: string | null }).finalized_at;
+    if (!projectFinalizedAt) {
+      return json(
+        {
+          status: "error",
+          message:
+            "Project plan must be approved before adding activities and cards. Use the Approve Project (Finalize Project) button first to create core product documents and directory structure.",
+        },
+        400,
+      );
+    }
     const workflow = Array.from(state.workflows.values()).find((w) => w.id === workflow_id);
     if (!workflow) {
       return json({ status: "error", message: "Workflow not found" }, 404);
@@ -225,11 +236,22 @@ export async function POST(
   const emptyWorkflows = Array.from(state.workflows.values()).filter(
     (wf) => getWorkflowActivities(state, wf.id).length === 0,
   );
+  const projectFinalizedAt = (state.project as { finalized_at?: string | null }).finalized_at;
   if (
     !mode &&
     emptyWorkflows.length > 0 &&
     POPULATE_INTENT.test(message)
   ) {
+    if (!projectFinalizedAt) {
+      return json({
+        status: "success",
+        responseType: "clarification",
+        message:
+          "Project plan must be approved before adding activities and cards. Use the **Approve Project** (Finalize Project) button above the map first to create core product documents and directory structure. Then you can use the Populate button on each workflow.",
+        applied: 0,
+        workflow_ids_created: [],
+      });
+    }
     let totalApplied = 0;
     let currentState = state;
     for (const workflow of emptyWorkflows) {
@@ -377,11 +399,24 @@ export async function POST(
     );
   }
 
+  // Do not apply createActivity, createCard, or upsertCardPlannedFile until project plan is approved
+  const projectFinalized = !!(state.project as { finalized_at?: string | null }).finalized_at;
+  const validAfterPlanGate = projectFinalized
+    ? valid
+    : valid.filter(
+        (a) =>
+          a.action_type !== "createActivity" &&
+          a.action_type !== "createCard" &&
+          a.action_type !== "upsertCardPlannedFile",
+      );
+
   // When mode is scaffold, only apply updateProject and createWorkflow (ignore any other types from LLM)
   const scaffoldOnly = mode === "scaffold";
   const toApply = scaffoldOnly
-    ? valid.filter((a) => a.action_type === "updateProject" || a.action_type === "createWorkflow")
-    : valid;
+    ? validAfterPlanGate.filter(
+        (a) => a.action_type === "updateProject" || a.action_type === "createWorkflow",
+      )
+    : validAfterPlanGate;
 
   // --- Apply ---
   let applied = 0;

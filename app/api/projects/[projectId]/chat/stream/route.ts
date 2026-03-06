@@ -175,6 +175,15 @@ export async function POST(
         }
 
         if (mode === "populate" && workflow_id) {
+          const projectFinalizedAt = (state.project as { finalized_at?: string | null }).finalized_at;
+          if (!projectFinalizedAt) {
+            emit("error", {
+              reason:
+                "Project plan must be approved before adding activities and cards. Use the Approve Project (Finalize Project) button first.",
+            });
+            emit("done", {});
+            return;
+          }
           const workflow = Array.from(state.workflows.values()).find((w) => w.id === workflow_id);
           if (!workflow) {
             emit("error", { reason: "Workflow not found" });

@@ -54,6 +54,7 @@ export const projectSchema = z.object({
   design_inspiration: z.string().nullable().optional(),
   repo_url: z.string().url().nullable().optional(),
   default_branch: z.string().min(1).default("main"),
+  finalized_at: z.string().datetime().nullable().optional(),
 });
 
 export const workflowSchema = z.object({

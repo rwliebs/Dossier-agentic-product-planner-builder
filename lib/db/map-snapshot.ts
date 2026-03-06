@@ -149,6 +149,7 @@ export async function fetchMapSnapshot(
     design_inspiration: readNullableString(projectObj, "design_inspiration") ?? null,
     repo_url: readNullableString(projectObj, "repo_url") ?? null,
     default_branch: readString(projectObj, "default_branch") ?? "main",
+    finalized_at: readNullableString(projectObj, "finalized_at") ?? null,
   };
 
   const state = createEmptyPlanningState(project);

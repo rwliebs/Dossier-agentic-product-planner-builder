@@ -46,6 +46,12 @@ next-env.d.ts
 electron/*.js
 electron/bin/
 
+# Rust build artifacts
+wyr/target/
+
+# Tauri auto-generated schemas
+wyr/wyr-app/gen/
+
 # marketing / download site (website/)
 website/node_modules
 website/dist

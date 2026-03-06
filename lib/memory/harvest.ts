@@ -3,7 +3,7 @@
  * Post-build: read learnings from swarm memory, filter for durable knowledge,
  * run each through ingestion pipeline. Link to source card and project scope.
  *
- * @see REMAINING_WORK_PLAN.md §4 M4.5
+ * @see docs/domains/memory-reference.md
  * @see docs/SECTION_4_MEMORY_COORDINATION_PROMPT.md
  */
 

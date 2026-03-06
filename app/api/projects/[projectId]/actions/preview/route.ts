@@ -1,7 +1,6 @@
 /**
  * POST /api/projects/[projectId]/actions/preview
  * Dry-run: returns delta without writing to DB.
- * REMAINING_WORK_PLAN §2 Task 6c
  */
 
 import { NextRequest } from "next/server";

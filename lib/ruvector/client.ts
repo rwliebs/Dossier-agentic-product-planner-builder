@@ -2,7 +2,7 @@
  * RuVector local client for Section 4 Memory Plane.
  * Vector storage for memory embeddings. Uses ~/.dossier/ruvector/ or DOSSIER_DATA_DIR/ruvector/.
  *
- * @see REMAINING_WORK_PLAN.md §4 Memory Plane
+ * @see docs/domains/memory-reference.md
  * @see docs/SECTION_4_MEMORY_COORDINATION_PROMPT.md
  */
 

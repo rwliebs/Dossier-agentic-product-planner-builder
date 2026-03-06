@@ -7,7 +7,7 @@
  * so it re-downloads the model every run. We use a file-based cache so the
  * model is downloaded once and reused (see getNodeModelCacheDir).
  *
- * @see REMAINING_WORK_PLAN.md §4 M4
+ * @see docs/domains/memory-reference.md
  */
 
 import { createRequire } from "node:module";

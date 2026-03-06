@@ -1,126 +1,150 @@
 ---
 document_id: doc.system-architecture
-last_verified: 2026-02-18
-tokens_estimate: 1200
+last_verified: 2026-03-06
+tokens_estimate: 950
 tags:
   - architecture
   - system
   - overview
 anchors:
   - id: overview
-    summary: "Self-deployable Next.js app; SQLite + agentic-flow + RuVector"
+    summary: "Desktop Next.js + Electron app; SQLite, agentic-flow, RuVector"
+  - id: data-model
+    summary: "Project → Workflow → Activity → Card; knowledge items; orchestration entities"
   - id: data-flow
-    summary: "Planning LLM → actions → DbAdapter; Build → orchestration → agents"
-  - id: endpoints
-    summary: "REST API under /api/projects; map, actions, artifacts, cards"
+    summary: "Chat → actions → SQLite; Build → clone → dispatch → feature branch"
   - id: boundaries
-    summary: "Planning vs Build Orchestrator; no code-gen from planning"
+    summary: "Planning LLM cannot build; build agents cannot merge; humans gate all merges"
 ttl_expires_on: null
 ---
-# System Architecture Reference
-
-**Anchors**: [data-contracts-reference.md#contract](#), [user-workflows-reference.md](#)
+# System Architecture — As Built
 
 ## Contract
 
 ### Invariants
 - INVARIANT: All map mutations flow through `POST /api/projects/[id]/actions`; no direct DB writes from UI
 - INVARIANT: Planning LLM never generates production code or triggers builds
-- INVARIANT: Build Orchestrator never auto-merges to main; PR lifecycle is user-gated
+- INVARIANT: Build agents write to feature branches only; PR merge is user-gated
+- INVARIANT: Every action batch validates schema, referential integrity, and policy before apply
+- INVARIANT: Card finalization must precede build dispatch
 
 ### Boundaries
-- ALLOWED: Planning LLM creates workflows, activities, steps, cards; proposes planned files; links context
+- ALLOWED: Planning LLM creates workflows, activities, cards; proposes planned files; links context artifacts
 - FORBIDDEN: Planning LLM writes to GitHub, creates real files, triggers code execution
+- FORBIDDEN: Build agents merge to main, skip checks, or auto-approve PRs
 
 ---
 
 ## Overview
 
-**Self-deployable now. Hostable later. Single-user now. Collaborative later.**
+Single-user desktop app. Next.js serves UI + API. Electron wraps it. SQLite stores all state locally. RuVector stores embeddings locally. Anthropic API provides LLM. Build agents run in-process via `@anthropic-ai/claude-agent-sdk`.
 
 ```
-┌──────────────────────────────────────────────────────┐
-│  Developer's Machine                                  │
-│                                                       │
-│  ┌────────────┐  ┌───────────┐  ┌────────────────┐   │
-│  │  Next.js   │  │  SQLite   │  │  agentic-flow   │   │
-│  │  (UI +     │──│  (single  │  │  (in-process   │   │
-│  │   API)     │  │   file)   │  │   agents)      │   │
-│  └──────┬─────┘  └───────────┘  └───────┬────────┘   │
-│         │                               │             │
-│         │        ┌───────────┐          │             │
-│         │        │  RuVector │          │             │
-│         │        │  (local   │──────────┘             │
-│         │        │   WASM)   │                        │
-│         │        └───────────┘                        │
-│         ▼                                             │
-│  ┌──────────────┐                                     │
-│  │  Local Git   │──── push ────▶ GitHub               │
-│  │  Repo        │                                     │
-│  └──────────────┘                                     │
-└──────────────────────────────────────────────────────┘
-         │
-         ▼
-   Anthropic API (planning LLM)
+┌─────────────────────────────────────────────────────────────┐
+│  Electron Shell                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Next.js 15 (standalone)                              │   │
+│  │  ┌──────────┐  ┌──────────┐  ┌───────────────────┐   │   │
+│  │  │ React 19 │  │ API      │  │ Claude Agent SDK  │   │   │
+│  │  │ UI       │──│ Routes   │──│ (in-process,      │   │   │
+│  │  │          │  │ /api/*   │  │  streaming query)  │   │   │
+│  │  └──────────┘  └────┬─────┘  └─────────┬─────────┘   │   │
+│  │                     │                   │             │   │
+│  │  ┌──────────────────┴───────┐   ┌──────┴──────┐      │   │
+│  │  │ SQLite (better-sqlite3)  │   │ RuVector    │      │   │
+│  │  │ ~/.dossier/dossier.db    │   │ (WASM,      │      │   │
+│  │  │                          │   │  384-dim)   │      │   │
+│  │  └──────────────────────────┘   └─────────────┘      │   │
+│  └──────────────────────────────────────────────────────┘   │
+│            │                                                 │
+│  ┌─────────┴──────────┐                                     │
+│  │ Local Git Repos    │──── push ────▶ GitHub                │
+│  │ ~/.dossier/repos/  │                                      │
+│  └────────────────────┘                                      │
+└─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+     Anthropic API
 ```
 
-| Component | Technology | Path |
-|-----------|------------|------|
-| UI + API | Next.js (React 19) | `app/` |
-| Database | SQLite (better-sqlite3) | `~/.dossier/dossier.db` |
-| DB abstraction | `DbAdapter` | `lib/db/adapter.ts` |
-| Planning LLM | Anthropic Claude | `lib/llm/` |
-| Build agents | agentic-flow (in-process) | TBD |
-| Embeddings | RuVector (local WASM) | TBD |
+| Layer | Technology | Location |
+|-------|-----------|----------|
+| Desktop shell | Electron + Forge | `electron/` |
+| UI | React 19 + Tailwind v4 + shadcn/ui | `app/`, `components/` |
+| API | Next.js App Router (route handlers) | `app/api/` |
+| Database | SQLite via better-sqlite3 (local, no Supabase) | `lib/db/` |
+| Planning LLM | Anthropic Claude (streaming + non-streaming) | `lib/llm/` |
+| Build agents | `@anthropic-ai/claude-agent-sdk` `query()` (streaming, in-process) | `lib/orchestration/` |
+| Agent definitions | agentic-flow registry (system prompts only) | `node_modules/agentic-flow/` |
+| Embeddings | all-MiniLM-L6-v2 (ONNX WASM, local) | `lib/memory/embedding.ts` |
+| Vector store | ruvector-core (native, local) | `lib/ruvector/` |
+| Memory | SQLite content + RuVector vectors | `lib/memory/` |
+| Schemas | Zod (slice-a, slice-b, slice-c) | `lib/schemas/` |
 
 ---
 
-## Data Flow
+## Data Model
 
-### Planning Path
 ```
-User chat → Planning LLM → stream-action-parser → PlanningAction[]
-  → validate-action → apply-action → DbAdapter.transaction()
-  → SQLite
+Project 1──* Workflow 1──* WorkflowActivity 1──* Card
+Card 1──* CardRequirement, CardKnownFact, CardAssumption, CardQuestion, CardPlannedFile
+Card *──* ContextArtifact  (via card_context_artifact)
+Project 1──* ContextArtifact, PlanningAction, SystemPolicyProfile (0..1)
+
+OrchestrationRun *──1 Project
+OrchestrationRun 1──* CardAssignment 1──* AgentExecution, AgentCommit
+OrchestrationRun 1──* RunCheck, ApprovalRequest, PullRequestCandidate (0..1)
+Project 1──* EventLog
+
+MemoryUnit *──* Entity (via memory_unit_relation)
 ```
 
-### Map Snapshot Path
-```
-GET /api/projects/[id]/map → DbAdapter queries → build map tree
-  → Project + Workflow[] + Activity[] + Card[]
-```
-
-### Build Path
-```
-User trigger → ensureClone (repo to ~/.dossier/repos/<projectId>/)
-  → createRun → createAssignment (worktree_path = clone)
-  → dispatch to agentic-flow (cwd = clone)
-  → agents write files, commit to feature branch
-  → GET /api/projects/[id]/files?source=repo → repo file tree + diff status
-  → RunCheck[] → ApprovalRequest → PR
-```
+Full schema details: [data-contracts-reference.md](domains/data-contracts-reference.md)
 
 ---
 
-## API Endpoints Summary
+## Data Flow (Summaries)
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/projects` | List projects |
-| POST | `/api/projects` | Create project |
-| GET | `/api/projects/[id]` | Get project |
-| GET | `/api/projects/[id]/map` | Canonical map snapshot |
-| POST | `/api/projects/[id]/actions` | Submit planning actions |
-| GET | `/api/projects/[id]/chat` | Chat (non-streaming) |
-| POST | `/api/projects/[id]/chat/stream` | Chat (streaming) |
-| GET | `/api/projects/[id]/artifacts` | List context artifacts |
-| GET | `/api/projects/[id]/cards/[cardId]/requirements` | Card requirements |
-| GET | `/api/projects/[id]/cards/[cardId]/planned-files` | Card planned files |
-| GET | `/api/projects/[id]/files` | File tree (planned or repo); `?source=repo` for produced code |
-| GET | `/api/projects/[id]/cards/[cardId]/finalize` | Card finalization package |
-| POST | `/api/projects/[id]/cards/[cardId]/finalize` | Confirm card finalization |
+### Planning
+`User chat → Anthropic streaming API → stream-action-parser → PlanningAction[] → validate → apply → SQLite`
 
-Full API reference: [reference/api-endpoints.md](reference/api-endpoints.md)
+Detail: [planning-reference.md](domains/planning-reference.md)
+
+### Map
+`GET /map → fetchMapSnapshot → PlanningState → buildMapTree → nested JSON for UI`
+
+Detail: [map-reference.md](domains/map-reference.md)
+
+### Mutation
+`PlanningAction[] → schema + semantic + guardrail validation → per-action DB writes in transaction`
+
+Detail: [mutation-reference.md](domains/mutation-reference.md)
+
+### Build
+`User trigger → git clone → createRun → per card: feature branch → dispatch → Claude Agent SDK query() (streaming) → agent writes + commits → auto-commit → checks → approval → PR`
+
+Detail: [orchestration-reference.md](domains/orchestration-reference.md)
+
+### Memory
+`Card finalize → embed (all-MiniLM-L6-v2) → RuVector insert + SQLite row → Build dispatch retrieves card-scoped then project-scoped`
+
+Detail: [memory-reference.md](domains/memory-reference.md)
+
+---
+
+## LLM Connection Models
+
+Two distinct connection patterns exist:
+
+| Concern | Planning LLM | Build Agent |
+|---------|-------------|-------------|
+| SDK | `@anthropic-ai/sdk` | `@anthropic-ai/claude-agent-sdk` |
+| Call style | `client.messages.create` / `client.messages.stream` | `query()` — async iterator |
+| Streaming | Optional (non-streaming for simple calls, streaming for chat) | Always streaming (`for await` over messages) |
+| Tools | None (text output only) | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
+| CWD | N/A | `worktree_path` (repo clone) |
+| Lifecycle | Request-response per chat turn | Fire-and-forget; result via in-process webhook callback |
+| Model | `claude-haiku-4-5-20251001` (configurable) | `claude-sonnet-4-5-20250929` (configurable) |
 
 ---
 
@@ -128,44 +152,49 @@ Full API reference: [reference/api-endpoints.md](reference/api-endpoints.md)
 
 | Path | Purpose |
 |------|---------|
-| `lib/schemas/` | Zod schemas (slice-a, slice-b, slice-c, action-payloads) |
-| `lib/actions/` | validate-action, apply-action, preview-action |
-| `lib/db/` | DbAdapter, sqlite-adapter, migrate |
-| `lib/llm/` | planning-prompt, stream-action-parser |
-| `lib/orchestration/` | create-run, dispatch, execute-checks, approval-gates |
-| `lib/memory/` | ingestion, retrieval, harvest |
-| `app/api/projects/` | Route handlers |
+| `app/` | Next.js pages + API route handlers |
+| `components/dossier/` | Domain UI (story map, cards, chat, sidebar) |
+| `components/ui/` | shadcn/ui primitives |
+| `lib/actions/` | validate, apply, preview actions |
+| `lib/db/` | DbAdapter, SQLite adapter, migrations |
+| `lib/llm/` | Planning prompts, stream parser, skills |
+| `lib/orchestration/` | Build runs, assignments, dispatch, checks, approvals, PRs |
+| `lib/memory/` | Ingestion, retrieval, embedding, harvest |
+| `lib/ruvector/` | RuVector client (vector DB) |
+| `lib/schemas/` | Zod schemas (slice-a/b/c, action-payloads) |
+| `lib/hooks/` | React hooks (project, map, actions, build, knowledge) |
+| `electron/` | Electron main, preload, runtime, window lifecycle |
 
-## Domain Overviews
+---
 
-| Domain | Doc | Purpose |
-|--------|-----|---------|
-| Planning | [planning-reference](domains/planning-reference.md) | LLM, prompts, stream parser, chat modes |
-| Mutation | [mutation-reference](domains/mutation-reference.md) | Actions pipeline, validate, apply |
-| Map | [map-reference](domains/map-reference.md) | Snapshot, tree build, PlanningState |
-| Orchestration | [orchestration-reference](domains/orchestration-reference.md) | Runs, assignments, checks, PR |
-| Memory | [memory-reference](domains/memory-reference.md) | RuVector, ingestion, retrieval, harvest |
+## Data Directory (`~/.dossier/`)
 
-## Subfolders
+| Path | Content |
+|------|---------|
+| `config` | Key=value config (API keys, overrides) |
+| `dossier.db` | SQLite database (all state) |
+| `repos/<projectId>/` | Git clones for build |
+| `logs/` | Electron main process logs |
 
-| Folder | Contents |
-|--------|----------|
-| [domains/](domains/) | Domain references (data contracts, API, planning, mutation, map, orchestration, memory) |
-| [product/](product/) | User personas, stories, workflows |
-| [reference/](reference/) | API endpoints, memory coordination prompt |
-| [strategy/](strategy/) | Dual LLM strategy, worktree management |
-| [plans/](plans/) | Remaining work plan |
-| [investigations/](investigations/) | Investigations (TTL: 2 weeks) |
-| [adr/](adr/) | Architecture Decision Records |
+---
+
+## Domain References
+
+| Domain | Doc |
+|--------|-----|
+| Data contracts | [data-contracts-reference.md](domains/data-contracts-reference.md) |
+| Planning | [planning-reference.md](domains/planning-reference.md) |
+| Mutation | [mutation-reference.md](domains/mutation-reference.md) |
+| Map | [map-reference.md](domains/map-reference.md) |
+| Orchestration | [orchestration-reference.md](domains/orchestration-reference.md) |
+| Memory | [memory-reference.md](domains/memory-reference.md) |
+| API endpoints | [api-reference.md](domains/api-reference.md) |
 
 ---
 
 ## Verification
-- [ ] DbAdapter is single seam for persistence
+- [ ] DbAdapter is single seam for all persistence
 - [ ] All map mutations go through actions pipeline
 - [ ] Planning vs Build boundaries enforced in prompts and validation
-
-## Related
-- [strategy/dual-llm-integration-strategy.md](strategy/dual-llm-integration-strategy.md)
-- [domains/data-contracts-reference.md](domains/data-contracts-reference.md)
-- [product/user-workflows-reference.md](product/user-workflows-reference.md)
+- [ ] No Supabase, Postgres, or external DB references in source code
+- [ ] Build agents use streaming SDK `query()`, not HTTP webhook from external service

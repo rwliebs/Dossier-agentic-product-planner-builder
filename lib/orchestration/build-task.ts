@@ -3,8 +3,8 @@
  * Translates DispatchPayload into agentic-flow task description with process check,
  * planned files, constraints, acceptance criteria, and completion verification.
  *
- * @see REMAINING_WORK_PLAN.md §5 O10.5
- * @see docs/strategy/build_button_execution_hookup plan
+ * @see docs/domains/orchestration-reference.md
+ * @see docs/domains/orchestration-reference.md
  */
 
 import type { DispatchPayload } from "./agentic-flow-client";

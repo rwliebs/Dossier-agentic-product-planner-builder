@@ -1,5 +1,5 @@
 /**
- * Action history reconstruction (REMAINING_WORK_PLAN §2 Task 6e)
+ * Action history reconstruction
  * Replay accepted PlanningActions onto empty state.
  * Drift detection: compare reconstructed state with actual DB state.
  */

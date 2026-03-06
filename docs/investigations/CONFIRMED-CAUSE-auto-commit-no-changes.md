@@ -65,5 +65,4 @@ See `docs/investigations/RACE-CONDITION-AUTO-COMMIT.md` for the same recommendat
 - `lib/orchestration/process-webhook.ts` (worktreePath from assignment, performAutoCommit(worktreePath))
 - `lib/orchestration/trigger-build.ts` (worktreePath = clonePath → createAssignment)
 - `lib/orchestration/dispatch.ts` (payload.worktree_path from assignment)
-- `docs/investigations/SDK-PATH-VERIFICATION.md` (SDK uses cwd for file operations)
 - `docs/investigations/RACE-CONDITION-AUTO-COMMIT.md` (retry-after-delay fix)

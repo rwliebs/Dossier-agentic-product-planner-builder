@@ -5,7 +5,7 @@
  * Handles empty (freshly-created) repos by seeding an initial commit so that
  * downstream git operations (checkout, ls-tree, diff) have a valid base.
  *
- * @see docs/strategy/worktree-management-flow.md
+ * @see docs/adr/0013-single-card-build-with-clone.md
  */
 
 import * as path from "node:path";

@@ -1,6 +1,6 @@
 ---
 document_id: doc.memory
-last_verified: 2026-02-19
+last_verified: 2026-03-06
 tokens_estimate: 750
 tags:
   - memory
@@ -19,7 +19,7 @@ ttl_expires_on: null
 ---
 # Memory Domain Reference
 
-**Anchors**: [SYSTEM_ARCHITECTURE.md](../SYSTEM_ARCHITECTURE.md), [dual-llm-integration-strategy.md](../strategy/dual-llm-integration-strategy.md)
+**Anchors**: [SYSTEM_ARCHITECTURE.md](../SYSTEM_ARCHITECTURE.md)
 
 ## Contract
 
@@ -40,7 +40,7 @@ ttl_expires_on: null
 ```
 Ingestion: Card context, requirements, planned files (approved)
   → embed via RuVector
-  → store in memory_unit (Postgres/SQLite) + RuVector index
+  → store in memory_unit (SQLite) + RuVector index
 
 Retrieval: cardId, projectId, contextSummary
   → MemoryStore.retrieveForCard (card-scoped first, then project-scoped)
@@ -111,5 +111,4 @@ To verify that memory is actually being stored:
 - [x] Real semantic embeddings load in Vitest (not hash fallback)
 
 ## Related
-- [memory-coordination-prompt.md](../reference/memory-coordination-prompt.md)
 - [orchestration-reference.md](orchestration-reference.md)

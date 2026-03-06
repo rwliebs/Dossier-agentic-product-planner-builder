@@ -2,7 +2,7 @@
 
 **Investigator**: Conclusive investigation using real data (SQLite DB, event_log, card_assignment, live repo).  
 **Date**: 2026-02-25  
-**Reference**: `.cursor/agents/investigator.md`, `docs/investigations/regression-auto-commit-and-trigger-finish.md`
+**Reference**: `.cursor/agents/investigator.md`
 
 ---
 
@@ -20,7 +20,7 @@
 - [ ] **Expected:** "Build Path: User trigger → ensureClone → createRun → createAssignment (worktree_path = clone) → dispatch → agents write files, commit to feature branch."  
   **Source:** `docs/SYSTEM_ARCHITECTURE.md` (Build Path).
 - [ ] **Expected:** "Auto-commit runs immediately on execution_completed, before executeRequiredChecks. Dossier stages and commits [agent-produced files]."  
-  **Source:** `docs/strategy/worktree-auto-commit.md`.
+  **Source:** `docs/adr/0012-worktree-auto-commit.md`.
 - [ ] **Expected:** "Only update card/assignment to completed when auto-commit outcome is committed; on no_changes → blocked, on error → failed."  
   **Source:** `lib/orchestration/process-webhook.ts` (execution_completed branch).
 
@@ -113,7 +113,7 @@
 - [ ] **Current behavior:** On execution_completed, performAutoCommit(worktreePath) runs `git status --porcelain --untracked-files=all` in worktreePath and gets no lines (or only ineligible paths), so it returns `no_changes` and we log execution_blocked and set card/assignment to blocked.  
   **Source:** event_log (execution_blocked, summary "No changes to commit"); `lib/orchestration/process-webhook.ts`; `lib/orchestration/auto-commit.ts`.
 - [ ] **Expected behavior:** Agent writes files in the clone at worktree_path; performAutoCommit runs in that same path and sees those files; it stages and commits them and returns `committed`; we then set card/assignment to completed.  
-  **Source:** `docs/strategy/worktree-auto-commit.md`, `docs/SYSTEM_ARCHITECTURE.md`.
+  **Source:** `docs/adr/0012-worktree-auto-commit.md`, `docs/SYSTEM_ARCHITECTURE.md`.
 
 #### 3.5.2 Root Cause (5-why)
 
@@ -144,7 +144,7 @@
 - **Wrong worktree_path in DB / different path for git:** Ruled out by code trace; same assignment.worktree_path used for both SDK cwd and performAutoCommit.
 - **All paths filtered out:** Ruled out; allowed_paths include the two component paths; they are not in ARTIFACT_EXCLUSIONS and are in allowed_paths.
 - **Branch mismatch:** Ruled out; getCurrentBranch would have returned an error and we’d get outcome "error", not "no_changes".
-- **SDK does not use cwd:** Ruled out by SDK verification; see SDK-PATH-VERIFICATION.md.
+- **SDK does not use cwd:** Ruled out by SDK verification (the SDK uses `options.cwd` for the session).
 
 ### 3.6 Secondary Root Cause: Rebuild Hung
 
@@ -215,4 +215,4 @@
 | **3. Implement fix** | YES | Root cause: **race condition** — we run git status immediately after agent exit; agent's writes not yet visible. Path ruled out (same assignment.worktree_path for SDK and performAutoCommit). Fix: when first getStatusPorcelain returns zero lines, wait 500–1000 ms and retry; if second call has lines, stage and commit. Secondary: execution timeout / stale-run recovery. |
 | **4. verify-completion** | YES | Run after fixes. |
 
-**Blocking uncertainty:** Resolved. **SDK path verified** (see `docs/investigations/SDK-PATH-VERIFICATION.md`): the SDK uses `options.cwd` for the session and passes it to the spawned Claude Code process, so the agent should write to worktreePath. Fixer can proceed with: diagnostic logging in performAutoCommit, optional delay/re-check before auto-commit, and execution timeout / stale-run recovery.
+**Blocking uncertainty:** Resolved. The SDK uses `options.cwd` for the session and passes it to the spawned Claude Code process, so the agent should write to worktreePath. Fixer can proceed with: diagnostic logging in performAutoCommit, optional delay/re-check before auto-commit, and execution timeout / stale-run recovery.

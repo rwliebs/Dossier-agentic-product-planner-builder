@@ -1,6 +1,6 @@
 # API Endpoints Reference
 
-Step 4 API layer for the Dossier planning system. Aligns with [dual-llm-integration-strategy.md](../strategy/dual-llm-integration-strategy.md) Phase 2: Persistence and API Baseline.
+REST API for the Dossier planning and build system. All routes under `/api`. SQLite (default) stores data in `~/.dossier/dossier.db`. Migrations run automatically on first use.
 
 ## Setup
 
@@ -314,9 +314,8 @@ File tree for the project. Two modes via `source` query param.
 
 ---
 
-## Dual LLM Strategy Alignment
+## As-Built Notes
 
-- **Planning Context Engine (Step 8):** `POST /api/projects/[id]/actions` receives `PlanningAction[]`. Engine must submit through this endpoint; no direct writes.
-- **Build Orchestrator (Step 9):** `GET /api/projects/[id]/map` provides `run_input_snapshot` structure. `GET .../planned-files` returns approved files for assignment. `GET .../files?source=repo` returns produced files from the cloned repo after build (with diff status).
-- **Action-centric mutations:** All map changes go through the actions endpoint.
-- **No-auth-first POC:** Auth/RLS deferred; endpoints use anon key.
+- **Mutations**: All map changes go through the actions endpoint; no direct writes.
+- **Auth**: No auth/RLS; endpoints use anon access (single-user desktop app).
+- **Database**: SQLite only; no Supabase or Postgres.

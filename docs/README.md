@@ -11,6 +11,7 @@ docs/
 ├── README.md                 # This file
 ├── testing-reference.md      # Test commands, structure, mocking
 ├── development-reference.md  # Setup, scripts, workflow
+├── agentic-flow-install-notes.md  # Install warnings explained
 │
 ├── domains/                  # Domain references
 │   ├── api-reference.md
@@ -22,33 +23,39 @@ docs/
 │   └── planning-reference.md
 │
 ├── product/                  # Product & UX
+│   ├── dossier-external-overview.md
 │   ├── user-personas.md
 │   ├── user-stories.md
 │   └── user-workflows-reference.md
 │
 ├── reference/                # Technical reference
 │   ├── api-endpoints.md
-│   ├── memory-coordination-prompt.md
+│   ├── configuration-reference.md
 │   ├── database-schema.md
-│   └── configuration-reference.md
+│   ├── memory-coordination-prompt.md
+│   └── skillsmith.md
 │
-├── strategy/                 # Strategic decisions
-│   ├── dual-llm-integration-strategy.md
-│   ├── finalization-phase-strategy.md
-│   └── worktree-management-flow.md
-│
-├── plans/                    # Work plans
-│   └── remaining-work-plan.md
-│
-├── investigations/           # Investigations (TTL: 2 weeks)
-│   ├── investigation-ruvector-retrieval-harvest-tests.md
-│   └── o10-claude-flow-gap.md (resolved: migrated to agentic-flow)
+├── design/                   # Design system
+│   └── design-system.md
 │
 ├── adr/                      # Architecture Decision Records
-│   └── 0001-*.md, 0002-*.md, ...
+│   └── 0001-*.md through 0015-*.md
+│
+├── Feature Plans/            # Future feature plans
+│   ├── claude-plugin-packaging.md
+│   ├── deferred-enhancements.md
+│   ├── execution-agent-size-reduction.md
+│   ├── hosted-multi-user.md
+│   └── multi-agent-swarm.md
+│
+├── releases/                 # Release notes
+│   └── v0.5.0-release-notes.md
+│
+├── investigations/           # Bug investigations (TTL: 2 weeks)
+│   └── (active reports)
+│
 └── archive/                  # Historical / deprecated
-    ├── README.md
-    └── STEP_2_*.md
+    └── README.md
 ```
 
 ## Quick Links
@@ -58,5 +65,3 @@ docs/
 - [Testing](testing-reference.md)
 - [Data Contracts](domains/data-contracts-reference.md)
 - [User Workflows](product/user-workflows-reference.md)
-- [Dual LLM Strategy](strategy/dual-llm-integration-strategy.md)
-- [Finalization Phase](strategy/finalization-phase-strategy.md)

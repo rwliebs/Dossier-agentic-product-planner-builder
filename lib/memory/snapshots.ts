@@ -3,8 +3,8 @@
  * Append-only to RuVector on status transitions, approval, build completion.
  * Async, never blocks. Include build outcome metadata for GNN learning.
  *
- * @see docs/plans/remaining-work-plan.md §4 M6
- * @see docs/strategy/dual-llm-integration-strategy.md §Storage Architecture
+ * @see docs/domains/memory-reference.md
+ * @see docs/domains/memory-reference.md §contract
  */
 
 import { getRuvectorClient } from "@/lib/ruvector/client";

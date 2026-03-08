@@ -331,7 +331,8 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
 
   const addMessage = (role: 'user' | 'agent', content: string) => {
     if (!content?.trim()) return;
-    setMessages(prev => [...prev, { id: crypto.randomUUID(), role, content }]);
+    const id = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setMessages(prev => [...prev, { id, role, content }]);
   };
 
   const lastRefetchRef = useRef<number>(0);

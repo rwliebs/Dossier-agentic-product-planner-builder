@@ -52,8 +52,22 @@ module.exports = {
   },
   makers: [
     { name: "@electron-forge/maker-dmg", config: {} },
-    { name: "@electron-forge/maker-squirrel", config: {} }, // Windows signing: add certificateFile + certificatePassword when ready
-    { name: "@electron-forge/maker-deb", config: {} },
+    {
+      name: "@electron-forge/maker-squirrel",
+      config: {
+        name: "Dossier",
+      },
+    },
+    {
+      name: "@electron-forge/maker-deb",
+      config: {
+        options: {
+          bin: "Dossier",
+          maintainer: "Dossier",
+          homepage: "https://github.com/rwliebs/Dossier",
+        },
+      },
+    },
   ],
   plugins: [
     {

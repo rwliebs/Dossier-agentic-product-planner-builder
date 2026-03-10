@@ -3,5 +3,6 @@ packages: []
 onlyBuiltDependencies:
   - better-sqlite3
   - electron
+  - electron-winstaller
   - macos-alias
   - fs-xattr

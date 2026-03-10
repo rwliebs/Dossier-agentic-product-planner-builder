@@ -81,7 +81,7 @@ jobs:
       - name: Build desktop installers
         env:
           # Windows: more heap (GITHUB_ENV blocks NODE_OPTIONS, so set per-step)
-          NODE_OPTIONS: ${{ matrix.os == 'windows-latest' && '--max-old-space-size=4096' }}
+          NODE_OPTIONS: ${{ matrix.os == 'windows-latest' && '--max-old-space-size=4096' || '' }}
         run: pnpm run electron:make
 
       - name: Read version

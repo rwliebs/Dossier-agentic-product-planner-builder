@@ -40,7 +40,7 @@ export class ChatErrorBoundary extends Component<ChatErrorBoundaryProps, ChatErr
   render(): ReactNode {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center py-12 gap-4 text-center px-4">
+        <div className="flex flex-col items-center justify-center py-12 gap-4 text-center px-4 animate-in fade-in duration-300">
           <div className="rounded-full bg-secondary p-3">
             <MessageSquare className="h-8 w-8 text-muted-foreground" />
           </div>
@@ -49,6 +49,7 @@ export class ChatErrorBoundary extends Component<ChatErrorBoundaryProps, ChatErr
             <p className="mt-1 text-xs text-muted-foreground max-w-sm">
               {this.state.error?.message ?? "The planning chat could not be loaded."}
             </p>
+            <p className="mt-1.5 text-[10px] text-muted-foreground/80">Try again to reconnect.</p>
           </div>
           <Button variant="outline" size="sm" onClick={this.handleRetry}>
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" />

@@ -126,6 +126,8 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  const THINKING_PHRASES = ['Thinking…', 'Working on it…'];
+  const [thinkingPhraseIndex, setThinkingPhraseIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Planning LLM state
@@ -227,6 +229,16 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
   useEffect(() => {
     onPlanningStateChange?.(isThinking || isPopulating);
   }, [isThinking, isPopulating, onPlanningStateChange]);
+
+  useEffect(() => {
+    const active = isThinking || isPopulating;
+    const showThinkingPhrase = active && !(isPopulating && populateProgress);
+    if (!showThinkingPhrase) return;
+    const id = window.setInterval(() => {
+      setThinkingPhraseIndex((i) => (i + 1) % THINKING_PHRASES.length);
+    }, 3000);
+    return () => window.clearInterval(id);
+  }, [isThinking, isPopulating, populateProgress]);
 
   const commitName = useCallback(() => {
     setEditingName(false);
@@ -638,8 +650,8 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
                       </div>
                       <span className="text-[10px] text-muted-foreground ml-1">
                         {isPopulating && populateProgress
-                          ? `Populating workflow ${populateProgress.current}/${populateProgress.total}...`
-                          : 'Thinking...'}
+                          ? `Populating workflow ${populateProgress.current}/${populateProgress.total}…`
+                          : THINKING_PHRASES[thinkingPhraseIndex]}
                       </span>
                     </div>
                   </div>

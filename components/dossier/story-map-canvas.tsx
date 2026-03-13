@@ -118,13 +118,14 @@ export function StoryMapCanvas({
               </div>
             </div>
           ))}
-          <div className="flex flex-col items-center gap-3 py-6 text-center max-w-sm mx-auto">
+          <div className="flex flex-col items-center gap-3 py-6 text-center max-w-sm mx-auto animate-in fade-in slide-in-from-bottom-2 duration-400">
             <div className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-secondary">
               <Layers className="h-5 w-5 text-muted-foreground" />
             </div>
             <p className="text-sm text-muted-foreground">
               Workflows are scaffolded — click Populate on any workflow to add activities and cards.
             </p>
+            <p className="text-[10px] text-muted-foreground/80 italic">One click per workflow and the agent fills the map.</p>
             {onAddWorkflow && (
               <div className="flex flex-col items-center gap-2">
                 <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Add workflow</span>

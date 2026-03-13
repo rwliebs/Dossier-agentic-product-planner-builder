@@ -16,6 +16,12 @@ import { MapSkeleton } from '@/components/dossier/map-skeleton';
 
 const PROJECT_STORAGE_KEY = 'dossier_project_id';
 
+const MAP_LOADING_MESSAGES = [
+  'Loading map…',
+  'Structuring workflows…',
+  'Preparing your canvas…',
+];
+
 function getStoredProjectId(): string {
   if (typeof window === 'undefined') return '';
   return localStorage.getItem(PROJECT_STORAGE_KEY) ?? '';
@@ -123,6 +129,15 @@ export default function DossierPage() {
   const [rightPanelTab, setRightPanelTab] = useState<'files' | 'docs' | 'chat'>('files');
   const [selectedDoc, setSelectedDoc] = useState<ContextArtifact | null>(null);
   const [filesBranchCardId, setFilesBranchCardId] = useState<string | null>(null);
+
+  const [mapLoadingMessageIndex, setMapLoadingMessageIndex] = useState(0);
+  useEffect(() => {
+    if (!mapLoading) return;
+    const id = window.setInterval(() => {
+      setMapLoadingMessageIndex((i) => (i + 1) % MAP_LOADING_MESSAGES.length);
+    }, 2500);
+    return () => window.clearInterval(id);
+  }, [mapLoading]);
 
   const LEFT_WIDTH_KEY = 'dossier_left_sidebar_width';
   const RIGHT_WIDTH_KEY = 'dossier_right_panel_width';
@@ -905,7 +920,7 @@ export default function DossierPage() {
         <div className="flex-1 flex flex-col overflow-hidden bg-background">
           {appMode === 'ideation' ? (
             <div className="flex-1 flex items-center justify-center">
-              <div className="text-center max-w-md px-6">
+              <div className="text-center max-w-md px-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                 <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-secondary mb-6">
                   <Sparkles className={`h-8 w-8 text-muted-foreground ${isPlanning ? 'animate-pulse' : ''}`} />
                 </div>
@@ -917,6 +932,9 @@ export default function DossierPage() {
                     ? 'The planning agent is structuring your idea into workflows, activities, and cards.'
                     : 'Use the Agent chat in the left panel to describe what you want to build. The planning agent will generate workflows, activities, and cards for your implementation map.'}
                 </p>
+                {!isPlanning && (
+                  <p className="mt-3 text-xs text-muted-foreground/90 italic">Your canvas is ready.</p>
+                )}
                 <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                   <div className={`h-2 w-2 rounded-full ${isPlanning ? 'bg-primary animate-pulse' : 'bg-yellow-500 animate-pulse'}`} />
                   <span>{isPlanning ? 'Creating your map…' : 'Waiting for your input…'}</span>
@@ -932,10 +950,18 @@ export default function DossierPage() {
                 </div>
               )}
               <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-auto scrollbar-map">
-                {mapLoading && <MapSkeleton />}
+                {mapLoading && (
+                  <div className="p-6 flex flex-col items-center gap-4">
+                    <p key={mapLoadingMessageIndex} className="text-sm text-muted-foreground animate-in fade-in duration-300">
+                      {MAP_LOADING_MESSAGES[mapLoadingMessageIndex]}
+                    </p>
+                    <MapSkeleton />
+                  </div>
+                )}
                 {!mapLoading && mapError && (
-                  <div className="flex flex-col items-center justify-center py-16 gap-2">
+                  <div className="flex flex-col items-center justify-center py-16 gap-3 text-center animate-in fade-in duration-300">
                     <p className="text-sm text-destructive">{mapError}</p>
+                    <p className="text-xs text-muted-foreground max-w-sm">We couldn’t load the map. Check your connection and try again.</p>
                     <button
                       type="button"
                       onClick={() => refetch()}
@@ -946,6 +972,7 @@ export default function DossierPage() {
                   </div>
                 )}
                 {!mapLoading && !mapError && snapshot && (
+                  <div className="animate-in fade-in duration-300">
                   <MapErrorBoundary onRetry={refetch}>
                   <WorkflowBlock
                     snapshot={snapshot}
@@ -990,6 +1017,7 @@ export default function DossierPage() {
                     getCardKnowledgeLoading={getCardKnowledgeLoading}
                   />
                   </MapErrorBoundary>
+                  </div>
                 )}
               </div>
             </>

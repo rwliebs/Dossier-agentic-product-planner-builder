@@ -249,12 +249,15 @@ export function RightPanel({
               <ScrollArea className="flex-1 min-w-0">
                 <div className="py-2">
                   {filesLoading && projectId ? (
-                    <div className="space-y-1 px-3 py-2">
+                    <div className="space-y-2 px-3 py-2">
+                      <p className="text-[10px] text-muted-foreground animate-in fade-in duration-200">Loading files…</p>
+                      <div className="space-y-1">
                       <Skeleton className="h-6 w-32 rounded" />
                       <Skeleton className="h-6 w-40 rounded ml-3" />
                       <Skeleton className="h-6 w-36 rounded ml-3" />
                       <Skeleton className="h-6 w-28 rounded ml-6" />
                       <Skeleton className="h-6 w-24 rounded" />
+                    </div>
                     </div>
                   ) : (
                     fileTree.map((node) => (
@@ -279,7 +282,7 @@ export function RightPanel({
                       <Skeleton className="h-4 w-full rounded" />
                     ) : (
                       <pre className="text-xs font-mono whitespace-pre-wrap break-words text-foreground">
-                        {selectedRepoFileContent ?? "(empty)"}
+                        {selectedRepoFileContent ?? "No content in this file."}
                       </pre>
                     )}
                   </ScrollArea>
@@ -357,7 +360,7 @@ export function RightPanel({
                       );
                     })
                   ) : (
-                    <p>No content available</p>
+                    <p className="text-muted-foreground">No content in this document.</p>
                   )}
                 </div>
               </div>
@@ -409,13 +412,13 @@ export function RightPanel({
               </div>
             ) : (
               <div className="h-full flex items-center justify-center">
-                <div className="text-center">
+                <div className="text-center max-w-[220px] animate-in fade-in duration-300">
                   <FileText className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
                   <p className="text-xs text-muted-foreground">
                     Select a context doc to view
                   </p>
                   <p className="text-[10px] text-muted-foreground/70 mt-1">
-                    Add docs via chat or link from a card
+                    Pick one from the list, or add one via the Agent chat.
                   </p>
                 </div>
               </div>

@@ -8,6 +8,7 @@ import { KeyRound, Github, Loader2, CheckCircle2 } from 'lucide-react';
 export default function SetupPage() {
   const router = useRouter();
   const [anthropicApiKey, setAnthropicApiKey] = useState('');
+  const [anthropicAuthToken, setAnthropicAuthToken] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +42,9 @@ export default function SetupPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          anthropicApiKey: anthropicApiKey || undefined,
-          githubToken: githubToken || undefined,
+          anthropicApiKey: anthropicApiKey.trim() || undefined,
+          anthropicAuthToken: anthropicAuthToken.trim() || undefined,
+          githubToken: githubToken.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -73,27 +75,47 @@ export default function SetupPage() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {needsAnthropic && (
-            <div className="space-y-2">
-              <label htmlFor="anthropic" className="text-sm font-medium flex items-center gap-2">
-                <KeyRound className="h-4 w-4" />
-                Anthropic API Key
-              </label>
-              <input
-                id="anthropic"
-                type="password"
-                placeholder="sk-ant-..."
-                value={anthropicApiKey}
-                onChange={(e) => setAnthropicApiKey(e.target.value)}
-                className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                autoComplete="off"
-              />
-              <p className="text-xs text-muted-foreground">
-                Get yours at{' '}
-                <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="underline">
-                  console.anthropic.com
-                </a>
-              </p>
-            </div>
+            <>
+              <div className="space-y-2">
+                <label htmlFor="anthropic" className="text-sm font-medium flex items-center gap-2">
+                  <KeyRound className="h-4 w-4" />
+                  Anthropic API Key
+                </label>
+                <input
+                  id="anthropic"
+                  type="password"
+                  placeholder="sk-ant-..."
+                  value={anthropicApiKey}
+                  onChange={(e) => setAnthropicApiKey(e.target.value)}
+                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Get yours at{' '}
+                  <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="underline">
+                    console.anthropic.com
+                  </a>
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="anthropic-oauth" className="text-sm font-medium flex items-center gap-2">
+                  <KeyRound className="h-4 w-4" />
+                  Anthropic OAuth Token (Max subscription)
+                </label>
+                <input
+                  id="anthropic-oauth"
+                  type="password"
+                  placeholder="Run: claude setup-token"
+                  value={anthropicAuthToken}
+                  onChange={(e) => setAnthropicAuthToken(e.target.value)}
+                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use API key or OAuth token. OAuth works for planning and build via Claude Max.
+                </p>
+              </div>
+            </>
           )}
 
           {needsGithub && (
@@ -126,15 +148,15 @@ export default function SetupPage() {
           )}
 
           {success && (
-            <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-500">
-              <CheckCircle2 className="h-4 w-4" />
+            <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-500 animate-in fade-in duration-300">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
               <span>Keys saved. Redirecting&hellip;</span>
             </div>
           )}
 
           <Button
             type="submit"
-            disabled={loading || success || (!anthropicApiKey && !githubToken)}
+            disabled={loading || success || (!anthropicApiKey.trim() && !anthropicAuthToken.trim() && !githubToken.trim())}
             className="w-full"
           >
             {loading ? (

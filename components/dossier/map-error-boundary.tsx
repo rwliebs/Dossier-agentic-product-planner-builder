@@ -40,7 +40,7 @@ export class MapErrorBoundary extends Component<MapErrorBoundaryProps, MapErrorB
   render(): ReactNode {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+        <div className="flex flex-col items-center justify-center py-24 gap-4 text-center animate-in fade-in duration-300">
           <div className="rounded-full bg-secondary p-4">
             <Map className="h-10 w-10 text-muted-foreground" />
           </div>
@@ -49,6 +49,7 @@ export class MapErrorBoundary extends Component<MapErrorBoundaryProps, MapErrorB
             <p className="mt-1 text-xs text-muted-foreground max-w-md">
               {this.state.error?.message ?? "The story map could not be displayed."}
             </p>
+            <p className="mt-1.5 text-[10px] text-muted-foreground/80">Reload to try again.</p>
           </div>
           <Button variant="outline" size="sm" onClick={this.handleRetry}>
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" />

@@ -9,7 +9,8 @@ export default function NotFound() {
       <p className="text-xs uppercase tracking-widest font-mono text-muted-foreground mb-8">
         AI-Native Product Building Platform
       </p>
-      <p className="text-sm text-muted-foreground mb-6">This page could not be found.</p>
+      <p className="text-sm text-muted-foreground mb-2">This page could not be found.</p>
+      <p className="text-xs text-muted-foreground/80 mb-6">The link may be outdated or the page may have moved.</p>
       <Link
         href="/"
         className="text-sm font-medium text-primary hover:underline"

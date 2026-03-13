@@ -46,7 +46,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
       return (
-        <div className="flex flex-col items-center justify-center gap-4 p-8 text-center">
+        <div className="flex flex-col items-center justify-center gap-4 p-8 text-center animate-in fade-in duration-300">
           <div className="rounded-full bg-destructive/10 p-3">
             <AlertCircle className="h-8 w-8 text-destructive" />
           </div>
@@ -57,6 +57,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <p className="mt-1 text-xs text-muted-foreground max-w-sm">
               {this.state.error?.message ?? "An unexpected error occurred."}
             </p>
+            <p className="mt-1.5 text-[10px] text-muted-foreground/80">You can try again or refresh the page.</p>
           </div>
           {this.props.onRetry && (
             <Button variant="outline" size="sm" onClick={this.handleRetry}>

@@ -262,6 +262,59 @@ export function createFeatureBranch(
 }
 
 /**
+ * Syncs the local base branch (e.g. main) with origin.
+ * Fetches from origin, then checks out the base branch and resets it to origin/<baseBranch>.
+ * Use after merging PRs on GitHub so the Dossier clone's local main is up to date.
+ * If the clone does not exist, runs ensureClone first (fetch + optional clone).
+ */
+export function syncMainBranch(
+  projectId: string,
+  repoUrl: string,
+  baseBranch = "main"
+): { success: boolean; error?: string } {
+  if (!repoUrl?.trim() || repoUrl.includes("placeholder")) {
+    return { success: false, error: "No repository connected." };
+  }
+
+  const cloneResult = ensureClone(projectId, repoUrl, null, baseBranch);
+  if (!cloneResult.success || !cloneResult.clonePath) {
+    return {
+      success: false,
+      error: cloneResult.error ?? "Clone or fetch failed. Run a build first to create the clone.",
+    };
+  }
+
+  const clonePath = cloneResult.clonePath;
+
+  try {
+    // origin/<baseBranch> may not exist for a freshly seeded repo
+    let originRefExists = false;
+    try {
+      runGitSync(clonePath, `rev-parse --verify origin/${baseBranch}`);
+      originRefExists = true;
+    } catch {
+      // Remote base branch not present yet; nothing to sync to
+    }
+
+    if (originRefExists) {
+      // Create or update local baseBranch to match origin (e.g. after merge on GitHub)
+      execSync(`git checkout -B "${baseBranch}" "origin/${baseBranch}"`, {
+        cwd: clonePath,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    }
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      error: `Sync failed: ${message}`,
+    };
+  }
+}
+
+/**
  * Pushes a branch from the project clone to origin.
  * Uses GITHUB_TOKEN (env or config) for auth when repoUrl is provided.
  * MVP: gets code onto GitHub so the user can open a PR there.

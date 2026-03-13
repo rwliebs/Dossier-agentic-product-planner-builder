@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronUp, Bot, User, Send, Github, Check, FolderOpen, Folder, FileCode, ChevronRight, Pencil } from 'lucide-react';
+import { ChevronDown, ChevronUp, Bot, User, Send, Github, Check, FolderOpen, Folder, FileCode, ChevronRight, Pencil, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -263,6 +263,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
   const [createPrivate, setCreatePrivate] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [connectSubmitting, setConnectSubmitting] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
   const [selectedContextFiles, setSelectedContextFiles] = useState<string[]>([]);
 
   const repoUrl = project.repo_url ?? null;
@@ -337,6 +338,27 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
   const disconnectRepo = useCallback(() => {
     onProjectUpdate?.({ repo_url: null });
   }, [onProjectUpdate]);
+
+  const handleSyncWithGitHub = useCallback(async () => {
+    if (!projectId) return;
+    setSyncLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/repo/sync`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      const msg = data?.error ?? (res.ok ? '' : 'Sync failed.');
+      const { toast } = await import('sonner');
+      if (res.ok) {
+        toast.success('Main branch synced with GitHub.');
+      } else {
+        toast.error(msg || 'Sync failed.');
+      }
+    } catch {
+      const { toast } = await import('sonner');
+      toast.error('Sync failed.');
+    } finally {
+      setSyncLoading(false);
+    }
+  }, [projectId]);
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   useEffect(() => { scrollToBottom(); }, [messages]);
@@ -719,7 +741,21 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
                     <FileTreeNode key={node.path} node={node} selectedFiles={selectedContextFiles} onToggleFile={toggleContextFile} />
                   ))}
                 </div>
-                <Button variant="ghost" size="sm" className="w-full text-[10px] h-6 mt-2 text-muted-foreground" onClick={disconnectRepo}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-[10px] h-6 mt-2"
+                  onClick={handleSyncWithGitHub}
+                  disabled={!projectId || syncLoading}
+                >
+                  {syncLoading ? (
+                    <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3 mr-1.5" />
+                  )}
+                  Sync with GitHub
+                </Button>
+                <Button variant="ghost" size="sm" className="w-full text-[10px] h-6 mt-1 text-muted-foreground" onClick={disconnectRepo}>
                   Disconnect repository
                 </Button>
               </>

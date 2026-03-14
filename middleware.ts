@@ -13,7 +13,12 @@ function needsSetup(): boolean {
     return false;
   }
   const cfg = readConfigFile();
-  const hasAnthropic = !!(process.env.ANTHROPIC_API_KEY?.trim() || cfg.ANTHROPIC_API_KEY?.trim());
+  const hasAnthropic = !!(
+    process.env.ANTHROPIC_API_KEY?.trim() ||
+    cfg.ANTHROPIC_API_KEY?.trim() ||
+    process.env.ANTHROPIC_AUTH_TOKEN?.trim() ||
+    cfg.ANTHROPIC_AUTH_TOKEN?.trim()
+  );
   const hasGithub = !!(process.env.GITHUB_TOKEN?.trim() || cfg.GITHUB_TOKEN?.trim());
   return !hasAnthropic || !hasGithub;
 }

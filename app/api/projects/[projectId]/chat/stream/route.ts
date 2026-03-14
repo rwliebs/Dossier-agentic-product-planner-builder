@@ -202,6 +202,7 @@ export async function POST(
 
         const linkedArtifacts = getLinkedArtifactsForPrompt(state, 3);
         let repoContext: string | null = null;
+        let planningCwd: string | undefined;
         const repoUrl = (state.project as { repo_url?: string | null }).repo_url;
         const baseBranch =
           (state.project as { default_branch?: string }).default_branch ?? "main";
@@ -209,6 +210,7 @@ export async function POST(
           const cloneResult = ensureClone(projectId, repoUrl, null, baseBranch);
           if (cloneResult.success && cloneResult.clonePath) {
             repoContext = getRepoContextForPrompt(cloneResult.clonePath, baseBranch);
+            planningCwd = cloneResult.clonePath;
           }
         }
         const systemPrompt = buildScaffoldSystemPrompt();
@@ -227,6 +229,7 @@ export async function POST(
           state,
           emit,
           mockResponse: mock_response,
+          ...(planningCwd && { cwd: planningCwd }),
         });
 
         if (mode === "scaffold") {

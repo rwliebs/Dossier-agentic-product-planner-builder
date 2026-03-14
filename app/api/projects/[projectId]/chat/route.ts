@@ -271,15 +271,17 @@ export async function POST(
 
   const useScaffold = mode === "scaffold" || !hasStructure;
   let repoContext: string | null = null;
-  if (useScaffold) {
-    const repoUrl = (state.project as { repo_url?: string | null }).repo_url;
-    const baseBranch =
-      (state.project as { default_branch?: string }).default_branch ?? "main";
-    if (repoUrl && typeof repoUrl === "string" && !repoUrl.includes("placeholder")) {
-      const cloneResult = ensureClone(projectId, repoUrl, null, baseBranch);
-      if (cloneResult.success && cloneResult.clonePath) {
+  let planningCwd: string | undefined;
+  const repoUrl = (state.project as { repo_url?: string | null }).repo_url;
+  const baseBranch =
+    (state.project as { default_branch?: string }).default_branch ?? "main";
+  if (repoUrl && typeof repoUrl === "string" && !repoUrl.includes("placeholder")) {
+    const cloneResult = ensureClone(projectId, repoUrl, null, baseBranch);
+    if (cloneResult.success && cloneResult.clonePath) {
+      if (useScaffold) {
         repoContext = getRepoContextForPrompt(cloneResult.clonePath, baseBranch);
       }
+      planningCwd = cloneResult.clonePath;
     }
   }
 
@@ -316,6 +318,7 @@ export async function POST(
       }, {
         systemPromptOverride: systemPrompt,
         userMessageOverride: userMessage,
+        ...(planningCwd && { cwd: planningCwd }),
       });
       llmText = llmResponse.text;
     } catch (e) {

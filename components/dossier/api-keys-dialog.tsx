@@ -27,6 +27,7 @@ interface SetupStatus {
 
 export function ApiKeysDialog({ open, onOpenChange }: ApiKeysDialogProps) {
   const [anthropicApiKey, setAnthropicApiKey] = useState('');
+  const [anthropicAuthToken, setAnthropicAuthToken] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +42,7 @@ export function ApiKeysDialog({ open, onOpenChange }: ApiKeysDialogProps) {
     setError(null);
     setSuccess(false);
     setAnthropicApiKey('');
+    setAnthropicAuthToken('');
     setGithubToken('');
     fetch('/api/setup/status')
       .then((r) => r.json())
@@ -65,6 +67,7 @@ export function ApiKeysDialog({ open, onOpenChange }: ApiKeysDialogProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           anthropicApiKey: anthropicApiKey.trim() || undefined,
+          anthropicAuthToken: anthropicAuthToken.trim() || undefined,
           githubToken: githubToken.trim() || undefined,
         }),
       });
@@ -86,7 +89,7 @@ export function ApiKeysDialog({ open, onOpenChange }: ApiKeysDialogProps) {
   };
 
   const canSubmit =
-    (anthropicApiKey.trim().length > 0 || githubToken.trim().length > 0) &&
+    (anthropicApiKey.trim().length > 0 || anthropicAuthToken.trim().length > 0 || githubToken.trim().length > 0) &&
     !loading &&
     !success;
 
@@ -137,6 +140,30 @@ export function ApiKeysDialog({ open, onOpenChange }: ApiKeysDialogProps) {
                 >
                   console.anthropic.com
                 </a>
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="api-keys-anthropic-oauth" className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4" />
+                Anthropic OAuth Token (Max subscription)
+                {hasAnthropic && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    (or use API key above)
+                  </span>
+                )}
+              </Label>
+              <Input
+                id="api-keys-anthropic-oauth"
+                type="password"
+                placeholder={hasAnthropic ? '••••••••' : 'Run: claude setup-token'}
+                value={anthropicAuthToken}
+                onChange={(e) => setAnthropicAuthToken(e.target.value)}
+                autoComplete="off"
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Use API key or OAuth token. With Claude Code (Max) locally, Dossier can use the same token from env or ~/.claude/settings.json—no need to paste here.
               </p>
             </div>
 

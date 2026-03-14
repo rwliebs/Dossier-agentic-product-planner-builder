@@ -21,8 +21,10 @@ export async function runLlmSubStep(opts: {
   maxTokens?: number;
   /** Optional label for logs when actionCount === 0 (e.g. finalize doc name) */
   stepLabel?: string;
+  /** When set (e.g. cloned repo path), planning SDK runs Read/Glob/Grep in this directory. */
+  cwd?: string;
 }): Promise<{ actionCount: number; updatedState: PlanningState }> {
-  const { db, projectId, systemPrompt, userMessage, emit, actionFilter, mockResponse, maxTokens, stepLabel } = opts;
+  const { db, projectId, systemPrompt, userMessage, emit, actionFilter, mockResponse, maxTokens, stepLabel, cwd } = opts;
   let currentState = opts.state;
 
   const useMock =
@@ -33,7 +35,7 @@ export async function runLlmSubStep(opts: {
   let rawLlmOutput = "";
   const llmStreamRaw = useMock
     ? null
-    : await claudeStreamingRequest({ systemPrompt, userMessage }, { maxTokens });
+    : await claudeStreamingRequest({ systemPrompt, userMessage }, { maxTokens, ...(cwd && { cwd }) });
   const llmStream = useMock
     ? new ReadableStream<string>({
         start(ctrl) {

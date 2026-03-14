@@ -7,8 +7,16 @@ import {
   buildConversationMessages,
   type ConversationMessage,
 } from "./planning-prompt";
+import { resolvePlanningCredential } from "./planning-credential";
+import { planningResponseFromSdkText } from "./planning-sdk-bridge";
+import { runPlanningQuery, streamPlanningQuery } from "./planning-sdk-runner";
 
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+
+/** OAuth tokens are not sk-ant-*; use Agent SDK path when credential is not an API key. */
+function isLikelyApiKey(credential: string): boolean {
+  return credential.startsWith("sk-ant-");
+}
 const DEFAULT_MAX_TOKENS = 16384;
 const DEFAULT_TIMEOUT_MS = 120_000;
 
@@ -60,12 +68,14 @@ export async function claudePlanningRequest(
     timeoutMs?: number;
     systemPromptOverride?: string;
     userMessageOverride?: string;
+    /** When set (e.g. cloned repo path), planning SDK runs Read/Glob/Grep in this directory. */
+    cwd?: string;
   },
 ): Promise<ClaudePlanningResponse> {
-  const apiKey = options?.apiKey ?? process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  const credential = options?.apiKey ?? resolvePlanningCredential();
+  if (!credential) {
     throw new Error(
-      "ANTHROPIC_API_KEY is required for planning LLM. Set it in .env.local.",
+      "Anthropic credential required for planning. Set ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN in .env.local or ~/.dossier/config.",
     );
   }
 
@@ -73,11 +83,51 @@ export async function claudePlanningRequest(
   const maxTokens = options?.maxTokens ?? DEFAULT_MAX_TOKENS;
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  const client = new Anthropic({ apiKey });
-
   const systemPrompt = options?.systemPromptOverride ?? buildPlanningSystemPrompt();
   const history = input.conversationHistory ?? [];
+  const userMessage = options?.userMessageOverride
+    ? options.userMessageOverride
+    : history.length > 0
+      ? (() => {
+          const messages = buildConversationMessages(
+            input.userRequest,
+            input.mapSnapshot,
+            input.linkedArtifacts ?? [],
+            history,
+          );
+          return messages
+            .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+            .join("\n\n");
+        })()
+      : buildPlanningUserMessage(
+          input.userRequest,
+          input.mapSnapshot,
+          input.linkedArtifacts ?? [],
+        );
 
+  if (!isLikelyApiKey(credential)) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const text = await runPlanningQuery({
+        systemPrompt,
+        userMessage,
+        model,
+        signal: controller.signal,
+        ...(options?.cwd && { cwd: options.cwd }),
+      });
+      clearTimeout(timeoutId);
+      return planningResponseFromSdkText(text, { model });
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error(`Planning LLM request timed out after ${timeoutMs}ms. Try again.`);
+      }
+      throw error;
+    }
+  }
+
+  const client = new Anthropic({ apiKey: credential });
   const messages = options?.userMessageOverride
     ? [{ role: "user" as const, content: options.userMessageOverride }]
     : history.length > 0
@@ -103,7 +153,6 @@ export async function claudePlanningRequest(
       system: systemPrompt,
       messages,
       stream: false as const,
-      // Prompt caching: cache system + prefix for 5m; repeat requests reuse cache (lower cost/latency).
       cache_control: { type: "ephemeral" },
     };
     const message = await client.messages.create(
@@ -165,20 +214,51 @@ export async function claudeStreamingRequest(
     model?: string;
     maxTokens?: number;
     timeoutMs?: number;
+    /** When set (e.g. cloned repo path), planning SDK runs Read/Glob/Grep in this directory. */
+    cwd?: string;
   },
 ): Promise<ReadableStream<string>> {
-  const apiKey = options?.apiKey ?? process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  const credential = options?.apiKey ?? resolvePlanningCredential();
+  if (!credential) {
     throw new Error(
-      "ANTHROPIC_API_KEY is required for planning LLM. Set it in .env.local.",
+      "Anthropic credential required for planning. Set ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN in .env.local or ~/.dossier/config.",
     );
   }
 
   const model = options?.model ?? process.env.PLANNING_LLM_MODEL ?? DEFAULT_MODEL;
-  const maxTokens = options?.maxTokens ?? DEFAULT_MAX_TOKENS;
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  const client = new Anthropic({ apiKey });
+  if (!isLikelyApiKey(credential)) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    return new ReadableStream<string>({
+      async start(streamController) {
+        try {
+          for await (const chunk of streamPlanningQuery({
+            systemPrompt: input.systemPrompt,
+            userMessage: input.userMessage,
+            model,
+            signal: controller.signal,
+            ...(options?.cwd && { cwd: options.cwd }),
+          })) {
+            clearTimeout(timeoutId);
+            streamController.enqueue(chunk);
+          }
+          streamController.close();
+        } catch (err) {
+          clearTimeout(timeoutId);
+          streamController.error(
+            err instanceof Error && err.name === "AbortError"
+              ? new Error(`Planning LLM stream idle for ${timeoutMs}ms with no data. Try again.`)
+              : err,
+          );
+        }
+      },
+    });
+  }
+
+  const client = new Anthropic({ apiKey: credential });
+  const maxTokens = options?.maxTokens ?? DEFAULT_MAX_TOKENS;
   const controller = new AbortController();
 
   let idleTimer: ReturnType<typeof setTimeout>;
@@ -194,7 +274,6 @@ export async function claudeStreamingRequest(
       max_tokens: maxTokens,
       system: input.systemPrompt,
       messages: [{ role: "user", content: input.userMessage }],
-      // Prompt caching: cache system + prefix for 5m; repeat requests reuse cache.
       cache_control: { type: "ephemeral" },
     } as Parameters<typeof client.messages.stream>[0],
     { signal: controller.signal },

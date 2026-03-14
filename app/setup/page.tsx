@@ -112,7 +112,7 @@ export default function SetupPage() {
                   autoComplete="off"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Use API key or OAuth token. OAuth works for planning and build via Claude Max.
+                  Use API key or OAuth token for planning and build. If you use Claude Code (Max) locally, Dossier can use the same token from env or <code className="text-xs bg-muted px-0.5 rounded">~/.claude/settings.json</code>—no need to paste here.
                 </p>
               </div>
             </>

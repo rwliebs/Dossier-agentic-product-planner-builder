@@ -1,321 +1,463 @@
 # API Endpoints Reference
 
-REST API for the Dossier planning and build system. All routes under `/api`. SQLite (default) stores data in `~/.dossier/dossier.db`. Migrations run automatically on first use.
-
-## Setup
-
-1. Copy `.env.example` to `.env.local` and set `ANTHROPIC_API_KEY` and `GITHUB_TOKEN`.
-2. Database: SQLite (default) stores data in `~/.dossier/dossier.db`. Migrations run automatically on first use.
+As-built API surface for Dossier (`app/api/**/route.ts`).
 
 ## Base URL
 
 - Local: `http://localhost:3000`
-- All routes are under `/api`
+- All endpoints are under `/api`
 
-## Error Response Format
+## Response Conventions
 
-All errors return JSON:
-
-```json
-{
-  "error": "error_code",
-  "message": "Human-readable description",
-  "details": { "field": ["specific issue"] }
-}
-```
-
-| HTTP Status | Error Code       | When                                      |
-|-------------|------------------|-------------------------------------------|
-| 400         | validation_failed | Malformed payload, schema mismatch        |
-| 404         | not_found        | Resource doesn't exist                    |
-| 409         | conflict         | Referential integrity error               |
-| 422         | action_rejected  | Action rejected (e.g. code-gen intent)    |
-| 500         | internal_error   | Database or unexpected error              |
+- Many routes use shared helpers and return:
+  ```json
+  { "error": "validation_failed|not_found|conflict|action_rejected|internal_error", "message": "...", "details": {} }
+  ```
+- Some endpoints intentionally return different envelopes (for example `/api/setup`, `/api/github/repos`, and SSE endpoints). Treat each endpoint contract below as source of truth.
+- Streaming endpoints return `Content-Type: text/event-stream`.
 
 ---
 
-## Project Management
+## Endpoint Inventory (quick scan)
 
-### GET /api/projects
+### Setup, docs, and integrations
 
-List all projects.
+- `POST /api/setup`
+- `GET /api/setup/status`
+- `GET /api/docs`
+- `GET /api/github/repos`
+- `POST /api/github/repos`
+- `POST /api/dev/restart-and-open` (development-only)
 
-**Response:** `200` — Array of project objects
+### Projects and planning
 
-```json
-[
-  { "id": "uuid", "name": "string", "repo_url": "string|null", "default_branch": "string", "created_at": "string", "updated_at": "string" }
-]
-```
+- `GET /api/projects`
+- `POST /api/projects`
+- `GET /api/projects/[projectId]`
+- `PATCH /api/projects/[projectId]`
+- `GET /api/projects/[projectId]/map`
+- `GET /api/projects/[projectId]/actions`
+- `POST /api/projects/[projectId]/actions`
+- `POST /api/projects/[projectId]/actions/preview`
+- `POST /api/projects/[projectId]/chat`
+- `POST /api/projects/[projectId]/chat/stream`
+- `GET /api/projects/[projectId]/memory`
+- `GET /api/projects/[projectId]/files`
 
-### POST /api/projects
+### Card context and approval
 
-Create a project.
+- Artifacts:
+  - `GET/POST /api/projects/[projectId]/artifacts`
+  - `GET/PATCH/DELETE /api/projects/[projectId]/artifacts/[artifactId]`
+- Knowledge:
+  - `GET/POST /requirements`, `PATCH/DELETE /requirements/[itemId]`
+  - `GET/POST /facts`, `PATCH/DELETE /facts/[itemId]`
+  - `GET/POST /assumptions`, `PATCH/DELETE /assumptions/[itemId]`
+  - `GET/POST /questions`, `PATCH/DELETE /questions/[itemId]`
+- Planned files:
+  - `GET/POST /api/projects/[projectId]/cards/[cardId]/planned-files`
+  - `PATCH/DELETE /api/projects/[projectId]/cards/[cardId]/planned-files/[fileId]`
+- Card execution support:
+  - `GET /api/projects/[projectId]/cards/[cardId]/context-artifacts`
+  - `GET /api/projects/[projectId]/cards/[cardId]/produced-files`
+  - `GET/POST /api/projects/[projectId]/cards/[cardId]/finalize`
+  - `POST /api/projects/[projectId]/cards/[cardId]/push`
 
-**Request body:**
-```json
-{
-  "name": "string (required)",
-  "repo_url": "string|null (optional)",
-  "default_branch": "string (optional, default: main)"
-}
-```
+### Orchestration
 
-**Response:** `201` — Created project object
-
-### GET /api/projects/[projectId]
-
-Get project details.
-
-**Response:** `200` — Project object | `404` — Not found
-
-### PATCH /api/projects/[projectId]
-
-Update project.
-
-**Request body:** Same as POST, all fields optional
-
-**Response:** `200` — Updated project object
+- Triggering:
+  - `POST /api/projects/[projectId]/orchestration/build`
+  - `POST /api/projects/[projectId]/orchestration/resume-blocked`
+- Runs:
+  - `GET/POST /api/projects/[projectId]/orchestration/runs`
+  - `GET/PATCH /api/projects/[projectId]/orchestration/runs/[runId]`
+- Checks:
+  - `GET/POST /api/projects/[projectId]/orchestration/runs/[runId]/checks`
+  - `GET /api/projects/[projectId]/orchestration/runs/[runId]/checks/[checkId]`
+- Assignments:
+  - `GET/POST /api/projects/[projectId]/orchestration/runs/[runId]/assignments`
+  - `GET /api/projects/[projectId]/orchestration/runs/[runId]/assignments/[assignmentId]`
+  - `POST /api/projects/[projectId]/orchestration/runs/[runId]/assignments/[assignmentId]/dispatch`
+- Approvals and PR candidates:
+  - `GET/POST /api/projects/[projectId]/orchestration/approvals`
+  - `GET/PATCH /api/projects/[projectId]/orchestration/approvals/[approvalId]`
+  - `GET/POST /api/projects/[projectId]/orchestration/pull-requests`
+  - `GET/PATCH /api/projects/[projectId]/orchestration/pull-requests/[prId]`
+- Agent callback:
+  - `POST /api/projects/[projectId]/orchestration/webhooks/agentic-flow`
 
 ---
 
-## Map & Actions
+## High-Value Contracts and Constraints
 
-### GET /api/projects/[projectId]/map
+### Setup and integration endpoints
 
-Canonical map snapshot: Workflow → WorkflowActivity → Step → Card tree.
+### `POST /api/setup`
 
-**Response:** `200`
+Save API keys to `~/.dossier/config` and inject into current process env.
+
+Request:
+
 ```json
 {
-  "project": { "id", "name", "repo_url", "default_branch" },
-  "workflows": [
-    {
-      "id", "project_id", "title", "description", "build_state", "position",
-      "activities": [
-        {
-          "id", "workflow_id", "title", "color", "position",
-          "steps": [{ "id", "title", "position", "cards": [...] }],
-          "cards": []
-        }
-      ]
-    }
-  ]
+  "anthropicApiKey": "optional string",
+  "githubToken": "optional string"
 }
 ```
 
-### GET /api/projects/[projectId]/actions
+Rules:
 
-Action history for the project.
+- At least one key must be non-empty after trim.
+- Returns `{ success: true, configPath }` on success.
 
-**Response:** `200` — Array of PlanningAction records
+### `GET /api/setup/status`
 
-### POST /api/projects/[projectId]/actions
+Returns setup readiness:
 
-Submit planning actions. Validates, applies, and persists. Rejects on first failure.
+```json
+{
+  "needsSetup": true,
+  "missingKeys": ["ANTHROPIC_API_KEY", "GITHUB_TOKEN"],
+  "configPath": "/home/.../.dossier/config"
+}
+```
 
-**Request body:**
+### `GET /api/github/repos`
+
+Lists repositories for the configured GitHub token (`env` first, then config file).
+
+- `503` if token is missing.
+- `401` if token is invalid.
+
+### `GET /api/docs`
+
+Docs panel API.
+
+- No query param: returns indexed docs from `docs/docs-index.yaml`
+- `?path=<relative-doc-path>`: returns `{ content }` for that document
+- Normalizes and guards path traversal (`400 Invalid path`, `404 Doc not found`)
+
+### `POST /api/github/repos`
+
+Creates a user repo.
+
+Request:
+
+```json
+{
+  "name": "repo-name",
+  "private": false
+}
+```
+
+Constraints:
+
+- `name` must match `^[a-zA-Z0-9._-]+$`
+- `422` on invalid/existing repo names from GitHub API
+
+### `POST /api/dev/restart-and-open`
+
+Development-only helper (`NODE_ENV=development`):
+
+- Requires `{ projectId }`
+- Starts `npm run dev` in clone path on first free port `3001..3010`
+- Returns `409` when clone does not exist and `503` when no view port is available
+
+---
+
+## Projects and planning
+
+### `POST /api/projects`
+
+Validated request schema accepts:
+
+- `name` (required)
+- `description`, `customer_personas`, `tech_stack`, `deployment`, `design_inspiration` (optional)
+- `repo_url` (optional URL/null)
+- `default_branch` (optional)
+
+Current create behavior persists `name`, `repo_url`, and `default_branch`, and creates a default system policy profile.
+
+### `PATCH /api/projects/[projectId]`
+
+Partial updates for all fields listed above.
+
+### `GET /api/projects/[projectId]/map`
+
+Canonical map shape is:
+
+`project -> workflows[] -> activities[] -> cards[]`
+
+There is no `step` level in this response. Card nodes include build and finalization fields such as `build_state`, `last_built_at`, `last_build_ref`, and `finalized_at`.
+
+### `POST /api/projects/[projectId]/actions`
+
+Applies planning actions transactionally.
+
+Request:
+
 ```json
 {
   "actions": [
     {
-      "id": "uuid (optional)",
-      "action_type": "createWorkflow|createActivity|createStep|createCard|updateCard|reorderCard|linkContextArtifact|upsertCardPlannedFile|approveCardPlannedFile|upsertCardKnowledgeItem|setCardKnowledgeStatus",
+      "id": "optional uuid",
+      "action_type": "updateProject|createWorkflow|createActivity|createCard|updateCard|reorderCard|deleteWorkflow|deleteActivity|deleteCard|linkContextArtifact|createContextArtifact|upsertCardPlannedFile|upsertCardKnowledgeItem",
       "target_ref": {},
       "payload": {}
     }
-  ]
+  ],
+  "idempotency_key": "optional string",
+  "expected_sequence": 12
 }
 ```
 
-**Response:** `201` — `{ "applied": number, "results": [...] }` | `422` — Action rejected
+Operational constraints:
 
-**Supported action types:**
+- `expected_sequence` mismatch returns `409`.
+- Duplicate `idempotency_key` returns previous results with `idempotent: true`.
+- Rejected actions return `422 action_rejected`.
 
-| Action | Description |
-|--------|-------------|
-| `createWorkflow` | Create a new workflow in the project |
-| `createActivity` | Create a workflow activity |
-| `createStep` | Create a step within an activity |
-| `createCard` | Create a card in a step or activity |
-| `updateCard` | Update card title, description, status, or priority |
-| `reorderCard` | Move card to new step/position |
-| `linkContextArtifact` | Link a context artifact to a card |
-| `upsertCardPlannedFile` | Create or update a planned file for a card |
-| `approveCardPlannedFile` | Approve or revert a planned file |
-| `upsertCardKnowledgeItem` | Create or update a requirement, fact, assumption, or question |
-| `setCardKnowledgeStatus` | Set status (draft/approved/rejected) on a knowledge item |
+### `POST /api/projects/[projectId]/actions/preview`
 
-Code-generation intents are rejected.
+Dry-run only; does not mutate DB.
 
----
+### `POST /api/projects/[projectId]/chat`
 
-## Context Artifacts
+Non-streaming planning endpoint.
 
-### GET /api/projects/[projectId]/artifacts
+Modes:
 
-List project artifacts.
+- `scaffold`
+- `populate` (requires `workflow_id`)
+- `finalize`
 
-**Response:** `200` — Array of ContextArtifact
+Returns JSON with fields like:
 
-### POST /api/projects/[projectId]/artifacts
-
-Create artifact. Requires at least one of: `content`, `uri`, `integration_ref`.
-
-**Request body:**
 ```json
 {
-  "name": "string",
-  "type": "doc|design|code|research|link|image|skill|mcp|cli|api|prompt|spec|runbook",
-  "title": "string|null",
-  "content": "string|null",
-  "uri": "string|null",
-  "locator": "string|null",
-  "mime_type": "string|null",
-  "integration_ref": "object|null"
+  "status": "success|error",
+  "responseType": "clarification|actions|mixed",
+  "applied": 0,
+  "workflow_ids_created": []
 }
 ```
 
-**Response:** `201` — Created artifact
+### `POST /api/projects/[projectId]/chat/stream`
 
-### GET /api/projects/[projectId]/artifacts/[artifactId]
+SSE variant for scaffold/populate/finalize. Emits events including:
 
-Get single artifact.
+- `error`
+- `phase_complete`
+- `done`
 
-### PATCH /api/projects/[projectId]/artifacts/[artifactId]
+### `GET /api/projects/[projectId]/memory`
 
-Update artifact. All fields optional.
+Returns memory units linked to project plus storage paths (`sqlite`, `ruvector`).
 
-### DELETE /api/projects/[projectId]/artifacts/[artifactId]
+### `GET /api/projects/[projectId]/files`
 
-Delete artifact. **Response:** `204`
+Query parameters:
+
+| Param | Values | Notes |
+|---|---|---|
+| `source` | `planned` (default), `repo` | planned DB tree vs repository tree |
+| `cardId` | uuid | card-specific repo view (assignment/worktree) |
+| `content` | `1` | with `source=repo&path=...`, return `text/plain` |
+| `diff` | `1` | with `source=repo&path=...`, return `text/x-diff` |
+| `path` | relative path | required for `content=1` or `diff=1` |
+
+Notes:
+
+- If `source=repo` and no run worktree exists, route falls back to clone tree when possible.
+- If no assignment branch is selected, `diff=1` returns an empty diff body (`200`) against base branch context.
 
 ---
 
-## Card Knowledge Items
+## Card-level endpoints
 
-All knowledge routes require the card to belong to the project (via workflow → activity).
+### Artifacts
 
-### Requirements
+Artifact type enum:
 
-- `GET /api/projects/[projectId]/cards/[cardId]/requirements`
-- `POST /api/projects/[projectId]/cards/[cardId]/requirements`
-- `PATCH /api/projects/[projectId]/cards/[cardId]/requirements/[itemId]`
-- `DELETE /api/projects/[projectId]/cards/[cardId]/requirements/[itemId]`
+`doc|design|code|research|link|image|skill|mcp|cli|api|prompt|spec|runbook|test|scaffold`
 
-### Facts
+Create requires at least one of `content`, `uri`, `integration_ref`.
 
-- `GET /api/projects/[projectId]/cards/[cardId]/facts`
-- `POST /api/projects/[projectId]/cards/[cardId]/facts`
-- `PATCH /api/projects/[projectId]/cards/[cardId]/facts/[itemId]`
-- `DELETE /api/projects/[projectId]/cards/[cardId]/facts/[itemId]`
+### Knowledge items
 
-### Assumptions
+Create payload shape (requirements/facts/assumptions/questions):
 
-- `GET /api/projects/[projectId]/cards/[cardId]/assumptions`
-- `POST /api/projects/[projectId]/cards/[cardId]/assumptions`
-- `PATCH /api/projects/[projectId]/cards/[cardId]/assumptions/[itemId]`
-- `DELETE /api/projects/[projectId]/cards/[cardId]/assumptions/[itemId]`
-
-### Questions
-
-- `GET /api/projects/[projectId]/cards/[cardId]/questions`
-- `POST /api/projects/[projectId]/cards/[cardId]/questions`
-- `PATCH /api/projects/[projectId]/cards/[cardId]/questions/[itemId]`
-- `DELETE /api/projects/[projectId]/cards/[cardId]/questions/[itemId]`
-
-**Create payload (e.g. requirements):**
 ```json
 {
   "text": "string",
-  "status": "draft|approved|rejected (optional)",
   "source": "agent|user|imported",
-  "confidence": "number 0-1 (optional)",
-  "position": "number (optional)"
+  "status": "draft|approved|rejected",
+  "confidence": 0.8,
+  "position": 0
 }
 ```
 
+Facts can also include `evidence_source`.
+
+### Planned files
+
+`artifact_kind`:
+
+`component|endpoint|service|schema|hook|util|middleware|job|config`
+
+`action`: `create|edit`
+
+`status`: `proposed|user_edited|approved`
+
+### `GET /cards/[cardId]/context-artifacts`
+
+Returns expanded artifact objects linked to the card.
+
+### `GET /cards/[cardId]/produced-files`
+
+Returns `[{ path, status }]` for `added|modified` files from latest completed card assignment.
+
+### `GET /cards/[cardId]/finalize`
+
+Returns finalization package:
+
+- `card`
+- `project_docs`
+- `card_artifacts`
+- `requirements`
+- `planned_files`
+- `finalized_at`
+
+### `POST /cards/[cardId]/finalize`
+
+SSE endpoint. Preconditions:
+
+- card exists in project
+- card is not already finalized
+- project is finalized
+- card has at least one requirement
+- card has at least one planned file/folder
+- planning LLM is enabled
+
+Emits `finalize_progress`, `phase_complete`, and `done`.
+
+### `POST /cards/[cardId]/push`
+
+Pushes completed card feature branch to remote:
+
+- `400` if repo is not connected
+- `409` if there is no completed build for the card
+- `401/502` on push failures
+
 ---
 
-## Card Planned Files
+## Orchestration API
 
-### GET /api/projects/[projectId]/cards/[cardId]/planned-files
+### Triggering
 
-List planned files for a card.
+#### `POST /orchestration/build`
 
-### POST /api/projects/[projectId]/cards/[cardId]/planned-files
+Request:
 
-Create planned file.
-
-**Request body:**
 ```json
 {
-  "logical_file_name": "string",
-  "module_hint": "string|null",
-  "artifact_kind": "component|endpoint|service|schema|hook|util|middleware|job|config",
-  "action": "create|edit",
-  "intent_summary": "string",
-  "contract_notes": "string|null",
-  "status": "proposed|user_edited|approved (optional)",
-  "position": "number (optional)"
+  "scope": "workflow|card",
+  "workflow_id": "required when scope=workflow",
+  "card_id": "required when scope=card",
+  "trigger_type": "card|workflow|manual",
+  "initiated_by": "string"
 }
 ```
 
-### PATCH /api/projects/[projectId]/cards/[cardId]/planned-files/[fileId]
+Returns `202` with `{ runId, assignmentIds, outcome_type }` on success.
 
-Update or approve planned file. Use `{ "status": "approved" }` for approval.
+#### `POST /orchestration/resume-blocked`
 
-### DELETE /api/projects/[projectId]/cards/[cardId]/planned-files/[fileId]
+Request:
 
-Delete planned file.
-
----
-
-## Project Files (Planned + Repository)
-
-### GET /api/projects/[projectId]/files
-
-File tree for the project. Two modes via `source` query param.
-
-**Query params:**
-
-| Param | Values | Description |
-|-------|--------|-------------|
-| `source` | `planned` (default) | Planned files from `card_planned_file` (intent, not produced code) |
-| `source` | `repo` | Actual files from cloned repo (after build); includes diff status |
-| `content` | `1` | With `source=repo` and `path`: return file content as `text/plain` |
-| `diff` | `1` | With `source=repo` and `path`: return unified diff vs base branch as `text/x-diff` |
-| `path` | `src/foo.ts` | Required when `content=1` or `diff=1`; file path (with or without leading slash) |
-
-**Default (`source=planned`):** Returns hierarchical file tree built from `card_planned_file.logical_file_name`.
-
-**`source=repo`:** Returns file tree from the latest build's cloned repo (feature branch). Requires at least one completed or running build with `worktree_root` set. Nodes include optional `status`: `added`, `modified`, `deleted`.
-
-**`source=repo&content=1&path=...`:** Returns raw file content. `404` if file not found.
-
-**`source=repo&diff=1&path=...`:** Returns `git diff base...feature -- path`. `404` if file unchanged or not found.
-
-**Response (tree):** `200` — Array of `FileNode`:
 ```json
-[
-  {
-    "name": "src",
-    "type": "folder",
-    "path": "/src",
-    "status": "modified",
-    "children": [
-      { "name": "index.ts", "type": "file", "path": "/src/index.ts", "status": "added" }
-    ]
-  }
-]
+{
+  "card_id": "uuid",
+  "actor": "optional string"
+}
 ```
 
-**Response (content/diff):** `200` — `text/plain` or `text/x-diff` body. `404` — Error JSON if no build or file not found.
+Returns `202` with resumed assignment/run identifiers.
+
+### Runs
+
+#### `GET /orchestration/runs`
+
+Query: `scope?`, `status?`, `limit?`
+
+#### `POST /orchestration/runs`
+
+Creates run directly; requires `repo_url`, `base_branch`, `run_input_snapshot`, and scope-specific IDs.
+
+#### `PATCH /orchestration/runs/[runId]`
+
+Allowed status transitions:
+
+- `queued -> running|cancelled`
+- `running -> blocked|failed|completed|cancelled`
+- `blocked -> running|failed|cancelled`
+- `failed -> queued`
+- `completed` and `cancelled` are terminal
+
+### Checks
+
+- `POST /orchestration/runs/[runId]/checks` requires `check_type` and `status`
+- check types: `dependency|security|policy|lint|unit|integration|e2e`
+- statuses: `passed|failed|skipped`
+
+### Assignments
+
+`POST /orchestration/runs/[runId]/assignments` requires:
+
+- `card_id`
+- `agent_role` (`planner|coder|reviewer|integrator|tester`)
+- `agent_profile`
+- `feature_branch`
+- `allowed_paths` (non-empty)
+- optional `forbidden_paths`, `worktree_path`, `assignment_input_snapshot`
+
+`POST /.../dispatch` accepts optional `{ actor }` and returns `202` with execution IDs.
+
+### Approvals and PR candidates
+
+- `GET /orchestration/approvals` requires `run_id` query param.
+- `POST /orchestration/approvals` requires `run_id`, `approval_type` (`create_pr|merge_pr`), `requested_by`.
+- `PATCH /orchestration/approvals/[approvalId]` requires `status` and `resolved_by`.
+- `GET /orchestration/pull-requests` requires `run_id`.
+- `POST /orchestration/pull-requests` requires `run_id`, `base_branch`, `head_branch`, `title`, `description`.
+- `PATCH /orchestration/pull-requests/[prId]` requires `status`, optional `pr_url`.
+
+### Agent webhook
+
+`POST /orchestration/webhooks/agentic-flow` requires:
+
+- `event_type`
+- `assignment_id`
+
+Allowed `event_type` values:
+
+- `execution_started`
+- `commit_created`
+- `execution_completed`
+- `execution_failed`
+- `execution_blocked`
 
 ---
+
+## Operational Pitfalls
+
+- **Different error envelopes by route:** do not hardcode one global error parser for all endpoints.
+- **SSE consumers:** finalize and stream routes require event-stream handling (`done` event indicates completion).
+- **Build output visibility:** `produced-files` and `files?source=repo` depend on run/assignment/worktree state; empty responses can be valid.
+- **Setup dependence:** GitHub and planning workflows depend on configured `GITHUB_TOKEN` and `ANTHROPIC_API_KEY`.
 
 ## As-Built Notes
 
-- **Mutations**: All map changes go through the actions endpoint; no direct writes.
-- **Auth**: No auth/RLS; endpoints use anon access (single-user desktop app).
-- **Database**: SQLite only; no Supabase or Postgres.
+- Mutations to map data flow through validated actions and mutation pipeline.
+- No auth/RLS layer in this single-user deployment mode.
+- SQLite is the default runtime datastore for API flows.

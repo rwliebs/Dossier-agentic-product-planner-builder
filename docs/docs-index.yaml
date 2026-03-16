@@ -62,9 +62,21 @@ docs_index:
       tags: [api, endpoints]
       anchors:
         - id: endpoints
-          summary: "REST API under /api/projects; map, actions, artifacts, cards"
+          summary: "REST API under /api; setup, projects, cards, orchestration, integrations"
       depends_on: [doc.system-architecture]
-      last_verified: "2026-02-18"
+      last_verified: "2026-03-16"
+
+    - id: doc.api-endpoints
+      path: reference/api-endpoints.md
+      tokens_estimate: 2200
+      tags: [api, endpoints, orchestration, setup, integrations]
+      anchors:
+        - id: endpoint-inventory
+          summary: "As-built endpoint inventory across setup, projects, cards, and orchestration"
+        - id: contracts
+          summary: "Key request/response contracts and operational constraints"
+      depends_on: [doc.api-reference, doc.data-contracts]
+      last_verified: "2026-03-16"
 
     - id: doc.planning
       path: domains/planning-reference.md

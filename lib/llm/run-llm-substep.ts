@@ -19,12 +19,12 @@ export async function runLlmSubStep(opts: {
   actionFilter?: (action: PlanningAction) => boolean;
   mockResponse?: string;
   maxTokens?: number;
+  /** Working directory for SDK Read/Glob/Grep tools (e.g. cloned repo path). */
+  cwd?: string;
   /** Optional label for logs when actionCount === 0 (e.g. finalize doc name) */
   stepLabel?: string;
-  /** When set (e.g. cloned repo path), planning SDK runs Read/Glob/Grep in this directory. */
-  cwd?: string;
 }): Promise<{ actionCount: number; updatedState: PlanningState }> {
-  const { db, projectId, systemPrompt, userMessage, emit, actionFilter, mockResponse, maxTokens, stepLabel, cwd } = opts;
+  const { db, projectId, systemPrompt, userMessage, emit, actionFilter, mockResponse, maxTokens, cwd, stepLabel } = opts;
   let currentState = opts.state;
 
   const useMock =

@@ -209,8 +209,8 @@ export async function POST(
         if (repoUrl && typeof repoUrl === "string" && !repoUrl.includes("placeholder")) {
           const cloneResult = ensureClone(projectId, repoUrl, null, baseBranch);
           if (cloneResult.success && cloneResult.clonePath) {
-            repoContext = getRepoContextForPrompt(cloneResult.clonePath, baseBranch);
             planningCwd = cloneResult.clonePath;
+            repoContext = getRepoContextForPrompt(cloneResult.clonePath, baseBranch);
           }
         }
         const systemPrompt = buildScaffoldSystemPrompt();

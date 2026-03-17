@@ -258,6 +258,8 @@ export async function claudePlanningRequest(
     timeoutMs?: number;
     systemPromptOverride?: string;
     userMessageOverride?: string;
+    /** Working directory for SDK Read/Glob/Grep tools (e.g. cloned repo path). */
+    cwd?: string;
     /** @internal Force CLI path for tests when child_process mock is not applied. */
     forceCliForTesting?: boolean;
   },
@@ -333,6 +335,7 @@ export async function claudePlanningRequest(
         userMessage,
         model,
         signal: controller.signal,
+        ...(options?.cwd && { cwd: options.cwd }),
       });
       clearTimeout(timeoutId);
       return planningResponseFromSdkText(text, { model });
@@ -432,6 +435,8 @@ export async function claudeStreamingRequest(
     model?: string;
     maxTokens?: number;
     timeoutMs?: number;
+    /** Working directory for SDK Read/Glob/Grep tools (e.g. cloned repo path). */
+    cwd?: string;
   },
 ): Promise<ReadableStream<string>> {
   const auth = resolveAuthMethod(options?.apiKey);
@@ -468,6 +473,7 @@ export async function claudeStreamingRequest(
             userMessage: input.userMessage,
             model,
             signal: controller.signal,
+            ...(options?.cwd && { cwd: options.cwd }),
           })) {
             resetIdleTimer();
             streamController.enqueue(chunk);

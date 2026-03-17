@@ -27,8 +27,13 @@ vi.mock("@/lib/llm/planning-credential", () => ({
   resolvePlanningCredential: vi.fn(),
 }));
 
+vi.mock("@/lib/llm/planning-sdk-runner", () => ({
+  runPlanningQuery: vi.fn(),
+}));
+
 import { readConfigFile } from "@/lib/config/data-dir";
 import { resolvePlanningCredential } from "@/lib/llm/planning-credential";
+import { runPlanningQuery } from "@/lib/llm/planning-sdk-runner";
 import type { ClaudePlanningRequestInput } from "@/lib/llm/claude-client";
 
 const minimalMapSnapshot = {
@@ -109,14 +114,14 @@ describe("claude-client CLI auth", () => {
     const { claudePlanningRequest } = await import("@/lib/llm/claude-client");
     process.env.ANTHROPIC_API_KEY = "sk-ant-api-key";
     vi.mocked(resolvePlanningCredential).mockReturnValue("sk-ant-api-key");
-    mockSpawn.mockImplementation(() => createFakeProcess("", 0));
+    vi.mocked(runPlanningQuery).mockRejectedValue(new Error("mock SDK failure"));
 
     await expect(
       claudePlanningRequest(
         { userRequest: "hello", mapSnapshot: minimalMapSnapshot },
         {},
       ),
-    ).rejects.toThrow(); // SDK will fail without real network; we only care that spawn was not used
+    ).rejects.toThrow();
 
     expect(mockSpawn).not.toHaveBeenCalled();
   });
@@ -124,6 +129,7 @@ describe("claude-client CLI auth", () => {
   it("does not spawn when API key is present (options.apiKey)", async () => {
     const { claudePlanningRequest } = await import("@/lib/llm/claude-client");
     vi.mocked(resolvePlanningCredential).mockReturnValue(null);
+    vi.mocked(runPlanningQuery).mockRejectedValue(new Error("mock SDK failure"));
 
     await expect(
       claudePlanningRequest(

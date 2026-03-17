@@ -1,7 +1,7 @@
 /**
- * Runs planning via Claude Agent SDK query() with read-only tools (Read, Glob, Grep).
- * Currently unused: planning uses Messages API with ANTHROPIC_API_KEY only (OAuth token
- * is no longer provided). Kept for possible future use (e.g. SDK path with API key).
+ * Runs planning via Claude Agent SDK query().
+ * This is the execution path for all credentialed users (API key or OAuth token).
+ * Tools: WebSearch always; Read/Glob/Grep only when a repo is connected (cwd provided).
  */
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
@@ -9,7 +9,12 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 
 /** Read-only tools for planning: inspect repo, no writes or Bash. */
-const PLANNING_TOOLS = ["Read", "Glob", "Grep"] as const;
+const REPO_TOOLS = ["Read", "Glob", "Grep"] as const;
+const WEB_TOOLS = ["WebSearch"] as const;
+
+function getPlanningTools(cwd?: string): string[] {
+  return cwd ? [...REPO_TOOLS, ...WEB_TOOLS] : [...WEB_TOOLS];
+}
 
 export interface PlanningSdkOptions {
   systemPrompt: string;
@@ -22,19 +27,20 @@ export interface PlanningSdkOptions {
 
 /**
  * Runs a planning session via Agent SDK and returns accumulated assistant text.
- * Planner can use Read/Glob/Grep to inspect the repo; we parse the final JSON from text.
- * Caller must ensure process.env has ANTHROPIC_API_KEY set (SDK uses it).
+ * Planner can use Read/Glob/Grep when repo is connected; WebSearch always available.
+ * Caller must ensure process.env has ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN set.
  */
 export async function runPlanningQuery(options: PlanningSdkOptions): Promise<string> {
   const model = options.model ?? process.env.PLANNING_LLM_MODEL ?? DEFAULT_MODEL;
+  const tools = getPlanningTools(options.cwd);
   const result = query({
     prompt: options.userMessage,
     options: {
       systemPrompt: options.systemPrompt,
       model,
       permissionMode: "default",
-      tools: [...PLANNING_TOOLS],
-      allowedTools: [...PLANNING_TOOLS],
+      tools,
+      allowedTools: tools,
       persistSession: false,
       ...(options.cwd && { cwd: options.cwd }),
     },
@@ -57,18 +63,19 @@ export async function runPlanningQuery(options: PlanningSdkOptions): Promise<str
 
 /**
  * Returns an async iterable of text chunks from the Agent SDK for planning streaming.
- * Yields the same shape as Messages API stream (text deltas) for parseActionsFromStream.
+ * Yields text deltas for parseActionsFromStream.
  */
 export async function* streamPlanningQuery(options: PlanningSdkOptions): AsyncGenerator<string> {
   const model = options.model ?? process.env.PLANNING_LLM_MODEL ?? DEFAULT_MODEL;
+  const tools = getPlanningTools(options.cwd);
   const result = query({
     prompt: options.userMessage,
     options: {
       systemPrompt: options.systemPrompt,
       model,
       permissionMode: "default",
-      tools: [...PLANNING_TOOLS],
-      allowedTools: [...PLANNING_TOOLS],
+      tools,
+      allowedTools: tools,
       persistSession: false,
       ...(options.cwd && { cwd: options.cwd }),
     },

@@ -11,7 +11,6 @@ import {
   buildScaffoldSystemPrompt,
   buildScaffoldUserMessage,
 } from "@/lib/llm/planning-prompt";
-import { runLlmSubStep } from "@/lib/llm/run-llm-substep";
 import { runPopulateWorkflow } from "@/lib/llm/run-populate-workflow";
 import { runFinalizeMultiStep } from "@/lib/llm/run-finalize-multistep";
 import { getArtifactsByProject, getProject } from "@/lib/db/queries";
@@ -24,7 +23,6 @@ import {
   pushBranch,
 } from "@/lib/orchestration/repo-manager";
 import { getRepoContextForPrompt } from "@/lib/orchestration/repo-reader";
-import type { PlanningAction } from "@/lib/schemas/slice-a";
 import { getWorkflowActivities } from "@/lib/schemas/planning-state";
 import { json } from "@/lib/api/response-helpers";
 import { PLANNING_LLM } from "@/lib/feature-flags";

@@ -275,7 +275,7 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
             runQueryAndCollectOutput(taskDescription, {
               systemPrompt: agent.systemPrompt,
               cwd: payload.worktree_path || undefined,
-              onStream: (chunk: string) => {
+              onStream: (_chunk: string) => {
                 if (abortController.signal.aborted) return;
               },
             })

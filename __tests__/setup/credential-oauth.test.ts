@@ -79,7 +79,7 @@ describe("setup credential (API key only)", () => {
     expect(data.missingKeys).toContain("ANTHROPIC_API_KEY");
   });
 
-  it("GET /api/setup/status returns needsSetup: false when only Claude CLI has API key (no env/config)", async () => {
+  it("GET /api/setup/status returns needsSetup: false and anthropicViaCli: true when only Claude CLI has API key (no env/config)", async () => {
     delete process.env.ANTHROPIC_API_KEY;
     process.env.GITHUB_TOKEN = "gh-token";
     process.env.CLAUDE_CONFIG_DIR = "/tmp/claude-status-test";
@@ -98,5 +98,18 @@ describe("setup credential (API key only)", () => {
     expect(res.ok).toBe(true);
     expect(data.needsSetup).toBe(false);
     expect(data.missingKeys).not.toContain("ANTHROPIC_API_KEY");
+    expect(data.anthropicViaCli).toBe(true);
+  });
+
+  it("GET /api/setup/status returns anthropicViaCli: false when API key is in env", async () => {
+    process.env.ANTHROPIC_API_KEY = "sk-ant-xxx";
+    process.env.GITHUB_TOKEN = "gh-token";
+
+    const res = await GET();
+    const data = await res.json();
+
+    expect(res.ok).toBe(true);
+    expect(data.needsSetup).toBe(false);
+    expect(data.anthropicViaCli).toBe(false);
   });
 });

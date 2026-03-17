@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { readConfigFile, getConfigPath } from "@/lib/config/data-dir";
-import { resolvePlanningCredential } from "@/lib/llm/planning-credential";
+import { resolvePlanningCredentialWithSource } from "@/lib/llm/planning-credential";
 import { isClaudeCliAvailable } from "@/lib/llm/claude-client";
 
 function hasKey(key: string, config: Record<string, string>): boolean {
@@ -15,10 +15,11 @@ function hasKey(key: string, config: Record<string, string>): boolean {
 export async function GET() {
   const config = readConfigFile();
   const missing: string[] = [];
-  const anthropicSatisfied = !!resolvePlanningCredential() || isClaudeCliAvailable();
+  const resolved = resolvePlanningCredentialWithSource();
+  const anthropicSatisfied = !!resolved || isClaudeCliAvailable();
   if (!anthropicSatisfied) missing.push("ANTHROPIC_API_KEY");
   if (!hasKey("GITHUB_TOKEN", config)) missing.push("GITHUB_TOKEN");
-  const cliDetected = !resolvePlanningCredential() && isClaudeCliAvailable();
+  const cliDetected = resolved?.source === "cli" || (!resolved && isClaudeCliAvailable());
   return NextResponse.json({
     needsSetup: missing.length > 0,
     missingKeys: missing,

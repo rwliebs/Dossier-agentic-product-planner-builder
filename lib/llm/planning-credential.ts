@@ -1,80 +1,93 @@
 /**
- * Resolves the Anthropic credential to use for planning (chat/stream).
- * Used by claude-client to support both API key and OAuth/Max (Issue #10).
- *
- * For local Max usage: also reads from ~/.claude/settings.json (Claude Code user scope)
- * when env.env.ANTHROPIC_AUTH_TOKEN is set there. See code.claude.com/docs/en/settings
- * and code.claude.com/docs/en/env-vars (ANTHROPIC_AUTH_TOKEN).
- *
- * When returning an OAuth token we set process.env.CLAUDE_CODE_OAUTH_TOKEN so
- * @anthropic-ai/claude-agent-sdk sees it (per issue #10 ref: anthropics/claude-agent-sdk-python#559).
+ * Resolves the Anthropic credential for planning (chat/stream).
+ * Order: (1) API key from env, (2) API key from ~/.dossier/config,
+ * (3) installed Claude CLI config ~/.claude/settings.json (env.ANTHROPIC_API_KEY or env.ANTHROPIC_AUTH_TOKEN).
+ * When the credential is a token (from CLI), we set CLAUDE_CODE_OAUTH_TOKEN for the Agent SDK.
  */
 
 import * as fs from "fs";
 import * as path from "path";
 import { readConfigFile } from "@/lib/config/data-dir";
 
-/** Claude Code user settings path (code.claude.com: "User settings are defined in ~/.claude/settings.json"). Respects CLAUDE_CONFIG_DIR. */
+/** Claude Code user settings path. Respects CLAUDE_CONFIG_DIR. */
 function getClaudeCodeUserSettingsPath(): string {
-  const configDir = process.env.CLAUDE_CONFIG_DIR ?? path.join(process.env.HOME ?? process.env.USERPROFILE ?? ".", ".claude");
+  const configDir =
+    process.env.CLAUDE_CONFIG_DIR ??
+    path.join(process.env.HOME ?? process.env.USERPROFILE ?? ".", ".claude");
   return path.join(configDir, "settings.json");
 }
 
+interface ClaudeSettingsEnv {
+  ANTHROPIC_API_KEY?: string;
+  ANTHROPIC_AUTH_TOKEN?: string;
+}
+
+type ClaudeCredential = { value: string; isToken: boolean };
+
 /**
- * Reads ANTHROPIC_AUTH_TOKEN from Claude Code user settings if present.
- * settings.json may contain {"env": {"ANTHROPIC_AUTH_TOKEN": "sk-ant-oat01-..."}}.
- * Returns null if file missing, invalid JSON, or key not set.
+ * Reads credential from installed Claude CLI user settings (~/.claude/settings.json).
+ * Prefers env.ANTHROPIC_API_KEY; falls back to env.ANTHROPIC_AUTH_TOKEN.
+ * Returns null if file missing, invalid, or neither key set.
  */
-function readTokenFromClaudeCodeSettings(): string | null {
+function readCredentialFromClaudeCliSettings(): ClaudeCredential | null {
   const settingsPath = getClaudeCodeUserSettingsPath();
   if (!fs.existsSync(settingsPath)) return null;
   try {
     const raw = fs.readFileSync(settingsPath, "utf-8");
-    const parsed = JSON.parse(raw) as { env?: Record<string, string> };
-    const token = parsed?.env?.ANTHROPIC_AUTH_TOKEN?.trim();
-    return token || null;
+    const parsed = JSON.parse(raw) as { env?: ClaudeSettingsEnv };
+    const env = parsed?.env;
+    if (!env) return null;
+    const apiKey = env.ANTHROPIC_API_KEY?.trim();
+    if (apiKey) return { value: apiKey, isToken: false };
+    const token = env.ANTHROPIC_AUTH_TOKEN?.trim();
+    if (token) return { value: token, isToken: true };
+    return null;
   } catch {
     return null;
   }
 }
 
+export type CredentialSource = "env" | "config" | "cli";
+
+export interface ResolvedCredential {
+  value: string;
+  source: CredentialSource;
+}
+
 /**
- * Returns the credential for planning LLM: API key or OAuth token.
- * Prefers ANTHROPIC_API_KEY when set; otherwise ANTHROPIC_AUTH_TOKEN (OAuth/Max).
- * Checks: process.env → ~/.dossier/config → ~/.claude/settings.json (Claude Code local Max).
- * When the token is used for the Agent SDK we also set CLAUDE_CODE_OAUTH_TOKEN (SDK expects this name).
- * Returns null when neither is set.
+ * Returns the credential for planning with its source.
+ * Order: env → ~/.dossier/config → ~/.claude/settings.json.
+ * When returning a token we set CLAUDE_CODE_OAUTH_TOKEN for the Agent SDK.
  */
-export function resolvePlanningCredential(): string | null {
-  const fromEnvKey = process.env.ANTHROPIC_API_KEY?.trim();
-  if (fromEnvKey) return fromEnvKey;
+export function resolvePlanningCredentialWithSource(): ResolvedCredential | null {
+  const fromEnv = process.env.ANTHROPIC_API_KEY?.trim();
+  if (fromEnv) return { value: fromEnv, source: "env" };
 
   const config = readConfigFile();
-  const fromConfigKey = config.ANTHROPIC_API_KEY?.trim();
-  if (fromConfigKey) {
-    process.env.ANTHROPIC_API_KEY = fromConfigKey;
-    return fromConfigKey;
+  const fromConfig = config.ANTHROPIC_API_KEY?.trim();
+  if (fromConfig) {
+    process.env.ANTHROPIC_API_KEY = fromConfig;
+    return { value: fromConfig, source: "config" };
   }
 
-  const fromEnvToken = process.env.ANTHROPIC_AUTH_TOKEN?.trim();
-  if (fromEnvToken) {
-    process.env.CLAUDE_CODE_OAUTH_TOKEN = fromEnvToken;
-    return fromEnvToken;
-  }
-
-  const fromConfigToken = config.ANTHROPIC_AUTH_TOKEN?.trim();
-  if (fromConfigToken) {
-    process.env.ANTHROPIC_AUTH_TOKEN = fromConfigToken;
-    process.env.CLAUDE_CODE_OAUTH_TOKEN = fromConfigToken;
-    return fromConfigToken;
-  }
-
-  const fromClaudeCodeSettings = readTokenFromClaudeCodeSettings();
-  if (fromClaudeCodeSettings) {
-    process.env.ANTHROPIC_AUTH_TOKEN = fromClaudeCodeSettings;
-    process.env.CLAUDE_CODE_OAUTH_TOKEN = fromClaudeCodeSettings;
-    return fromClaudeCodeSettings;
+  const fromClaudeCli = readCredentialFromClaudeCliSettings();
+  if (fromClaudeCli) {
+    if (fromClaudeCli.isToken) {
+      process.env.ANTHROPIC_AUTH_TOKEN = fromClaudeCli.value;
+      process.env.CLAUDE_CODE_OAUTH_TOKEN = fromClaudeCli.value;
+      return { value: fromClaudeCli.value, source: "cli" };
+    }
+    process.env.ANTHROPIC_API_KEY = fromClaudeCli.value;
+    return { value: fromClaudeCli.value, source: "cli" };
   }
 
   return null;
+}
+
+/**
+ * Returns the credential value for planning, or null.
+ * Convenience wrapper around resolvePlanningCredentialWithSource().
+ */
+export function resolvePlanningCredential(): string | null {
+  return resolvePlanningCredentialWithSource()?.value ?? null;
 }

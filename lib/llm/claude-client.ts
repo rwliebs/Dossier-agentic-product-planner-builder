@@ -24,16 +24,27 @@ const CLI_DEFAULT_MODEL = "claude-sonnet-4-6";
 /** Verify the claude binary exists and is authenticated (e.g. Max subscription). */
 const CLI_VERSION_CHECK_TIMEOUT_MS = 3_000;
 
+/** Process-lifetime cache to avoid blocking execSync on every middleware/setup request. */
+let cliAvailableCache: boolean | null = null;
+
 export function isClaudeCliAvailable(): boolean {
+  if (cliAvailableCache !== null) return cliAvailableCache;
   try {
     execSync("claude --version", {
       stdio: "pipe",
       timeout: CLI_VERSION_CHECK_TIMEOUT_MS,
     });
+    cliAvailableCache = true;
     return true;
   } catch {
+    cliAvailableCache = false;
     return false;
   }
+}
+
+/** Clear CLI availability cache (for tests). */
+export function clearCliAvailabilityCache(): void {
+  cliAvailableCache = null;
 }
 
 /**
@@ -332,6 +343,7 @@ export async function claudePlanningRequest(
       model,
       signal: controller.signal,
       ...(options?.cwd && { cwd: options.cwd }),
+      apiKey: credential,
     });
     clearTimeout(timeoutId);
     return planningResponseFromSdkText(text, { model });
@@ -402,6 +414,7 @@ export async function claudeStreamingRequest(
           model,
           signal: controller.signal,
           ...(options?.cwd && { cwd: options.cwd }),
+          apiKey: credential,
         })) {
           resetIdleTimer();
           streamController.enqueue(chunk);

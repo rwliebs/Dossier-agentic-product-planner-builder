@@ -126,7 +126,7 @@ describe("claude-client CLI auth", () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  it("does not spawn when API key is present (options.apiKey)", async () => {
+  it("does not spawn when API key is present (options.apiKey) and passes apiKey to runPlanningQuery", async () => {
     const { claudePlanningRequest } = await import("@/lib/llm/claude-client");
     vi.mocked(resolvePlanningCredential).mockReturnValue(null);
     vi.mocked(runPlanningQuery).mockRejectedValue(new Error("mock SDK failure"));
@@ -139,6 +139,9 @@ describe("claude-client CLI auth", () => {
     ).rejects.toThrow();
 
     expect(mockSpawn).not.toHaveBeenCalled();
+    expect(runPlanningQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ apiKey: "sk-ant-override" }),
+    );
   });
 
   it("throws informative error when neither API key nor CLI is available", async () => {

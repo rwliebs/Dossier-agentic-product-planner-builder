@@ -16,6 +16,11 @@ function getPlanningTools(cwd?: string): string[] {
   return cwd ? [...REPO_TOOLS, ...WEB_TOOLS] : [...WEB_TOOLS];
 }
 
+/** Distinguishes API keys (sk-ant-api*) from OAuth tokens (sk-ant-oat*). */
+function isApiKey(credential: string): boolean {
+  return credential.startsWith("sk-ant-") && !credential.startsWith("sk-ant-oat");
+}
+
 export interface PlanningSdkOptions {
   systemPrompt: string;
   userMessage: string;
@@ -23,12 +28,32 @@ export interface PlanningSdkOptions {
   signal?: AbortSignal;
   /** When set, Read/Glob/Grep run in this directory (e.g. cloned repo path). */
   cwd?: string;
+  /**
+   * Explicit API key or OAuth token. When set, passed via options.env so the SDK
+   * uses it instead of process.env. Required when caller passes apiKey override.
+   */
+  apiKey?: string;
+}
+
+/**
+ * Build env override so the SDK uses the given credential instead of process.env.
+ * API keys use ANTHROPIC_API_KEY; OAuth tokens use CLAUDE_CODE_OAUTH_TOKEN + ANTHROPIC_AUTH_TOKEN.
+ */
+function buildEnvWithCredential(credential: string): Record<string, string | undefined> {
+  const base = { ...process.env } as Record<string, string | undefined>;
+  if (isApiKey(credential)) {
+    base.ANTHROPIC_API_KEY = credential;
+  } else {
+    base.CLAUDE_CODE_OAUTH_TOKEN = credential;
+    base.ANTHROPIC_AUTH_TOKEN = credential;
+  }
+  return base;
 }
 
 /**
  * Runs a planning session via Agent SDK and returns accumulated assistant text.
  * Planner can use Read/Glob/Grep when repo is connected; WebSearch always available.
- * Caller must ensure process.env has ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN set.
+ * When apiKey is provided, it is passed via options.env; otherwise the SDK uses process.env.
  */
 export async function runPlanningQuery(options: PlanningSdkOptions): Promise<string> {
   const model = options.model ?? process.env.PLANNING_LLM_MODEL ?? DEFAULT_MODEL;
@@ -43,6 +68,7 @@ export async function runPlanningQuery(options: PlanningSdkOptions): Promise<str
       allowedTools: tools,
       persistSession: false,
       ...(options.cwd && { cwd: options.cwd }),
+      ...(options.apiKey && { env: buildEnvWithCredential(options.apiKey) }),
     },
   });
 
@@ -78,6 +104,7 @@ export async function* streamPlanningQuery(options: PlanningSdkOptions): AsyncGe
       allowedTools: tools,
       persistSession: false,
       ...(options.cwd && { cwd: options.cwd }),
+      ...(options.apiKey && { env: buildEnvWithCredential(options.apiKey) }),
     },
   });
 

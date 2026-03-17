@@ -8,29 +8,30 @@ import { KeyRound, Github, Loader2, CheckCircle2 } from 'lucide-react';
 export default function SetupPage() {
   const router = useRouter();
   const [anthropicApiKey, setAnthropicApiKey] = useState('');
-  const [anthropicAuthToken, setAnthropicAuthToken] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [missingKeys, setMissingKeys] = useState<string[]>([]);
   const [configPath, setConfigPath] = useState('~/.dossier/config');
+  const [anthropicViaCli, setAnthropicViaCli] = useState(false);
 
   useEffect(() => {
     fetch('/api/setup/status')
       .then((r) => r.json())
-      .then((data: { needsSetup: boolean; missingKeys: string[]; configPath?: string }) => {
+      .then((data: { needsSetup: boolean; missingKeys: string[]; configPath?: string; anthropicViaCli?: boolean }) => {
         if (!data.needsSetup) {
           router.replace('/');
           return;
         }
         setMissingKeys(data.missingKeys ?? []);
         if (data.configPath) setConfigPath(data.configPath);
+        setAnthropicViaCli(!!data.anthropicViaCli);
       })
       .catch(() => setMissingKeys(['ANTHROPIC_API_KEY', 'GITHUB_TOKEN']));
   }, [router]);
 
-  const needsAnthropic = missingKeys.includes('ANTHROPIC_API_KEY') || missingKeys.length === 0;
+  const needsAnthropic = (missingKeys.includes('ANTHROPIC_API_KEY') || missingKeys.length === 0) && !anthropicViaCli;
   const needsGithub = missingKeys.includes('GITHUB_TOKEN') || missingKeys.length === 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,7 +44,6 @@ export default function SetupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           anthropicApiKey: anthropicApiKey.trim() || undefined,
-          anthropicAuthToken: anthropicAuthToken.trim() || undefined,
           githubToken: githubToken.trim() || undefined,
         }),
       });
@@ -74,6 +74,12 @@ export default function SetupPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {anthropicViaCli && (
+            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600 dark:text-green-500" />
+              <span>Claude Code CLI detected — Max subscription will be used for planning.</span>
+            </div>
+          )}
           {needsAnthropic && (
             <>
               <div className="space-y-2">
@@ -95,24 +101,7 @@ export default function SetupPage() {
                   <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="underline">
                     console.anthropic.com
                   </a>
-                </p>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="anthropic-oauth" className="text-sm font-medium flex items-center gap-2">
-                  <KeyRound className="h-4 w-4" />
-                  Anthropic OAuth Token (Max subscription)
-                </label>
-                <input
-                  id="anthropic-oauth"
-                  type="password"
-                  placeholder="Run: claude setup-token"
-                  value={anthropicAuthToken}
-                  onChange={(e) => setAnthropicAuthToken(e.target.value)}
-                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  autoComplete="off"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Use API key or OAuth token for planning and build. If you use Claude Code (Max) locally, Dossier can use the same token from env or <code className="text-xs bg-muted px-0.5 rounded">~/.claude/settings.json</code>—no need to paste here.
+                  . If you use Claude Code, we’ll use your installed CLI config when no key is set.
                 </p>
               </div>
             </>
@@ -156,7 +145,7 @@ export default function SetupPage() {
 
           <Button
             type="submit"
-            disabled={loading || success || (!anthropicApiKey.trim() && !anthropicAuthToken.trim() && !githubToken.trim())}
+            disabled={loading || success || (!anthropicApiKey.trim() && !githubToken.trim())}
             className="w-full"
           >
             {loading ? (

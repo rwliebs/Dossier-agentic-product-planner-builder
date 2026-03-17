@@ -23,6 +23,7 @@ interface SetupStatus {
   needsSetup: boolean;
   missingKeys: string[];
   configPath?: string;
+  anthropicViaCli?: boolean;
 }
 
 export function ApiKeysDialog({ open, onOpenChange }: ApiKeysDialogProps) {
@@ -34,6 +35,7 @@ export function ApiKeysDialog({ open, onOpenChange }: ApiKeysDialogProps) {
   const [statusLoading, setStatusLoading] = useState(true);
   const [missingKeys, setMissingKeys] = useState<string[]>([]);
   const [configPath, setConfigPath] = useState('~/.dossier/config');
+  const [anthropicViaCli, setAnthropicViaCli] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -47,6 +49,7 @@ export function ApiKeysDialog({ open, onOpenChange }: ApiKeysDialogProps) {
       .then((data: SetupStatus) => {
         setMissingKeys(data.missingKeys ?? []);
         if (data.configPath) setConfigPath(data.configPath);
+        setAnthropicViaCli(!!data.anthropicViaCli);
       })
       .catch(() => setMissingKeys(['ANTHROPIC_API_KEY', 'GITHUB_TOKEN']))
       .finally(() => setStatusLoading(false));
@@ -114,7 +117,7 @@ export function ApiKeysDialog({ open, onOpenChange }: ApiKeysDialogProps) {
                 Anthropic API Key
                 {hasAnthropic && (
                   <span className="text-xs font-normal text-muted-foreground">
-                    (configured)
+                    {anthropicViaCli ? '(via Claude CLI)' : '(configured)'}
                   </span>
                 )}
               </Label>

@@ -1,6 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { execSync, spawn } from "child_process";
-import { readConfigFile } from "@/lib/config/data-dir";
 import type { PlanningState } from "@/lib/schemas/planning-state";
 import type { ContextArtifact } from "@/lib/schemas/slice-b";
 import {
@@ -15,9 +14,9 @@ import { runPlanningQuery, streamPlanningQuery } from "./planning-sdk-runner";
 
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 
-/** API keys start with sk-ant-; otherwise treat as token (use Agent SDK). */
-function isLikelyApiKey(credential: string): boolean {
-  return credential.startsWith("sk-ant-");
+/** API keys start with sk-ant- but OAuth tokens use sk-ant-oat prefix; route tokens to Agent SDK. */
+export function isLikelyApiKey(credential: string): boolean {
+  return credential.startsWith("sk-ant-") && !credential.startsWith("sk-ant-oat");
 }
 const DEFAULT_MAX_TOKENS = 16384;
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -45,9 +44,6 @@ export function isClaudeCliAvailable(): boolean {
  */
 function resolveAuthMethod(apiKeyOverride?: string): "api-key" | "cli" {
   if (apiKeyOverride?.trim()) return "api-key";
-  if (process.env.ANTHROPIC_API_KEY?.trim()) return "api-key";
-  const config = readConfigFile();
-  if (config.ANTHROPIC_API_KEY?.trim()) return "api-key";
   if (resolvePlanningCredential()) return "api-key";
   if (isClaudeCliAvailable()) return "cli";
   throw new Error(
@@ -139,16 +135,33 @@ async function claudeStreamingRequestViaCli(
 
     const stream = new ReadableStream<string>({
       start(controller) {
+        let done = false;
+
+        const finish = (error?: Error) => {
+          if (done) return;
+          done = true;
+          if (error) {
+            controller.error(error);
+          } else {
+            controller.close();
+          }
+        };
+
+        const safeEnqueue = (text: string) => {
+          if (done) return;
+          controller.enqueue(text);
+        };
+
         const timer = setTimeout(() => {
           proc.kill();
           if (!hadChunk && fullStdout.trim()) {
             hadChunk = true;
-            controller.enqueue(fullStdout.trim());
+            safeEnqueue(fullStdout.trim());
           }
           if (!hadChunk) {
-            controller.error(new Error(`CLI stream timed out after ${timeoutMs}ms`));
+            finish(new Error(`CLI stream timed out after ${timeoutMs}ms`));
           } else {
-            controller.close();
+            finish();
           }
         }, timeoutMs);
 
@@ -166,7 +179,7 @@ async function claudeStreamingRequestViaCli(
               const text = parsed.text ?? parsed.delta ?? (typeof parsed === "string" ? parsed : "");
               if (text) {
                 hadChunk = true;
-                controller.enqueue(text);
+                safeEnqueue(text);
               }
             } catch {
               // Not JSON or unknown shape; skip
@@ -182,7 +195,7 @@ async function claudeStreamingRequestViaCli(
               const text = parsed.text ?? parsed.delta ?? lineBuffer.trim();
               if (text) {
                 hadChunk = true;
-                controller.enqueue(text);
+                safeEnqueue(text);
               }
             } catch {
               // fall through to full buffer fallback
@@ -190,12 +203,12 @@ async function claudeStreamingRequestViaCli(
           }
           if (!hadChunk && fullStdout.trim()) {
             hadChunk = true;
-            controller.enqueue(fullStdout.trim());
+            safeEnqueue(fullStdout.trim());
           }
           if (code !== 0 && !hadChunk) {
-            controller.error(new Error(`claude CLI exited with code ${code}`));
+            finish(new Error(`claude CLI exited with code ${code}`));
           } else {
-            controller.close();
+            finish();
           }
         });
 

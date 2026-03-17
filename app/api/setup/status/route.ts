@@ -16,10 +16,11 @@ export async function GET() {
   const config = readConfigFile();
   const missing: string[] = [];
   const resolved = resolvePlanningCredentialWithSource();
-  const anthropicSatisfied = !!resolved || isClaudeCliAvailable();
+  const cliAvailable = !resolved && isClaudeCliAvailable();
+  const anthropicSatisfied = !!resolved || cliAvailable;
   if (!anthropicSatisfied) missing.push("ANTHROPIC_API_KEY");
   if (!hasKey("GITHUB_TOKEN", config)) missing.push("GITHUB_TOKEN");
-  const cliDetected = resolved?.source === "cli" || (!resolved && isClaudeCliAvailable());
+  const cliDetected = resolved?.source === "cli" || cliAvailable;
   return NextResponse.json({
     needsSetup: missing.length > 0,
     missingKeys: missing,

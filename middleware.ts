@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { readConfigFile } from "@/lib/config/data-dir";
 import { resolvePlanningCredential } from "@/lib/llm/planning-credential";
+import { isClaudeCliAvailable } from "@/lib/llm/claude-client";
 
 export const config = {
   runtime: "nodejs",
@@ -10,7 +11,8 @@ export const config = {
 const SETUP_PATH = "/setup";
 
 function needsSetup(): boolean {
-  const hasAnthropic = Boolean(resolvePlanningCredential());
+  const credential = resolvePlanningCredential();
+  const hasAnthropic = Boolean(credential) || (!credential && isClaudeCliAvailable());
   const cfg = readConfigFile();
   const hasGithub = !!(process.env.GITHUB_TOKEN?.trim() || cfg.GITHUB_TOKEN?.trim());
   return !hasAnthropic || !hasGithub;

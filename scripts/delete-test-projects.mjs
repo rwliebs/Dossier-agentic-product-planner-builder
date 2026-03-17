@@ -39,13 +39,15 @@ if (!existsSync(dbPath)) {
 const db = new Database(dbPath);
 db.pragma("foreign_keys = ON");
 
-// Projects whose name contains "test" or "e2e" (case-insensitive)
+// Projects whose name contains "test" or "e2e" and at least one digit (numbered test projects)
 const select = db.prepare(
-  "SELECT id, name FROM project WHERE LOWER(name) LIKE '%test%' OR LOWER(name) LIKE '%e2e%'"
+  `SELECT id, name FROM project
+   WHERE (LOWER(name) LIKE '%test%' OR LOWER(name) LIKE '%e2e%')
+   AND (name GLOB '*0*' OR name GLOB '*1*' OR name GLOB '*2*' OR name GLOB '*3*' OR name GLOB '*4*' OR name GLOB '*5*' OR name GLOB '*6*' OR name GLOB '*7*' OR name GLOB '*8*' OR name GLOB '*9*')`
 );
 const toDelete = select.all();
 if (toDelete.length === 0) {
-  console.log("No projects with 'test' or 'e2e' in the title.");
+  console.log("No numbered test projects found (name contains test/e2e and a digit).");
   db.close();
   process.exit(0);
 }

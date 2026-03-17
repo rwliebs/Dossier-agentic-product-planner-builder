@@ -1,11 +1,7 @@
 /**
- * Runs planning via Claude Agent SDK query() for OAuth/Max credential path (Issue #10).
- * Used when only ANTHROPIC_AUTH_TOKEN is set; Messages API does not accept OAuth.
- * See: https://github.com/anthropics/claude-agent-sdk-python/issues/559 (Max plan billing).
- *
- * Read-only tools: We give the planner Read, Glob, and Grep so it can inspect the
- * repo (files, structure, usages) before proposing workflows/cards/planned files.
- * Same contract out: we accumulate all assistant text and parse the final JSON plan.
+ * Runs planning via Claude Agent SDK query() with read-only tools (Read, Glob, Grep).
+ * Currently unused: planning uses Messages API with ANTHROPIC_API_KEY only (OAuth token
+ * is no longer provided). Kept for possible future use (e.g. SDK path with API key).
  */
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
@@ -27,8 +23,7 @@ export interface PlanningSdkOptions {
 /**
  * Runs a planning session via Agent SDK and returns accumulated assistant text.
  * Planner can use Read/Glob/Grep to inspect the repo; we parse the final JSON from text.
- * Caller must ensure process.env has ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN set
- * (SDK reads CLAUDE_CODE_OAUTH_TOKEN when using OAuth).
+ * Caller must ensure process.env has ANTHROPIC_API_KEY set (SDK uses it).
  */
 export async function runPlanningQuery(options: PlanningSdkOptions): Promise<string> {
   const model = options.model ?? process.env.PLANNING_LLM_MODEL ?? DEFAULT_MODEL;

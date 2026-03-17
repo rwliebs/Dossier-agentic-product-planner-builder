@@ -134,13 +134,13 @@ Detail: [memory-reference.md](domains/memory-reference.md)
 
 ## LLM Connection Models
 
-Two distinct connection patterns exist. Planning supports both API key (Messages API) and OAuth/Max (Agent SDK) — see Issue #10.
+Two distinct connection patterns exist.
 
 | Concern | Planning LLM | Build Agent |
 |---------|-------------|-------------|
-| Auth | `ANTHROPIC_API_KEY` (Messages API) or `ANTHROPIC_AUTH_TOKEN` (OAuth/Max via Agent SDK) | Same: API key or OAuth token |
-| SDK | `@anthropic-ai/sdk` (API key) or `@anthropic-ai/claude-agent-sdk` (OAuth path) | `@anthropic-ai/claude-agent-sdk` |
-| Call style | `messages.create` / `messages.stream` or `query()` when OAuth | `query()` — async iterator |
+| Auth | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY` |
+| SDK | `@anthropic-ai/sdk` (Messages API) | `@anthropic-ai/claude-agent-sdk` |
+| Call style | `messages.create` / `messages.stream` | `query()` — async iterator |
 | Streaming | Optional (non-streaming for simple calls, streaming for chat) | Always streaming (`for await` over messages) |
 | Tools | None (text output only) | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
 | CWD | N/A | `worktree_path` (repo clone) |

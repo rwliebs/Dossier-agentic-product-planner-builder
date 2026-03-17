@@ -10,10 +10,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const anthropicApiKey = typeof body.anthropicApiKey === "string" ? body.anthropicApiKey.trim() : "";
-    const anthropicAuthToken = typeof body.anthropicAuthToken === "string" ? body.anthropicAuthToken.trim() : "";
     const githubToken = typeof body.githubToken === "string" ? body.githubToken.trim() : "";
 
-    if (!anthropicApiKey && !anthropicAuthToken && !githubToken) {
+    if (!anthropicApiKey && !githubToken) {
       return NextResponse.json(
         { success: false, error: "At least one key is required" },
         { status: 400 }
@@ -22,7 +21,6 @@ export async function POST(request: NextRequest) {
 
     const updates: Record<string, string> = {};
     if (anthropicApiKey) updates.ANTHROPIC_API_KEY = anthropicApiKey;
-    if (anthropicAuthToken) updates.ANTHROPIC_AUTH_TOKEN = anthropicAuthToken;
     if (githubToken) updates.GITHUB_TOKEN = githubToken;
 
     writeConfigFile(updates);

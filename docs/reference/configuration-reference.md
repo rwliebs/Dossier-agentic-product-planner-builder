@@ -23,18 +23,17 @@ ttl_expires_on: null
 
 - INVARIANT: Config precedence: `process.env` > `.env.local` > `~/.dossier/config`
 - INVARIANT: Self-deploy uses `~/.dossier/config`; dev uses `.env.local`
-- Anthropic credential resolution (planning/build): env and `~/.dossier/config` first; then, if no API key or token is set, we read **`~/.claude/settings.json`** (Claude Code user settings). If that file has `env.ANTHROPIC_AUTH_TOKEN`, we use it so local Max users don't need to paste a token. Respects `CLAUDE_CONFIG_DIR` for the config directory.
+- Anthropic credential: we accept **API key** first (env, then `~/.dossier/config`). If none is set, we use your **installed Claude CLI** config: `~/.claude/settings.json` (or `CLAUDE_CONFIG_DIR`/settings.json). We read `env.ANTHROPIC_API_KEY` or `env.ANTHROPIC_AUTH_TOKEN` from that file so you don’t need to paste a key if Claude Code is already configured.
 
 ---
 
 ## Required
 
-At least one Anthropic credential and a GitHub token:
+Anthropic credential (API key or Claude CLI config) and GitHub token:
 
 | Variable | Purpose |
 |----------|---------|
-| ANTHROPIC_API_KEY | Planning LLM and build agents (API key from [console.anthropic.com](https://console.anthropic.com/)) |
-| ANTHROPIC_AUTH_TOKEN | Alternative: OAuth token for Claude Max (e.g. `claude setup-token`). Stored in config; at runtime we set `CLAUDE_CODE_OAUTH_TOKEN` so the Agent SDK sees it. Planning and build use the SDK when only this is set. |
+| ANTHROPIC_API_KEY | Planning LLM and build (set in env or `~/.dossier/config`; or we use your Claude CLI `~/.claude/settings.json` when no key is set) |
 | GITHUB_TOKEN | Push branches, create PRs; [github.com/settings/tokens](https://github.com/settings/tokens) `repo` scope |
 
 ---

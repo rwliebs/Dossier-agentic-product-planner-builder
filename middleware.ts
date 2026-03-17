@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { readConfigFile } from "@/lib/config/data-dir";
+import { resolvePlanningCredential } from "@/lib/llm/planning-credential";
 
 export const config = {
   runtime: "nodejs",
@@ -9,16 +10,8 @@ export const config = {
 const SETUP_PATH = "/setup";
 
 function needsSetup(): boolean {
-  if (process.env.ANTHROPIC_API_KEY?.trim() && process.env.GITHUB_TOKEN?.trim()) {
-    return false;
-  }
+  const hasAnthropic = Boolean(resolvePlanningCredential());
   const cfg = readConfigFile();
-  const hasAnthropic = !!(
-    process.env.ANTHROPIC_API_KEY?.trim() ||
-    cfg.ANTHROPIC_API_KEY?.trim() ||
-    process.env.ANTHROPIC_AUTH_TOKEN?.trim() ||
-    cfg.ANTHROPIC_AUTH_TOKEN?.trim()
-  );
   const hasGithub = !!(process.env.GITHUB_TOKEN?.trim() || cfg.GITHUB_TOKEN?.trim());
   return !hasAnthropic || !hasGithub;
 }

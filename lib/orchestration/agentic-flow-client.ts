@@ -232,7 +232,7 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
         return {
           success: false,
           error:
-            "Anthropic credential not set (set ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN in env or ~/.dossier/config)",
+            "Anthropic credential not set (set ANTHROPIC_API_KEY in env or ~/.dossier/config)",
         };
       }
 
@@ -460,9 +460,7 @@ function isAgenticFlowInstalled(): { hasPackage: boolean; hasSdk: boolean } {
 }
 
 /**
- * Resolves Anthropic credential from process.env or ~/.dossier/config.
- * Prefers ANTHROPIC_API_KEY; falls back to ANTHROPIC_AUTH_TOKEN (OAuth/Max) for Agent SDK (Issue #10).
- * When using the token we set CLAUDE_CODE_OAUTH_TOKEN so the SDK sees it (ref: anthropics/claude-agent-sdk-python#559).
+ * Resolves Anthropic API key from process.env or ~/.dossier/config.
  */
 function resolveAnthropicKey(): string | null {
   const fromEnv = process.env.ANTHROPIC_API_KEY?.trim();
@@ -473,19 +471,6 @@ function resolveAnthropicKey(): string | null {
   if (fromConfig) {
     process.env.ANTHROPIC_API_KEY = fromConfig;
     return fromConfig;
-  }
-
-  const fromEnvToken = process.env.ANTHROPIC_AUTH_TOKEN?.trim();
-  if (fromEnvToken) {
-    process.env.CLAUDE_CODE_OAUTH_TOKEN = fromEnvToken;
-    return fromEnvToken;
-  }
-
-  const fromConfigToken = config.ANTHROPIC_AUTH_TOKEN?.trim();
-  if (fromConfigToken) {
-    process.env.ANTHROPIC_AUTH_TOKEN = fromConfigToken;
-    process.env.CLAUDE_CODE_OAUTH_TOKEN = fromConfigToken;
-    return fromConfigToken;
   }
 
   return null;
@@ -504,7 +489,7 @@ export function createAgenticFlowClient(): AgenticFlowClient {
   const reasons: string[] = [];
   if (!hasKey)
     reasons.push(
-      "Anthropic credential not set (set ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN in env or ~/.dossier/config)"
+      "Anthropic credential not set (set ANTHROPIC_API_KEY in env or ~/.dossier/config)"
     );
   if (!hasPackage)
     reasons.push(

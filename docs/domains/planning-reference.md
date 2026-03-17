@@ -71,9 +71,8 @@ User clicks "Finalize" on card → POST /cards/[cardId]/finalize
 | `lib/llm/planning-prompt.ts` | System prompts; mode selection |
 | `lib/llm/stream-action-parser.ts` | Parse streaming JSON → actions |
 | `lib/llm/build-preview-response.ts` | Preview response before apply |
-| `lib/llm/claude-client.ts` | Planning LLM client (Messages API or Agent SDK when OAuth) |
-| `lib/llm/planning-credential.ts` | Resolves ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN |
-| `lib/llm/planning-sdk-runner.ts` | Agent SDK query() path for planning (OAuth/Max) |
+| `lib/llm/claude-client.ts` | Planning LLM client (Messages API) |
+| `lib/llm/planning-credential.ts` | Resolves ANTHROPIC_API_KEY from env or ~/.dossier/config |
 | `app/api/projects/[id]/chat/route.ts` | Non-streaming chat |
 | `app/api/projects/[id]/chat/stream/route.ts` | Streaming chat (scaffold, populate, finalize) |
 | `app/api/projects/[id]/cards/[cardId]/finalize/route.ts` | Per-card finalize endpoint |

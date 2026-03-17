@@ -36,15 +36,12 @@ const basePayload: DispatchPayload = {
 describe("createAgenticFlowClient factory (O10)", () => {
   it("throws when Anthropic credential is missing from both env and config", () => {
     const origKey = process.env.ANTHROPIC_API_KEY;
-    const origToken = process.env.ANTHROPIC_AUTH_TOKEN;
     delete process.env.ANTHROPIC_API_KEY;
-    delete process.env.ANTHROPIC_AUTH_TOKEN;
     try {
       expect(() => createAgenticFlowClient()).toThrow("agentic-flow not available");
       expect(() => createAgenticFlowClient()).toThrow(/ANTHROPIC_API_KEY|credential/);
     } finally {
       if (origKey !== undefined) process.env.ANTHROPIC_API_KEY = origKey;
-      if (origToken !== undefined) process.env.ANTHROPIC_AUTH_TOKEN = origToken;
     }
   });
 });

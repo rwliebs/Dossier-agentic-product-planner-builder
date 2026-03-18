@@ -70,6 +70,26 @@ export function stagePath(cwd: string, path: string): GitOpsResult {
 }
 
 /**
+ * Returns the HEAD commit SHA of the given branch (or HEAD if no branch given).
+ */
+export function getHeadSha(cwd: string, ref = "HEAD"): { success: boolean; sha?: string; error?: string } {
+  const r = runGit(cwd, ["rev-parse", ref]);
+  if (!r.success) return { success: false, error: r.error };
+  return { success: true, sha: r.stdout || undefined };
+}
+
+/**
+ * Returns the number of commits branch is ahead of base.
+ * Useful for detecting agent self-commits when working tree is clean.
+ */
+export function commitsAheadOf(cwd: string, base: string, branch = "HEAD"): { success: boolean; count: number; error?: string } {
+  const r = runGit(cwd, ["rev-list", "--count", `${base}..${branch}`]);
+  if (!r.success) return { success: false, count: 0, error: r.error };
+  const count = parseInt(r.stdout, 10);
+  return { success: true, count: isNaN(count) ? 0 : count };
+}
+
+/**
  * Commits staged changes. Returns the new commit SHA.
  */
 export function commit(

@@ -335,21 +335,30 @@ export async function claudePlanningRequest(
         );
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const timerRef = { id: undefined as ReturnType<typeof setTimeout> | undefined };
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timerRef.id = setTimeout(() => {
+      controller.abort();
+      reject(new DOMException("Aborted", "AbortError"));
+    }, timeoutMs);
+  });
   try {
-    const text = await runPlanningQuery({
-      systemPrompt,
-      userMessage,
-      model,
-      signal: controller.signal,
-      ...(options?.cwd && { cwd: options.cwd }),
-      apiKey: credential,
-    });
-    clearTimeout(timeoutId);
+    const text = await Promise.race([
+      runPlanningQuery({
+        systemPrompt,
+        userMessage,
+        model,
+        signal: controller.signal,
+        ...(options?.cwd && { cwd: options.cwd }),
+        apiKey: credential,
+      }),
+      timeoutPromise,
+    ]);
+    clearTimeout(timerRef.id);
     return planningResponseFromSdkText(text, { model });
   } catch (error) {
-    clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === "AbortError") {
+    clearTimeout(timerRef.id);
+    if (error && typeof error === "object" && (error as { name?: string }).name === "AbortError") {
       throw new Error(`Planning LLM request timed out after ${timeoutMs}ms. Try again.`);
     }
     if (error && typeof error === "object" && "status" in error && (error as { status: number }).status === 429) {
@@ -400,31 +409,35 @@ export async function claudeStreamingRequest(
 
   const controller = new AbortController();
   let idleTimer: ReturnType<typeof setTimeout>;
-  const resetIdleTimer = () => {
-    clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => controller.abort(), timeoutMs);
-  };
-  resetIdleTimer();
   return new ReadableStream<string>({
     async start(streamController) {
+      const iter = streamPlanningQuery({
+        systemPrompt: input.systemPrompt,
+        userMessage: input.userMessage,
+        model,
+        signal: controller.signal,
+        ...(options?.cwd && { cwd: options.cwd }),
+        apiKey: credential,
+      });
       try {
-        for await (const chunk of streamPlanningQuery({
-          systemPrompt: input.systemPrompt,
-          userMessage: input.userMessage,
-          model,
-          signal: controller.signal,
-          ...(options?.cwd && { cwd: options.cwd }),
-          apiKey: credential,
-        })) {
-          resetIdleTimer();
-          streamController.enqueue(chunk);
+        while (true) {
+          clearTimeout(idleTimer);
+          const idlePromise = new Promise<never>((_, reject) => {
+            idleTimer = setTimeout(() => {
+              controller.abort();
+              reject(new DOMException("Aborted", "AbortError"));
+            }, timeoutMs);
+          });
+          const result = (await Promise.race([iter.next(), idlePromise])) as IteratorResult<string>;
+          clearTimeout(idleTimer);
+          if (result.done) break;
+          streamController.enqueue(result.value);
         }
-        clearTimeout(idleTimer);
         streamController.close();
       } catch (err) {
         clearTimeout(idleTimer);
         streamController.error(
-          err instanceof Error && err.name === "AbortError"
+          err && typeof err === "object" && (err as { name?: string }).name === "AbortError"
             ? new Error(`Planning LLM stream idle for ${timeoutMs}ms with no data. Try again.`)
             : err,
         );

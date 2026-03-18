@@ -159,4 +159,38 @@ describe("claude-client CLI auth", () => {
 
     expect(mockSpawn).not.toHaveBeenCalled();
   });
+
+  it("throws user-friendly timeout error when runPlanningQuery throws AbortError", async () => {
+    const { claudePlanningRequest } = await import("@/lib/llm/claude-client");
+    process.env.ANTHROPIC_API_KEY = "sk-ant-api-key";
+    vi.mocked(resolvePlanningCredential).mockReturnValue("sk-ant-api-key");
+    vi.mocked(runPlanningQuery).mockRejectedValue(new DOMException("Aborted", "AbortError"));
+
+    await expect(
+      claudePlanningRequest(
+        { userRequest: "hello", mapSnapshot: minimalMapSnapshot },
+        { timeoutMs: 100 },
+      ),
+    ).rejects.toThrow(/timed out.*Try again/);
+
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("throws user-friendly timeout error when Promise.race timeout wins (stalled stream)", async () => {
+    const { claudePlanningRequest } = await import("@/lib/llm/claude-client");
+    process.env.ANTHROPIC_API_KEY = "sk-ant-api-key";
+    vi.mocked(resolvePlanningCredential).mockReturnValue("sk-ant-api-key");
+    vi.mocked(runPlanningQuery).mockImplementation(
+      () => new Promise(() => {}),
+    );
+
+    await expect(
+      claudePlanningRequest(
+        { userRequest: "hello", mapSnapshot: minimalMapSnapshot },
+        { timeoutMs: 50 },
+      ),
+    ).rejects.toThrow(/timed out.*Try again/);
+
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
 });

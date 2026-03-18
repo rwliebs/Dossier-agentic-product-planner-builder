@@ -289,12 +289,20 @@ export default function DossierPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message, mode: 'populate', workflow_id: workflowId }),
         });
-        const data = (await res.json()) as {
+        let data: {
           status?: string;
           message?: string;
           applied?: number;
           error?: string;
         };
+        try {
+          data = await res.json();
+        } catch {
+          const { toast } = await import('sonner');
+          toast.error(`Populate failed (${res.status}): server returned a non-JSON response.`);
+          setPopulatingWorkflowId(null);
+          return;
+        }
         if (!res.ok) {
           const msg = data.message ?? data.error ?? `Populate failed (${res.status})`;
           const { toast } = await import('sonner');
@@ -450,13 +458,20 @@ export default function DossierPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: 'Finalize project', mode: 'finalize' }),
         });
-        const data = (await res.json()) as {
+        let data: {
           status?: string;
           message?: string;
           artifacts_created?: number;
           failed_docs?: string[];
           error?: string;
         };
+        try {
+          data = await res.json();
+        } catch {
+          const { toast } = await import('sonner');
+          toast.error(`Approve failed (${res.status}): server returned a non-JSON response. Check server logs.`);
+          return;
+        }
         if (!res.ok) {
           const msg = data.message ?? data.error ?? `Approve failed (${res.status})`;
           const failedDocs = data.failed_docs?.length ? ` Failed docs: ${data.failed_docs.join(', ')}.` : '';
@@ -546,10 +561,6 @@ export default function DossierPage() {
           if (contextDocsGenerated > 0) parts.push(`${contextDocsGenerated} context doc(s) generated`);
           toast.success(parts.join(' — '));
         }
-        refetch();
-        refetchArtifacts();
-        refetchCardContextArtifacts();
-        refetchCardPlannedFiles();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Approve failed';
         const { toast } = await import('sonner');
@@ -557,6 +568,10 @@ export default function DossierPage() {
       } finally {
         setFinalizingCardId(null);
         setCardFinalizeProgress('');
+        refetch();
+        refetchArtifacts();
+        refetchCardContextArtifacts();
+        refetchCardPlannedFiles();
       }
     },
     [projectId, refetch, refetchArtifacts, refetchCardContextArtifacts, refetchCardPlannedFiles]
@@ -899,10 +914,13 @@ export default function DossierPage() {
             repo_url: snapshot?.project?.repo_url ?? null,
           }}
           projectId={projectId || undefined}
-          onPlanningApplied={() => {
+          onPlanningApplied={async () => {
             setAgentStatus(hasContent ? 'reviewing' : 'building');
-            refetch();
+            await refetch();
             refetchArtifacts();
+          }}
+          onMapChanged={async () => {
+            await refetch();
           }}
           onPlanningStateChange={setIsPlanning}
           onProjectUpdate={handleProjectUpdate}

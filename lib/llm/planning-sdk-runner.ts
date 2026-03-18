@@ -51,9 +51,24 @@ function buildEnvWithCredential(credential: string): Record<string, string | und
 }
 
 /**
+ * Returns a promise that rejects with AbortError when the signal fires.
+ * If already aborted, rejects immediately.
+ */
+function abortPromise(signal?: AbortSignal): Promise<never> | null {
+  if (!signal) return null;
+  if (signal.aborted) return Promise.reject(new DOMException("Aborted", "AbortError"));
+  return new Promise<never>((_, reject) => {
+    signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+  });
+}
+
+/**
  * Runs a planning session via Agent SDK and returns accumulated assistant text.
  * Planner can use Read/Glob/Grep when repo is connected; WebSearch always available.
  * When apiKey is provided, it is passed via options.env; otherwise the SDK uses process.env.
+ *
+ * Each iterator.next() is raced against the abort signal so that a stalled SDK
+ * stream is interrupted immediately when the caller's timeout fires.
  */
 export async function runPlanningQuery(options: PlanningSdkOptions): Promise<string> {
   const model = options.model ?? process.env.PLANNING_LLM_MODEL ?? DEFAULT_MODEL;
@@ -72,10 +87,15 @@ export async function runPlanningQuery(options: PlanningSdkOptions): Promise<str
     },
   });
 
+  const abort = abortPromise(options.signal);
+  const iter = result[Symbol.asyncIterator]();
   let output = "";
-  for await (const msg of result) {
-    if (options.signal?.aborted) break;
-    const m = msg as { type?: string; message?: { content?: Array<{ type?: string; text?: string }> } };
+
+  while (true) {
+    const next = iter.next();
+    const step = abort ? await Promise.race([next, abort]) : await next;
+    if (step.done) break;
+    const m = step.value as { type?: string; message?: { content?: Array<{ type?: string; text?: string }> } };
     if (m.type === "assistant" && m.message?.content) {
       const chunk =
         m.message.content
@@ -90,6 +110,9 @@ export async function runPlanningQuery(options: PlanningSdkOptions): Promise<str
 /**
  * Returns an async iterable of text chunks from the Agent SDK for planning streaming.
  * Yields text deltas for parseActionsFromStream.
+ *
+ * Each iterator.next() is raced against the abort signal so a stalled SDK
+ * stream is interrupted immediately when the caller's idle timer fires.
  */
 export async function* streamPlanningQuery(options: PlanningSdkOptions): AsyncGenerator<string> {
   const model = options.model ?? process.env.PLANNING_LLM_MODEL ?? DEFAULT_MODEL;
@@ -108,9 +131,14 @@ export async function* streamPlanningQuery(options: PlanningSdkOptions): AsyncGe
     },
   });
 
-  for await (const msg of result) {
-    if (options.signal?.aborted) break;
-    const m = msg as { type?: string; message?: { content?: Array<{ type?: string; text?: string }> } };
+  const abort = abortPromise(options.signal);
+  const iter = result[Symbol.asyncIterator]();
+
+  while (true) {
+    const next = iter.next();
+    const step = abort ? await Promise.race([next, abort]) : await next;
+    if (step.done) break;
+    const m = step.value as { type?: string; message?: { content?: Array<{ type?: string; text?: string }> } };
     if (m.type === "assistant" && m.message?.content) {
       const chunk =
         m.message.content

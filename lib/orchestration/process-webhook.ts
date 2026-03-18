@@ -229,6 +229,7 @@ export async function processWebhook(
       const worktreePath = (assignment as { worktree_path?: string | null }).worktree_path;
       const featureBranch = (assignment as { feature_branch: string }).feature_branch;
       const allowedPaths = (assignment as { allowed_paths: string[] }).allowed_paths ?? [];
+      const baseBranch = (run as { base_branch?: string }).base_branch ?? "main";
 
       let autoCommitOk = true;
       if (worktreePath) {
@@ -237,6 +238,7 @@ export async function processWebhook(
         const autoResult = await performAutoCommit({
           worktreePath,
           featureBranch,
+          baseBranch,
           cardTitle,
           cardId,
           allowedPaths,
@@ -258,6 +260,29 @@ export async function processWebhook(
             payload: {
               assignment_id,
               commit: { sha: autoResult.sha, branch: featureBranch, message: autoResult.message },
+            },
+          });
+        } else if (autoResult.outcome === "agent_committed") {
+          await db.insertAgentCommit({
+            assignment_id,
+            sha: autoResult.sha,
+            branch: featureBranch,
+            message: `Agent committed directly (${autoResult.aheadBy} commit${autoResult.aheadBy !== 1 ? "s" : ""} ahead)`,
+            committed_at: new Date().toISOString(),
+          });
+          await logEvent(db, {
+            project_id: projectId,
+            run_id: runId,
+            event_type: "commit_created",
+            actor: "dossier-auto-commit",
+            payload: {
+              assignment_id,
+              commit: {
+                sha: autoResult.sha,
+                branch: featureBranch,
+                message: `Agent committed directly (${autoResult.aheadBy} ahead)`,
+                agent_self_commit: true,
+              },
             },
           });
         } else if (autoResult.outcome === "no_changes") {

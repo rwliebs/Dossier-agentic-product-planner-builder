@@ -72,7 +72,9 @@ interface LeftSidebarProps {
   /** Controlled width in pixels for the expanded sidebar */
   width?: number;
   /** Called when user accepts preview and actions are applied (map should refresh) */
-  onPlanningApplied?: () => void;
+  onPlanningApplied?: () => void | Promise<void>;
+  /** Called when map data has changed (e.g. workflows scaffolded) so parent can refetch without implying user approval */
+  onMapChanged?: () => void | Promise<void>;
   /** Called when planning state changes (thinking or populating) so parent can show global indicators */
   onPlanningStateChange?: (isPlanning: boolean) => void;
   /** Called when user edits the project name, description, context fields, or repo link. May return a Promise that resolves to true if the update succeeded. */
@@ -114,7 +116,7 @@ function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: 
   );
 }
 
-export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, onPlanningApplied, onPlanningStateChange, onProjectUpdate }: LeftSidebarProps) {
+export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, onPlanningApplied, onMapChanged, onPlanningStateChange, onProjectUpdate }: LeftSidebarProps) {
   const { data: projectFiles } = useProjectFiles(projectId);
   const contextFileTree = projectFiles && projectFiles.length > 0 ? projectFiles : [];
 
@@ -397,10 +399,15 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
         body: JSON.stringify({ message: text }),
       });
 
-      const data = await res.json() as ChatPreviewResponse & {
+      const data = await res.json().catch(() => null) as (ChatPreviewResponse & {
         applied?: number;
         workflow_ids_created?: string[];
-      };
+      }) | null;
+
+      if (!data) {
+        addMessage('agent', `Server returned a non-JSON response (${res.status}). Check server logs.`);
+        return;
+      }
 
       if (!res.ok) {
         addMessage('agent', data.message ?? 'Planning service error. Try again.');
@@ -421,15 +428,15 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
         });
         setPendingActions([]);
         setPendingErrors([]);
+        await onMapChanged?.();
       } else if ((data.applied ?? 0) > 0) {
         addMessage('agent', data.message || `Applied ${data.applied} change(s).`);
+        await onPlanningApplied?.();
       } else if (data.message) {
         addMessage('agent', data.message);
       } else {
         addMessage('agent', "I wasn't able to generate a structure yet. Could you tell me more?");
       }
-
-      onPlanningApplied?.();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Planning service unavailable. Check your connection.';
       addMessage('agent', msg);
@@ -462,9 +469,9 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
               workflow_id: wfId,
             }),
           });
-          const data = (await res.json()) as { status?: string; message?: string; applied?: number };
-          if (!res.ok) {
-            addMessage('agent', data.message ?? `Failed to populate workflow ${i + 1}/${total}.`);
+          const data = (await res.json().catch(() => null)) as { status?: string; message?: string; applied?: number } | null;
+          if (!data || !res.ok) {
+            addMessage('agent', data?.message ?? `Failed to populate workflow ${i + 1}/${total}.`);
             continue;
           }
           throttledPlanningApplied();
@@ -488,8 +495,8 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ actions: pendingActions }),
       });
-      const data = await res.json();
-      if (res.ok && (data.applied ?? 0) > 0) {
+      const data = await res.json().catch(() => null);
+      if (data && res.ok && (data.applied ?? 0) > 0) {
         setPendingPreview(null);
         setPendingActions([]);
         setPendingErrors([]);

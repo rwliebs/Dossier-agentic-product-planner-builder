@@ -92,8 +92,14 @@ export async function POST(
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      let closed = false;
       const emit: Emitter = (event, data) => {
-        controller.enqueue(encoder.encode(sseEvent(event, data)));
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(sseEvent(event, data)));
+        } catch {
+          closed = true;
+        }
       };
 
       try {
@@ -255,7 +261,10 @@ export async function POST(
         console.error("[chat/stream] Error:", msg);
         emit("error", { reason: msg });
       } finally {
-        controller.close();
+        if (!closed) {
+          closed = true;
+          try { controller.close(); } catch { /* already closed */ }
+        }
       }
     },
   });

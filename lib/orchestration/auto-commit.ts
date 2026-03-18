@@ -10,6 +10,8 @@
 import {
   getCurrentBranch,
   getStatusPorcelain,
+  getHeadSha,
+  commitsAheadOf,
   stagePath,
   commit,
 } from "./git-ops";
@@ -67,6 +69,7 @@ function delay(ms: number): Promise<void> {
 export interface AutoCommitInput {
   worktreePath: string;
   featureBranch: string;
+  baseBranch?: string;
   cardTitle?: string;
   cardId: string;
   allowedPaths: string[];
@@ -74,6 +77,7 @@ export interface AutoCommitInput {
 
 export type AutoCommitOutcome =
   | { outcome: "committed"; sha: string; message: string }
+  | { outcome: "agent_committed"; sha: string; aheadBy: number }
   | { outcome: "no_changes"; reason: string }
   | { outcome: "error"; error: string };
 
@@ -139,7 +143,7 @@ function parsePorcelainLines(lines: string[]): string[] {
  * When the first git status is empty (race: agent writes not yet visible), waits once then retries once.
  */
 export async function performAutoCommit(input: AutoCommitInput): Promise<AutoCommitOutcome> {
-  const { worktreePath, featureBranch, cardTitle, cardId, allowedPaths } = input;
+  const { worktreePath, featureBranch, baseBranch = "main", cardTitle, cardId, allowedPaths } = input;
 
   const branchResult = getCurrentBranch(worktreePath);
   if (!branchResult.success) {
@@ -181,6 +185,23 @@ export async function performAutoCommit(input: AutoCommitInput): Promise<AutoCom
   });
 
   if (eligible.length === 0) {
+    // Check if the agent already committed directly (Claude CLI uses git)
+    const ahead = commitsAheadOf(worktreePath, baseBranch, featureBranch);
+    if (ahead.success && ahead.count > 0) {
+      const headResult = getHeadSha(worktreePath);
+      const sha = headResult.sha ?? "";
+      console.warn("[auto-commit] outcome=agent_committed (agent committed directly)", {
+        cardId,
+        aheadBy: ahead.count,
+        sha: sha.slice(0, 7),
+      });
+      return {
+        outcome: "agent_committed",
+        sha,
+        aheadBy: ahead.count,
+      };
+    }
+
     const reason = "No changes to commit";
     console.warn("[auto-commit] outcome=no_changes", { cardId, reason });
     return {

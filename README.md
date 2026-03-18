@@ -61,6 +61,8 @@ Every product has a top-level brief: description, tech stack, customer personas,
 
 Connect a GitHub repository (optional) and select files for context. Agents can write files locally; GitHub is required only when you want to open PRs. Dossier maps your product structure directly onto your codebase. Agents know which files to touch, which to leave alone, and how the pieces fit together.
 
+NEW: Pull an updated copy of your remote repo without leaving Dossier.
+
 ### Context documents — everything that informs the build
 
 ![Project documents: FILES and DOCS tabs](docs/images/context_files.png)
@@ -151,6 +153,8 @@ On first run you'll be guided through API key setup, or navigate directly to `/s
 | **Full doc index** | [docs/README.md](docs/README.md) |
 
 Configuration (API keys, GitHub token) can be set via the web UI at `/setup` or by editing `~/.dossier/config`. See [.env.example](.env.example) for all options.
+
+NEW: Use your Claude MAX account directly, no extra setup required (if you've got Claude Code installed locally.)
 
 ---
 

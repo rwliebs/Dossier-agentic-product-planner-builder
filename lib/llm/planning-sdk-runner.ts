@@ -63,12 +63,14 @@ function abortPromise(signal?: AbortSignal): Promise<never> | null {
 }
 
 /**
- * Runs a planning session via Agent SDK and returns accumulated assistant text.
+ * Runs a planning session via Agent SDK and returns the final result text.
  * Planner can use Read/Glob/Grep when repo is connected; WebSearch always available.
  * When apiKey is provided, it is passed via options.env; otherwise the SDK uses process.env.
  *
- * Each iterator.next() is raced against the abort signal so that a stalled SDK
- * stream is interrupted immediately when the caller's timeout fires.
+ * The agent may use tools across multiple turns to explore the codebase before
+ * producing its final answer. We return ONLY the ResultMessage.result — the
+ * structured JSON output the system prompt requests — not the intermediate
+ * assistant text from tool-using turns.
  */
 export async function runPlanningQuery(options: PlanningSdkOptions): Promise<string> {
   const model = options.model ?? process.env.PLANNING_LLM_MODEL ?? DEFAULT_MODEL;
@@ -89,27 +91,37 @@ export async function runPlanningQuery(options: PlanningSdkOptions): Promise<str
 
   const abort = abortPromise(options.signal);
   const iter = result[Symbol.asyncIterator]();
-  let output = "";
+  let finalResult = "";
 
   while (true) {
     const next = iter.next();
     const step = abort ? await Promise.race([next, abort]) : await next;
     if (step.done) break;
-    const m = step.value as { type?: string; message?: { content?: Array<{ type?: string; text?: string }> } };
-    if (m.type === "assistant" && m.message?.content) {
-      const chunk =
-        m.message.content
-          ?.map((c) => (c.type === "text" ? c.text : ""))
-          .join("") || "";
-      output += chunk;
+    const m = step.value as {
+      type?: string;
+      subtype?: string;
+      result?: string;
+      message?: { content?: Array<{ type?: string; text?: string }> };
+    };
+    if (m.type === "result" && m.subtype === "success" && m.result) {
+      finalResult = m.result;
     }
   }
-  return output;
+
+  if (!finalResult) {
+    throw new Error("Agent SDK session ended without a successful result.");
+  }
+  return finalResult;
 }
 
 /**
  * Returns an async iterable of text chunks from the Agent SDK for planning streaming.
  * Yields text deltas for parseActionsFromStream.
+ *
+ * The agent may use tools across multiple turns (Read/Glob/Grep, WebSearch) to
+ * explore the codebase. We skip intermediate assistant text (which is conversational
+ * reasoning between tool calls) and yield ONLY the final ResultMessage.result —
+ * the structured JSON that the stream parser expects.
  *
  * Each iterator.next() is raced against the abort signal so a stalled SDK
  * stream is interrupted immediately when the caller's idle timer fires.
@@ -138,13 +150,14 @@ export async function* streamPlanningQuery(options: PlanningSdkOptions): AsyncGe
     const next = iter.next();
     const step = abort ? await Promise.race([next, abort]) : await next;
     if (step.done) break;
-    const m = step.value as { type?: string; message?: { content?: Array<{ type?: string; text?: string }> } };
-    if (m.type === "assistant" && m.message?.content) {
-      const chunk =
-        m.message.content
-          ?.map((c) => (c.type === "text" ? c.text : ""))
-          .join("") || "";
-      if (chunk) yield chunk;
+    const m = step.value as {
+      type?: string;
+      subtype?: string;
+      result?: string;
+      message?: { content?: Array<{ type?: string; text?: string }> };
+    };
+    if (m.type === "result" && m.subtype === "success" && m.result) {
+      yield m.result;
     }
   }
 }

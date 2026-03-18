@@ -417,17 +417,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
       if (data.responseType === 'clarification') {
         addMessage('agent', data.message || 'Could you tell me more about what you want to build?');
       } else if (data.workflow_ids_created?.length) {
-        addMessage('agent', data.message || `Created ${data.workflow_ids_created.length} workflow(s).`);
-        setPopulateConfirmWorkflowIds(data.workflow_ids_created);
-        setPopulateOriginalMessage(text);
-        setPendingPreview({
-          added: { workflows: data.workflow_ids_created, activities: [], cards: [] },
-          modified: { cards: [], artifacts: [] },
-          reordered: [],
-          summary: `Populate ${data.workflow_ids_created.length} workflow(s) with activities and cards?`,
-        });
-        setPendingActions([]);
-        setPendingErrors([]);
+        addMessage('agent', data.message || `Created ${data.workflow_ids_created.length} workflow(s). Review the map and click **Approve Project** to create core documents and set up the directory structure. After that, you can populate each workflow with activities and cards.`);
         await onMapChanged?.();
       } else if ((data.applied ?? 0) > 0) {
         addMessage('agent', data.message || `Applied ${data.applied} change(s).`);
@@ -503,7 +493,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
         onPlanningApplied?.();
         addMessage('agent', `Applied ${data.applied ?? (pendingActions?.length ?? 0)} change(s).`);
       } else {
-        addMessage('agent', data.message ?? data.details?.validation?.[0] ?? 'Failed to apply changes.');
+        addMessage('agent', data?.message ?? data?.details?.validation?.[0] ?? 'Failed to apply changes.');
       }
     } catch {
       addMessage('agent', 'Failed to apply changes. Try again.');

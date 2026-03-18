@@ -53,11 +53,6 @@ export default function DossierPage() {
 
   const projectId = projectIdState || defaultProjectId;
 
-  const handleSelectProjectId = useCallback((id: string) => {
-    setStoredProjectId(id);
-    setProjectIdState(id);
-  }, []);
-
   const [viewMode, setViewMode] = useState<'functionality' | 'architecture'>('functionality');
   const [agentStatus, setAgentStatus] = useState<'idle' | 'building' | 'reviewing'>('idle');
   const { data: snapshot, loading: mapLoading, error: mapError, refetch } = useMapSnapshot(
@@ -72,6 +67,19 @@ export default function DossierPage() {
   const { triggerBuild, resumeBlocked } = useTriggerBuild(appMode === 'active' ? projectId : undefined);
 
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [isPlanning, setIsPlanning] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [rightPanelTab, setRightPanelTab] = useState<'files' | 'docs' | 'chat'>('files');
+  const [selectedDoc, setSelectedDoc] = useState<ContextArtifact | null>(null);
+  const [filesBranchCardId, setFilesBranchCardId] = useState<string | null>(null);
+
+  const handleSelectProjectId = useCallback((id: string) => {
+    setStoredProjectId(id);
+    setProjectIdState(id);
+    setExpandedCardId(null);
+    setFilesBranchCardId(null);
+  }, []);
   const { data: cardKnowledge, loading: cardKnowledgeLoading, refetch: refetchCardKnowledge } = useCardKnowledge(
     appMode === 'active' ? projectId : undefined,
     expandedCardId ?? undefined
@@ -122,13 +130,6 @@ export default function DossierPage() {
     return acc;
   }
   const availableFilePaths = projectFilesTree ? flattenFilePaths(projectFilesTree) : [];
-
-  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
-  const [isPlanning, setIsPlanning] = useState(false);
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
-  const [rightPanelTab, setRightPanelTab] = useState<'files' | 'docs' | 'chat'>('files');
-  const [selectedDoc, setSelectedDoc] = useState<ContextArtifact | null>(null);
-  const [filesBranchCardId, setFilesBranchCardId] = useState<string | null>(null);
 
   const [mapLoadingMessageIndex, setMapLoadingMessageIndex] = useState(0);
   useEffect(() => {

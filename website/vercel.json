@@ -1,6 +1,0 @@
-{
-  "buildCommand": "npm run build:static",
-  "outputDirectory": "dist/public",
-  "framework": null,
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
-}

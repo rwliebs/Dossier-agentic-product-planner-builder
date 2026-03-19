@@ -45,9 +45,6 @@
     "electron:package": "pnpm run build && pnpm run electron:prepare-node && pnpm run electron:compile && electron-forge package",
     "electron:make": "pnpm run build && pnpm run electron:prepare-node && pnpm run electron:compile && electron-forge make",
     "electron:publish": "pnpm run electron:make && electron-forge publish",
-    "website:install": "cd website && npm install",
-    "website:build": "cd website && npm run build",
-    "website:dev": "cd website && npm run dev",
     "prepare": "husky"
   },
   "dependencies": {

@@ -195,4 +195,6 @@ Contributions are welcome. Open an issue to discuss what you'd like to change, o
 
 ## License
 
-MIT
+[PolyForm Shield License 1.0.0](LICENSE)
+
+Free to use for any purpose that does not compete with Dossier. You can fork it, build on it, self-host it, and integrate it into your own products — as long as you're not building a competing AI-native product planning or build orchestration tool. See [LICENSE](LICENSE) for the full terms.

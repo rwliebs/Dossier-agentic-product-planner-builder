@@ -1,6 +1,7 @@
 {
   "name": "dossier-agentic-product-planner-builder",
   "version": "0.5.3",
+  "license": "PolyForm-Shield-1.0.0",
   "author": "Dossier",
   "repository": "https://github.com/rwliebs/Dossier",
   "description": "AI-native product craft platform — plan workflows, orchestrate multi-agent builds, ship iteratively",

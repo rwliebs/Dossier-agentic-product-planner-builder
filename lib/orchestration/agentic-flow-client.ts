@@ -172,6 +172,7 @@ async function runQueryAndCollectOutput(
   options: {
     systemPrompt: string;
     cwd?: string;
+    additionalDirectories?: string[];
     onStream?: (chunk: string) => void;
   }
 ): Promise<string> {
@@ -193,6 +194,7 @@ async function runQueryAndCollectOutput(
         "WebSearch",
       ],
       cwd: options.cwd,
+      additionalDirectories: options.additionalDirectories,
       persistSession: false,
     },
   });
@@ -212,6 +214,19 @@ async function runQueryAndCollectOutput(
     }
   }
   return output;
+}
+
+/**
+ * Resolves directories containing bundled skills (e.g. Impeccable design skills)
+ * that should be available to execution agents via --add-dir.
+ */
+function getBundledSkillDirectories(): string[] {
+  const dirs: string[] = [];
+  const agentsDir = path.join(process.cwd(), ".agents");
+  if (fs.existsSync(agentsDir)) {
+    dirs.push(agentsDir);
+  }
+  return dirs;
 }
 
 /**
@@ -275,6 +290,7 @@ export function createRealAgenticFlowClient(): AgenticFlowClient {
             runQueryAndCollectOutput(taskDescription, {
               systemPrompt: agent.systemPrompt,
               cwd: payload.worktree_path || undefined,
+              additionalDirectories: getBundledSkillDirectories(),
               onStream: (_chunk: string) => {
                 if (abortController.signal.aborted) return;
               },

@@ -18,6 +18,7 @@
     "THIRD-PARTY-NOTICES.md"
   ],
   "scripts": {
+    "postinstall": "node bin/postinstall.mjs",
     "build": "next build --webpack && npm run postbuild",
     "postbuild": "cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public && bash scripts/copy-native-deps.sh",
     "dev": "next dev -H 127.0.0.1",

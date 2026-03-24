@@ -11,8 +11,9 @@
 
 import { existsSync, readFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
@@ -114,9 +115,42 @@ async function openBrowser(url) {
 }
 
 // ---------------------------------------------------------------------------
+// Ensure native addons exist for this platform
+// ---------------------------------------------------------------------------
+function ensureNativeAddons() {
+  const standaloneDir = join(__dirname, "..", ".next", "standalone");
+  const sqliteBinary = join(standaloneDir, "node_modules", "better-sqlite3", "build", "Release", "better_sqlite3.node");
+
+  let needsInstall = !existsSync(sqliteBinary);
+
+  if (!needsInstall) {
+    try {
+      const cjsRequire = createRequire(join(standaloneDir, "dummy.js"));
+      cjsRequire("better-sqlite3");
+    } catch {
+      needsInstall = true;
+    }
+  }
+
+  if (!needsInstall) return;
+
+  console.log("  Installing native dependencies for your platform...");
+  try {
+    execSync("node " + JSON.stringify(join(__dirname, "postinstall.mjs")), {
+      stdio: "inherit",
+      env: { ...process.env },
+    });
+  } catch {
+    console.warn("  WARNING: Native dependency install failed. Some features may not work.");
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
+  ensureNativeAddons();
+
   const dataDir = getDataDir();
   const isFirstRun = !existsSync(dataDir);
 

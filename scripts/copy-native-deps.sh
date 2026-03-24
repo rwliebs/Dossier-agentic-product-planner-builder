@@ -27,14 +27,11 @@ copy_pkg() {
 
 echo "[copy-native-deps] Copying native/wasm deps into standalone output..."
 
-# Native SQLite addon
-copy_pkg "better-sqlite3"
+# better-sqlite3 and ruvector-core: Do NOT copy — they contain
+# platform-specific native binaries. The postinstall script in
+# package.json installs them for the user's platform at npm install / npx time.
 
-# ruvector-core ships a platform-specific .node binary inside its own
-# nested node_modules (e.g. ruvector-core-darwin-arm64). Copy the whole tree.
-copy_pkg "ruvector-core"
-
-# ruvector-onnx-embeddings-wasm ships a .wasm file
+# ruvector-onnx-embeddings-wasm ships a .wasm file (platform-independent)
 copy_pkg "ruvector-onnx-embeddings-wasm"
 
 echo "[copy-native-deps] Done."

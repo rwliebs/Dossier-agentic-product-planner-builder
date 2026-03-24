@@ -11,7 +11,6 @@ const nextConfig = {
   serverExternalPackages: [
     "better-sqlite3",
     "ruvector-core",
-    "ruvector-onnx-embeddings-wasm",
   ],
 }
 

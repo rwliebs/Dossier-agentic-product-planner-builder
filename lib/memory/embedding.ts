@@ -10,7 +10,6 @@
  * @see docs/domains/memory-reference.md
  */
 
-import { createRequire } from "node:module";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -72,23 +71,17 @@ type Embedder = { embedOne: (text: string) => Float32Array };
 let _loadPromise: Promise<Embedder | null> | null = null;
 
 /**
- * Load the WASM module via CJS to work around an upstream bug:
- * ruvector-onnx-embeddings-wasm declares "type":"module" but the generated
- * WASM JS glue uses CJS globals (__dirname, require, module.exports).
- * We copy the file to .cjs and load via createRequire so Node treats it as CJS.
- * Uses createRequire(import.meta.url) so this works in ESM (Vitest) and Node.
+ * Load the WASM module via dynamic import.
+ * ruvector-onnx-embeddings-wasm ships both ESM and CJS entry points;
+ * the .cjs file works in Node without import.meta.url issues.
  */
-function loadWasmModuleCjs(): Record<string, unknown> | null {
+async function loadWasmModule(): Promise<Record<string, unknown> | null> {
   try {
-    const req = createRequire(import.meta.url);
-    const pkgDir = path.dirname(req.resolve("ruvector-onnx-embeddings-wasm"));
-    const src = path.join(pkgDir, "ruvector_onnx_embeddings_wasm.js");
-    const cjsCopy = path.join(pkgDir, "ruvector_onnx_embeddings_wasm.cjs");
-    if (!fs.existsSync(cjsCopy)) {
-      fs.copyFileSync(src, cjsCopy);
-    }
-    const pkgRequire = createRequire(path.join(pkgDir, "index.js"));
-    return pkgRequire("./ruvector_onnx_embeddings_wasm.cjs") as Record<string, unknown>;
+    const mod = await import(
+      /* webpackIgnore: true */
+      "ruvector-onnx-embeddings-wasm"
+    );
+    return (mod.default ?? mod) as Record<string, unknown>;
   } catch {
     return null;
   }
@@ -96,13 +89,16 @@ function loadWasmModuleCjs(): Record<string, unknown> | null {
 
 async function doLoadEmbedder(): Promise<Embedder | null> {
   try {
-    const wasmModule = loadWasmModuleCjs();
+    const wasmModule = await loadWasmModule();
     if (!wasmModule) return null;
 
     const modelName = process.env.EMBEDDING_MODEL ?? DEFAULT_MODEL;
 
     if (isNode) {
-      const { MODELS } = await import("ruvector-onnx-embeddings-wasm/loader.js");
+      const { MODELS } = await import(
+        /* webpackIgnore: true */
+        "ruvector-onnx-embeddings-wasm/loader.js"
+      );
       const config = (MODELS as Record<string, { model: string; tokenizer: string; maxLength: number }>)[modelName];
       if (!config) return null;
 
@@ -154,7 +150,10 @@ async function doLoadEmbedder(): Promise<Embedder | null> {
       return WasmEmbedder.withConfig(modelBytes, tokenizerJson, embedderConfig);
     }
 
-    const { createEmbedder } = await import("ruvector-onnx-embeddings-wasm/loader.js");
+    const { createEmbedder } = await import(
+      /* webpackIgnore: true */
+      "ruvector-onnx-embeddings-wasm/loader.js"
+    );
     return await createEmbedder(modelName, wasmModule) as Embedder;
   } catch (err) {
     console.warn(

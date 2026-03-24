@@ -11,9 +11,11 @@
   },
   "files": [
     "bin/",
+    ".agents/",
     ".next/standalone/",
     ".next/static/",
-    "public/"
+    "public/",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "scripts": {
     "build": "next build --webpack && npm run postbuild",

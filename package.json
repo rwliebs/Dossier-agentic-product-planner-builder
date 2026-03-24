@@ -16,8 +16,8 @@
     "public/"
   ],
   "scripts": {
-    "build": "next build && npm run postbuild",
-    "postbuild": "cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public",
+    "build": "next build --webpack && npm run postbuild",
+    "postbuild": "cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public && bash scripts/copy-native-deps.sh",
     "dev": "next dev -H 127.0.0.1",
     "rebuild": "./scripts/rebuild-and-restart.sh",
     "rebuild:prod": "./scripts/rebuild-and-restart.sh prod",

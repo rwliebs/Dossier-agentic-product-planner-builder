@@ -1,0 +1,49 @@
+---
+description: Enforces strict scope boundaries on every file modification. Prevents unauthorized out-of-scope changes.
+globs: *
+alwaysApply: true
+---
+
+# SCOPE ENFORCEMENT — MANDATORY, NO EXCEPTIONS
+
+This rule is **non-negotiable**. There is no circumstance where it may be skipped, deferred, or overridden by pattern-matching, convenience, or "while I'm here" reasoning.
+
+## The Rule
+
+**Before modifying any file, you MUST verify it is within the agreed scope of the current task.**
+
+A file is in scope ONLY if:
+1. The user explicitly named it, OR
+2. The user described a problem and this file is a **direct, necessary** part of solving that specific problem, OR
+3. You asked the user whether this file should be changed and the user said yes
+
+## What "direct, necessary" means
+
+- The file MUST be on the critical path of the user's stated problem
+- "Related," "similar pattern," "while I'm here," "good cleanup," "might as well" — these are NOT justifications
+- If you have to argue why a file is in scope, it isn't
+
+## Before Every File Edit
+
+Ask yourself:
+1. Did the user ask me to change this file? → If NO, go to 2.
+2. Does the user's problem literally require changing this file to be solved? → If NO, go to 3.
+3. **STOP. Ask the user before proceeding.**
+
+The question to the user must be:
+> "I noticed [file] has [issue]. This is outside the scope of your request. Should I include it?"
+
+Then **wait for the answer**. Do not proceed until the user responds.
+
+## Violations
+
+Any file edit that does not pass the 3-step check above is a rule violation. Rule violations are not acceptable. There is no "I'll apologize later" path. The rule exists to prevent unauthorized changes, and unauthorized changes are never acceptable regardless of their quality.
+
+## Why This Rule Exists
+
+The user's rules explicitly state:
+- "Clarify scope — Ask user questions when your solutions or fixes would add or remove functionality not shared in the chat or context documents."
+- "A change would add or remove end user-facing functionality or features" requires user approval.
+- "Anticipate and ask questions before writing code."
+
+This rule converts those guidelines into a hard gate.

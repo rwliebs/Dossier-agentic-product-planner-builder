@@ -117,10 +117,15 @@ Product
 
 ## Quickstart
 
-**One-shot run (Node 20+):**  
-Package is published to NPM:
+**Install from npm (Node 20+):**
 ```bash
-npx @rwliebs/dossier-agentic-product-planner-builder
+npm i -g dossier-agentic-product-planner-builder
+dossier
+```
+
+**Or try without installing:**
+```bash
+npx dossier-agentic-product-planner-builder
 ```
 
 **Or from source:**

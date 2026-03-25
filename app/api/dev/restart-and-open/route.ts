@@ -4,6 +4,7 @@ import { promisify } from 'util';
 import { exec } from 'child_process';
 import fs from 'node:fs';
 import { getClonePath } from '@/lib/orchestration/repo-manager';
+import open from 'open';
 
 const execAsync = promisify(exec);
 
@@ -78,8 +79,6 @@ export async function POST(request: Request) {
 
   const script = [
     `cd "${clonePath}" && PORT=${port} nohup npm run dev > /tmp/dossier-view-${port}.log 2>&1 &`,
-    `sleep 10`,
-    `(command -v open >/dev/null 2>&1 && open "http://localhost:${port}") || (command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:${port}") || true`,
   ].join(' && ');
 
   const child = spawn('bash', ['-c', script], {
@@ -88,6 +87,10 @@ export async function POST(request: Request) {
     cwd: clonePath,
   });
   child.unref();
+
+  setTimeout(() => {
+    open(`http://localhost:${port}`).catch(() => {});
+  }, 10_000);
 
   return NextResponse.json({
     ok: true,

@@ -101,17 +101,15 @@ function printBanner(dataDir, isFirstRun) {
 }
 
 // ---------------------------------------------------------------------------
-// Open browser (cross-platform, no dependency)
+// Open browser (cross-platform via `open` package)
 // ---------------------------------------------------------------------------
 async function openBrowser(url) {
-  const { platform } = process;
-  const cmd =
-    platform === "darwin"
-      ? "open"
-      : platform === "win32"
-        ? "start"
-        : "xdg-open";
-  spawn(cmd, [url], { detached: true, stdio: "ignore" }).unref();
+  try {
+    const open = (await import("open")).default;
+    await open(url);
+  } catch {
+    // Silently fail — user can open the URL manually
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -8,7 +8,7 @@ tags:
   - workflow
 anchors:
   - id: setup
-    summary: "Node 18+, npm install, .env.local or ~/.dossier/config"
+    summary: "Node 20+, npm install, .env.local or ~/.dossier/config"
   - id: scripts
     summary: "dev, build, test, dossier, rebuild"
   - id: ports
@@ -30,7 +30,7 @@ ttl_expires_on: null
 ## Setup
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 20+
 - Anthropic API key
 - GitHub token (repo scope) for PR creation
 

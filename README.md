@@ -117,7 +117,7 @@ Product
 
 ## Quickstart
 
-**One-shot run (Node 18+):**  
+**One-shot run (Node 20+):**  
 Package is published to NPM:
 ```bash
 npx @rwliebs/dossier-agentic-product-planner-builder
@@ -136,7 +136,13 @@ Your browser will open to **http://localhost:3000**. First run creates `~/.dossi
 
 On first run you'll be guided through API key setup, or navigate directly to `/setup`.
 
-**Prerequisites:** Node.js 18+, [Anthropic API key](https://console.anthropic.com/). A [GitHub token](https://github.com/settings/tokens) with `repo` scope is needed only if you want agents to open PRs; agents can write files locally without it.
+**Prerequisites:** Node.js 20+, [Anthropic API key](https://console.anthropic.com/). A [GitHub token](https://github.com/settings/tokens) with `repo` scope is needed only if you want agents to open PRs; agents can write files locally without it.
+
+> **Windows users:** Dossier uses native SQLite, which requires a C++ compiler during install. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/) with the **"Desktop development with C++"** workload, or run this from an elevated PowerShell:
+> ```powershell
+> npm install -g windows-build-tools
+> ```
+> This is a one-time setup. macOS and Linux typically have the required build tools already.
 
 ---
 

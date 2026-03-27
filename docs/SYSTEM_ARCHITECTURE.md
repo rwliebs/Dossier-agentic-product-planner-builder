@@ -1,6 +1,6 @@
 ---
 document_id: doc.system-architecture
-last_verified: 2026-03-06
+last_verified: 2026-03-23
 tokens_estimate: 950
 tags:
   - architecture
@@ -106,7 +106,7 @@ Full schema details: [data-contracts-reference.md](domains/data-contracts-refere
 ## Data Flow (Summaries)
 
 ### Planning
-`User chat → Anthropic streaming API → stream-action-parser → PlanningAction[] → validate → apply → SQLite`
+`User chat → planning SDK query()/stream wrapper → stream-action-parser → PlanningAction[] → validate → apply → SQLite`
 
 Detail: [planning-reference.md](domains/planning-reference.md)
 
@@ -138,12 +138,12 @@ Two distinct connection patterns exist.
 
 | Concern | Planning LLM | Build Agent |
 |---------|-------------|-------------|
-| Auth | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY` |
-| SDK | `@anthropic-ai/sdk` (Messages API) | `@anthropic-ai/claude-agent-sdk` |
-| Call style | `messages.create` / `messages.stream` | `query()` — async iterator |
-| Streaming | Optional (non-streaming for simple calls, streaming for chat) | Always streaming (`for await` over messages) |
-| Tools | None (text output only) | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
-| CWD | N/A | `worktree_path` (repo clone) |
+| Auth | `ANTHROPIC_API_KEY` (env/config) or Claude CLI credential (`~/.claude/settings.json`) | `ANTHROPIC_API_KEY` (env/config) |
+| SDK | `@anthropic-ai/claude-agent-sdk` via planning wrapper | `@anthropic-ai/claude-agent-sdk` |
+| Call style | `query()` wrapper (non-streaming and streaming paths) | `query()` — async iterator |
+| Streaming | Optional (chat stream uses streaming path) | Always streaming (`for await` over messages) |
+| Tools | `WebSearch` always; `Read/Glob/Grep` when repo clone (`cwd`) is available | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch |
+| CWD | Optional clone path when repo connected | `worktree_path` (repo clone) |
 | Lifecycle | Request-response per chat turn | Fire-and-forget; result via in-process webhook callback |
 | Model | `claude-haiku-4-5-20251001` (configurable) | `claude-sonnet-4-5-20250929` (configurable) |
 

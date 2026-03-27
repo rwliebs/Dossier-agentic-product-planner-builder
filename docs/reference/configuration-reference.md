@@ -1,7 +1,7 @@
 ---
 document_id: doc.configuration
-last_verified: 2026-02-18
-tokens_estimate: 600
+last_verified: 2026-03-23
+tokens_estimate: 700
 tags:
   - configuration
   - env
@@ -10,9 +10,9 @@ anchors:
   - id: precedence
     summary: "process.env > .env.local > ~/.dossier/config"
   - id: required
-    summary: "ANTHROPIC_API_KEY, GITHUB_TOKEN"
+    summary: "Anthropic planning credential + GITHUB_TOKEN"
   - id: optional
-    summary: "DB_DRIVER, DOSSIER_DATA_DIR, feature flags"
+    summary: "DB pathing, model selection, runtime tuning, feature flags"
 ttl_expires_on: null
 ---
 # Configuration Reference
@@ -21,44 +21,56 @@ ttl_expires_on: null
 
 ## Contract
 
-- INVARIANT: Config precedence: `process.env` > `.env.local` > `~/.dossier/config`
-- INVARIANT: Self-deploy uses `~/.dossier/config`; dev uses `.env.local`
-- Anthropic credential: we accept **API key** first (env, then `~/.dossier/config`). If none is set, we use your **installed Claude CLI** config: `~/.claude/settings.json` (or `CLAUDE_CONFIG_DIR`/settings.json). We read `env.ANTHROPIC_API_KEY` or `env.ANTHROPIC_AUTH_TOKEN` from that file so you don’t need to paste a key if Claude Code is already configured.
+- INVARIANT: Config precedence is `process.env` > `.env.local` > `~/.dossier/config`
+- INVARIANT: `/setup` writes to `~/.dossier/config` and updates `process.env` for immediate use
+- INVARIANT: Planning credential resolution is env/config first, then Claude CLI settings
+
+Planning credential resolution order:
+1. `process.env.ANTHROPIC_API_KEY`
+2. `~/.dossier/config` -> `ANTHROPIC_API_KEY`
+3. Claude CLI settings (`~/.claude/settings.json`, or `CLAUDE_CONFIG_DIR/settings.json`):
+   - `env.ANTHROPIC_API_KEY`, else
+   - `env.ANTHROPIC_AUTH_TOKEN` (also mapped to `CLAUDE_CODE_OAUTH_TOKEN`)
 
 ---
 
 ## Required
 
-Anthropic credential (API key or Claude CLI config) and GitHub token:
+| Variable | Required for | Notes |
+|----------|--------------|-------|
+| `ANTHROPIC_API_KEY` | Planning/build LLM access | Optional if Claude CLI credential is available via settings.json |
+| `GITHUB_TOKEN` | Push/sync branch operations | Required by `/api/projects/[projectId]/cards/[cardId]/push` and `/api/projects/[projectId]/repo/sync` |
 
-| Variable | Purpose |
-|----------|---------|
-| ANTHROPIC_API_KEY | Planning LLM and build (set in env or `~/.dossier/config`; or we use your Claude CLI `~/.claude/settings.json` when no key is set) |
-| GITHUB_TOKEN | Push branches, create PRs; [github.com/settings/tokens](https://github.com/settings/tokens) `repo` scope |
-
----
-
-## Optional
-
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| DB_DRIVER | sqlite | `sqlite` or `postgres` |
-| DATABASE_URL | — | Postgres connection string (when DB_DRIVER=postgres) |
-| DOSSIER_DATA_DIR | ~/.dossier | Data directory |
-| SQLITE_PATH | ~/.dossier/dossier.db | Override SQLite path |
-| EMBEDDING_MODEL | all-MiniLM-L6-v2 | RuVector embedding model |
-| PLANNING_LLM_MODEL | claude-haiku-4-5-20251001 | Planning LLM model |
-| DOSSIER_STALE_RUN_MINUTES | 0 | Minutes before marking stuck runs as failed. 0 = disabled (no timeout). |
+Token guidance:
+- Classic token: `repo` scope
+- Fine-grained token: repository `Contents` write permission
 
 ---
 
-## Feature Flags (NEXT_PUBLIC_*)
+## Optional Runtime Variables
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| NEXT_PUBLIC_PLANNING_LLM_ENABLED | true | Planning chat |
-| NEXT_PUBLIC_BUILD_ORCHESTRATOR_ENABLED | true | Build triggers |
-| NEXT_PUBLIC_MEMORY_PLANE_ENABLED | true | Memory ingestion/retrieval |
+| `DB_DRIVER` | `sqlite` | Database driver selector; `postgres` currently not implemented at runtime |
+| `DATABASE_URL` | — | Checked when `DB_DRIVER=postgres`; runtime throws if postgres selected |
+| `DOSSIER_DATA_DIR` | `~/.dossier` | Base data directory |
+| `SQLITE_PATH` | `~/.dossier/dossier.db` | Explicit SQLite path override |
+| `PLANNING_LLM_MODEL` | `claude-haiku-4-5-20251001` | Planning model override |
+| `COMPLETION_MODEL` | `claude-sonnet-4-5-20250929` | Build execution model override |
+| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Memory embedding model |
+| `DOSSIER_STALE_RUN_MINUTES` | `0` | Stale run timeout; `0` disables timeout |
+| `DOSSIER_PRE_AUTOCOMMIT_DELAY_MS` | `2000` | Delay before webhook/auto-commit after execution completion |
+| `PLANNING_DEBUG` | unset | Extra planning diagnostics when set to `1` |
+
+---
+
+## Feature Flags
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `NEXT_PUBLIC_PLANNING_LLM_ENABLED` | `true` | Enables chat/chat-stream planning endpoints |
+| `NEXT_PUBLIC_BUILD_ORCHESTRATOR_ENABLED` | `true` | Enables orchestration/build routes |
+| `NEXT_PUBLIC_MEMORY_PLANE_ENABLED` | `true` | Enables memory ingestion/retrieval flows |
 
 ---
 
@@ -66,26 +78,56 @@ Anthropic credential (API key or Claude CLI config) and GitHub token:
 
 | Variable | Purpose |
 |----------|---------|
-| PLANNING_MOCK_ALLOWED | 1 = mock LLM in planning tests |
+| `PLANNING_MOCK_ALLOWED` | `1` enables mock LLM payload support in planning routes/tests |
 
 ---
 
 ## Config File Format
 
-`~/.dossier/config` or `.env.local`:
+Both `.env.local` and `~/.dossier/config` use:
 
-```
+```bash
 KEY=value
 KEY="value with spaces"
 # comments ignored
 ```
 
+`/api/setup` accepts:
+
+```json
+{
+  "anthropicApiKey": "optional string",
+  "githubToken": "optional string"
+}
+```
+
+At least one key must be present.
+
+---
+
+## Troubleshooting
+
+### Setup loop redirects back to `/setup`
+Check `/api/setup/status`:
+- `missingKeys` includes `GITHUB_TOKEN` -> add token via `/setup` or config file
+- `missingKeys` includes `ANTHROPIC_API_KEY` and `anthropicViaCli=false` -> provide key or ensure Claude CLI is installed/authenticated
+
+### Push/sync returns 401 or auth error
+- Ensure `GITHUB_TOKEN` is present in env or `~/.dossier/config`
+- Verify token scope/permissions for target repo
+
+### `DB_DRIVER=postgres` fails at runtime
+- Current runtime implementation supports SQLite only
+- Use default `DB_DRIVER=sqlite`
+
 ---
 
 ## Verification
-- [ ] Required vars set before running
-- [ ] /setup writes to ~/.dossier/config
+- [ ] `/api/setup/status` reports expected `needsSetup` and `missingKeys`
+- [ ] `/api/setup` persists values to `~/.dossier/config`
+- [ ] Push/sync routes succeed with configured `GITHUB_TOKEN`
 
 ## Related
 - [.env.example](../../.env.example)
 - [lib/config/data-dir.ts](../../lib/config/data-dir.ts)
+- [lib/llm/planning-credential.ts](../../lib/llm/planning-credential.ts)

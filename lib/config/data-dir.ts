@@ -100,6 +100,36 @@ export function writeConfigFile(updates: Record<string, string>): void {
   });
 }
 
+/**
+ * Remove keys from the config file (lines starting with KEY=). No-op if file missing.
+ */
+export function removeConfigKeys(keys: string[]): void {
+  if (keys.length === 0) return;
+  const configPath = getConfigPath();
+  if (!fs.existsSync(configPath)) return;
+  const drop = new Set(keys);
+  const content = fs.readFileSync(configPath, "utf-8");
+  const out: string[] = [];
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      out.push(line);
+      continue;
+    }
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx < 1) {
+      out.push(line);
+      continue;
+    }
+    const key = trimmed.slice(0, eqIdx).trim();
+    if (drop.has(key)) continue;
+    out.push(line);
+  }
+  fs.writeFileSync(configPath, out.join("\n") + (out.length ? "\n" : ""), {
+    mode: 0o600,
+  });
+}
+
 function escapeConfigValue(v: string): string {
   if (v.includes(" ") || v.includes("#") || v.includes('"')) {
     return `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;

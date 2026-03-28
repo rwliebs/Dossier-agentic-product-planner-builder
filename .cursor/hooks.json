@@ -9,6 +9,18 @@
         "command": ".cursor/hooks/gate-first-edit.sh",
         "matcher": "Write",
         "timeout": 5
+      },
+      {
+        "command": ".cursor/hooks/gate-first-edit.sh",
+        "matcher": "Delete",
+        "timeout": 5
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": ".cursor/hooks/mark-test-success.sh",
+        "matcher": "Shell",
+        "timeout": 5
       }
     ],
     "stop": [

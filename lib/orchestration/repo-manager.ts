@@ -11,18 +11,11 @@
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { execSync, execFileSync } from "node:child_process";
-import { getDataDir, ensureDataDir, readConfigFile } from "@/lib/config/data-dir";
+import { getDataDir, ensureDataDir } from "@/lib/config/data-dir";
+import { resolveGitHubToken } from "@/lib/github/resolve-github-token";
 import type { ScaffoldFile } from "./parse-scaffold-files";
 
 const REPOS_DIR = "repos";
-
-function getGitHubToken(): string | null {
-  const fromEnv = process.env.GITHUB_TOKEN?.trim();
-  if (fromEnv) return fromEnv;
-  const config = readConfigFile();
-  const fromConfig = config.GITHUB_TOKEN?.trim();
-  return fromConfig ?? null;
-}
 
 function runGitSync(cwd: string, args: string): string {
   return execSync(`git ${args}`, {
@@ -99,7 +92,7 @@ export function ensureClone(
   baseBranch = "main"
 ): { success: boolean; clonePath?: string; error?: string } {
   const clonePath = getClonePath(projectId);
-  const effectiveToken = token ?? getGitHubToken();
+  const effectiveToken = token ?? resolveGitHubToken();
   const cloneUrl = repoUrlToCloneUrl(repoUrl, effectiveToken);
 
   try {
@@ -335,7 +328,7 @@ export function pushBranch(
 
   try {
     if (repoUrl && !repoUrl.trim().toLowerCase().startsWith("file://")) {
-      const token = getGitHubToken();
+      const token = resolveGitHubToken();
       const cloneUrl = repoUrlToCloneUrl(repoUrl.trim(), token);
       execFileSync("git", ["remote", "set-url", "origin", cloneUrl], {
         cwd: clonePath,

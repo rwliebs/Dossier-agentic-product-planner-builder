@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Header } from '@/components/dossier/header';
 import { LeftSidebar } from '@/components/dossier/left-sidebar';
 import { WorkflowBlock } from '@/components/dossier/workflow-block';
@@ -13,6 +14,10 @@ import { useProjects } from '@/lib/hooks/use-projects';
 import { MapErrorBoundary } from '@/components/dossier/map-error-boundary';
 import { ChatErrorBoundary } from '@/components/dossier/chat-error-boundary';
 import { MapSkeleton } from '@/components/dossier/map-skeleton';
+import {
+  GITHUB_OAUTH_REPO_PICKER_EVENT,
+  GITHUB_OAUTH_REOPEN_KEYS_SESSION,
+} from '@/lib/github/oauth-client';
 
 const PROJECT_STORAGE_KEY = 'dossier_project_id';
 
@@ -33,12 +38,19 @@ function setStoredProjectId(id: string): void {
   else localStorage.removeItem(PROJECT_STORAGE_KEY);
 }
 
-export default function DossierPage() {
+function DossierPageInner() {
+  const searchParams = useSearchParams();
+  const urlProjectId = searchParams.get('project');
   const defaultProjectId = process.env.NEXT_PUBLIC_DEFAULT_PROJECT_ID ?? '';
   const [projectIdState, setProjectIdState] = useState<string>(() => getStoredProjectId() || defaultProjectId);
   const { data: projects } = useProjects();
 
   useEffect(() => {
+    if (urlProjectId && urlProjectId !== projectIdState) {
+      setStoredProjectId(urlProjectId);
+      setProjectIdState(urlProjectId);
+      return;
+    }
     const stored = getStoredProjectId();
     if (stored && stored !== projectIdState) {
       setProjectIdState(stored);
@@ -49,7 +61,7 @@ export default function DossierPage() {
       setStoredProjectId(firstId);
       setProjectIdState(firstId);
     }
-  }, [projects, projectIdState]);
+  }, [projects, projectIdState, urlProjectId]);
 
   const projectId = projectIdState || defaultProjectId;
 
@@ -119,6 +131,7 @@ export default function DossierPage() {
   const availableFilePaths = projectFilesTree ? flattenFilePaths(projectFilesTree) : [];
 
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [apiKeysOpen, setApiKeysOpen] = useState(false);
   const [isPlanning, setIsPlanning] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [rightPanelTab, setRightPanelTab] = useState<'files' | 'docs' | 'chat'>('files');
@@ -130,6 +143,30 @@ export default function DossierPage() {
     setProjectIdState(id);
     setExpandedCardId(null);
     setFilesBranchCardId(null);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('github_oauth') !== 'success') return;
+    try {
+      if (sessionStorage.getItem(GITHUB_OAUTH_REOPEN_KEYS_SESSION) === '1') {
+        sessionStorage.removeItem(GITHUB_OAUTH_REOPEN_KEYS_SESSION);
+        setApiKeysOpen(true);
+      } else {
+        queueMicrotask(() => {
+          window.dispatchEvent(new CustomEvent(GITHUB_OAUTH_REPO_PICKER_EVENT));
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+    void import('sonner').then(({ toast }) => {
+      toast.success('GitHub connected.');
+    });
+    const url = new URL(window.location.href);
+    url.searchParams.delete('github_oauth');
+    window.history.replaceState({}, '', url.pathname + url.search);
   }, []);
 
   const [mapLoadingMessageIndex, setMapLoadingMessageIndex] = useState(0);
@@ -901,6 +938,8 @@ export default function DossierPage() {
         selectedProjectId={projectId}
         onSelectProjectId={handleSelectProjectId}
         onSaveCurrentProject={refetch}
+        apiKeysOpen={apiKeysOpen}
+        onApiKeysOpenChange={setApiKeysOpen}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -926,6 +965,7 @@ export default function DossierPage() {
           }}
           onPlanningStateChange={setIsPlanning}
           onProjectUpdate={handleProjectUpdate}
+          onOpenApiKeys={() => setApiKeysOpen(true)}
         />
         </ChatErrorBoundary>
 
@@ -1101,5 +1141,19 @@ export default function DossierPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function DossierPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen w-screen flex items-center justify-center bg-background font-mono text-sm text-muted-foreground">
+          Loading…
+        </div>
+      }
+    >
+      <DossierPageInner />
+    </Suspense>
   );
 }

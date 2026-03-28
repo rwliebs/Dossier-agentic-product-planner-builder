@@ -4,7 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { writeConfigFile, getConfigPath } from "@/lib/config/data-dir";
+import { writeConfigFile, getConfigPath, removeConfigKeys } from "@/lib/config/data-dir";
+import { DOSSIER_GITHUB_IGNORE_ENV_KEY } from "@/lib/github/resolve-github-token";
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +22,10 @@ export async function POST(request: NextRequest) {
 
     const updates: Record<string, string> = {};
     if (anthropicApiKey) updates.ANTHROPIC_API_KEY = anthropicApiKey;
-    if (githubToken) updates.GITHUB_TOKEN = githubToken;
+    if (githubToken) {
+      removeConfigKeys([DOSSIER_GITHUB_IGNORE_ENV_KEY]);
+      updates.GITHUB_TOKEN = githubToken;
+    }
 
     writeConfigFile(updates);
 

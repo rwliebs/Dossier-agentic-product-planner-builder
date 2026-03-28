@@ -25,6 +25,8 @@ interface SettingsMenuProps {
   onSelectProjectId: (id: string) => void;
   /** Called before creating a new project to ensure current project is saved. */
   onSaveCurrentProject?: () => void | Promise<void>;
+  apiKeysOpen: boolean;
+  onApiKeysOpenChange: (open: boolean) => void;
 }
 
 const DEFAULT_BLANK_PROJECT_NAME = 'New project';
@@ -33,9 +35,10 @@ export function SettingsMenu({
   selectedProjectId,
   onSelectProjectId,
   onSaveCurrentProject,
+  apiKeysOpen,
+  onApiKeysOpenChange,
 }: SettingsMenuProps) {
   const { data: projects, loading, refetch } = useProjects();
-  const [apiKeysOpen, setApiKeysOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [creatingBlank, setCreatingBlank] = useState(false);
 
@@ -183,7 +186,7 @@ export function SettingsMenu({
             <DropdownMenuLabel className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
               API Keys
             </DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => setApiKeysOpen(true)}>
+            <DropdownMenuItem onClick={() => onApiKeysOpenChange(true)}>
               <KeyRound className="h-3.5 w-3.5 mr-2" />
               Edit keys &amp; tokens…
             </DropdownMenuItem>
@@ -191,7 +194,7 @@ export function SettingsMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <ApiKeysDialog open={apiKeysOpen} onOpenChange={setApiKeysOpen} />
+      <ApiKeysDialog open={apiKeysOpen} onOpenChange={onApiKeysOpenChange} />
     </>
   );
 }

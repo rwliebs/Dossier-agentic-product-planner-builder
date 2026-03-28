@@ -34,7 +34,16 @@ Anthropic credential (API key or Claude CLI config) and GitHub token:
 | Variable | Purpose |
 |----------|---------|
 | ANTHROPIC_API_KEY | Planning LLM and build (set in env or `~/.dossier/config`; or we use your Claude CLI `~/.claude/settings.json` when no key is set) |
-| GITHUB_TOKEN | Push branches, create PRs; [github.com/settings/tokens](https://github.com/settings/tokens) `repo` scope |
+| GITHUB_TOKEN | Push branches, list/create repos, HTTPS git; classic PAT from [tokens](https://github.com/settings/tokens) (`repo` scope), or written by **Connect GitHub** OAuth into `~/.dossier/config` |
+
+### GitHub OAuth (local / desktop)
+
+| Variable | Purpose |
+|----------|---------|
+| GITHUB_OAUTH_CLIENT_ID | OAuth App client ID for authorization code + PKCE ([new OAuth App](https://github.com/settings/applications/new)). Callback: `http://127.0.0.1:<port>/api/github/oauth/callback` — loopback allows a runtime port that differs from the one registered. |
+| GITHUB_OAUTH_CLIENT_SECRET | Optional; include in `.env.local` / server env if your token exchange requires it. Do not ship in public client builds. |
+| NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID | Optional; same ID as above for in-app links (e.g. GitHub “authorized applications” revoke URL). |
+| DOSSIER_GITHUB_IGNORE_ENV | Written by the app (not hand-set): when `1`/`true`/`yes`, `GITHUB_TOKEN` in **environment** is ignored and only `~/.dossier/config` `GITHUB_TOKEN` is used—so **Disconnect** works even if `.env.local` still defines `GITHUB_TOKEN`. Cleared on Connect / PAT save. |
 
 ---
 

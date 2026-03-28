@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { ChatPreviewPanel } from '@/components/dossier/chat-preview-panel';
 import { useProjectFiles, type FileNode } from '@/lib/hooks/use-project-files';
+import { githubOAuthStartHref, GITHUB_OAUTH_REPO_PICKER_EVENT } from '@/lib/github/oauth-client';
 
 function repoUrlToDisplayName(url: string | null | undefined): string {
   if (!url) return '';
@@ -88,6 +89,8 @@ interface LeftSidebarProps {
     repo_url?: string | null;
     default_branch?: string;
   }) => void | Promise<boolean | void>;
+  /** Open the API keys dialog (e.g. when GitHub token is missing). */
+  onOpenApiKeys?: () => void;
 }
 
 function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: FileNode; depth?: number; selectedFiles: string[]; onToggleFile: (path: string) => void }) {
@@ -116,7 +119,7 @@ function FileTreeNode({ node, depth = 0, selectedFiles, onToggleFile }: { node: 
   );
 }
 
-export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, onPlanningApplied, onMapChanged, onPlanningStateChange, onProjectUpdate }: LeftSidebarProps) {
+export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, onPlanningApplied, onMapChanged, onPlanningStateChange, onProjectUpdate, onOpenApiKeys }: LeftSidebarProps) {
   const { data: projectFiles } = useProjectFiles(projectId);
   const contextFileTree = projectFiles && projectFiles.length > 0 ? projectFiles : [];
 
@@ -264,33 +267,86 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
   const [createName, setCreateName] = useState('');
   const [createPrivate, setCreatePrivate] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [reposErrorKind, setReposErrorKind] = useState<'no_token' | 'bad_token' | 'other' | null>(null);
   const [connectSubmitting, setConnectSubmitting] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [selectedContextFiles, setSelectedContextFiles] = useState<string[]>([]);
+  /** True when /api/github/user succeeds but this project has no repo_url yet */
+  const [githubSignedInNoRepo, setGithubSignedInNoRepo] = useState<boolean | null>(null);
 
   const repoUrl = project.repo_url ?? null;
   const githubConnected = !!repoUrl;
   const repoName = repoUrlToDisplayName(repoUrl);
 
+  useEffect(() => {
+    if (githubConnected) {
+      setGithubSignedInNoRepo(null);
+      return;
+    }
+    let cancelled = false;
+    setGithubSignedInNoRepo(null);
+    fetch('/api/github/user')
+      .then((r) => {
+        if (!cancelled) setGithubSignedInNoRepo(r.ok);
+      })
+      .catch(() => {
+        if (!cancelled) setGithubSignedInNoRepo(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [githubConnected]);
+
   const openConnectDialog = useCallback(() => {
     setConnectError(null);
+    setReposErrorKind(null);
     setConnectDialogOpen(true);
     if (connectMode === 'link') {
       setReposLoading(true);
       setRepos([]);
       fetch('/api/github/repos')
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.error) setConnectError(data.error);
-          else setRepos(data.repos ?? []);
+        .then(async (r) => {
+          const data = (await r.json().catch(() => ({}))) as {
+            error?: string;
+            repos?: Array<{ full_name: string; html_url: string; private: boolean }>;
+          };
+          if (!r.ok) {
+            if (r.status === 503) setReposErrorKind('no_token');
+            else if (r.status === 401) setReposErrorKind('bad_token');
+            else setReposErrorKind('other');
+            setConnectError(typeof data.error === 'string' ? data.error : 'Failed to load repositories.');
+            setRepos([]);
+            return;
+          }
+          setReposErrorKind(null);
+          setConnectError(null);
+          setRepos(data.repos ?? []);
         })
-        .catch(() => setConnectError('Failed to load repositories.'))
+        .catch(() => {
+          setReposErrorKind('other');
+          setConnectError('Failed to load repositories.');
+        })
         .finally(() => setReposLoading(false));
     } else {
       setCreateName('');
       setCreatePrivate(false);
     }
   }, [connectMode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => {
+      if (project.repo_url?.trim()) return;
+      setExpandedSections((prev) => {
+        const next = new Set(prev);
+        next.add('github');
+        return next;
+      });
+      openConnectDialog();
+    };
+    window.addEventListener(GITHUB_OAUTH_REPO_PICKER_EVENT, handler);
+    return () => window.removeEventListener(GITHUB_OAUTH_REPO_PICKER_EVENT, handler);
+  }, [project.repo_url, openConnectDialog]);
 
   const linkRepo = useCallback(
     async (htmlUrl: string) => {
@@ -759,9 +815,16 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
               </>
             ) : (
               <>
-                <p className="text-[10px] text-muted-foreground mb-2">Connect a repo to include existing code as context.</p>
+                <p className="text-[10px] text-muted-foreground mb-2">
+                  {githubSignedInNoRepo === true
+                    ? 'GitHub is signed in. Choose a repository for this project — you’ll return to the map after you pick one.'
+                    : githubSignedInNoRepo === false
+                      ? 'Sign in to GitHub from Setup or API keys, then link a repository to use code as context.'
+                      : 'Checking GitHub connection…'}
+                </p>
                 <Button variant="outline" size="sm" className="w-full text-[11px] h-7 bg-transparent" onClick={openConnectDialog}>
-                  <Github className="h-3 w-3 mr-1.5" />Connect Repository
+                  <Github className="h-3 w-3 mr-1.5" />
+                  {githubSignedInNoRepo === true ? 'Choose repository' : 'Link repository'}
                 </Button>
               </>
             )}
@@ -771,9 +834,24 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
         <Dialog open={connectDialogOpen} onOpenChange={setConnectDialogOpen}>
           <DialogContent className="sm:max-w-md" showCloseButton={true}>
             <DialogHeader>
-              <DialogTitle>Connect GitHub repository</DialogTitle>
+              <DialogTitle>Link a GitHub repository</DialogTitle>
               <DialogDescription>
-                Link an existing repository or create a new one. Your GitHub token is used only on the server.
+                Choose a repo for this project (you’ll land back on the map when done), or create a new one. Credentials (OAuth or a PAT in{' '}
+                <code className="text-[10px] bg-muted px-0.5 rounded">GITHUB_TOKEN</code>) stay on this machine
+                under <code className="text-[10px] bg-muted px-0.5 rounded">~/.dossier/config</code>. Revoke access in{' '}
+                <a
+                  href={
+                    process.env.NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID
+                      ? `https://github.com/settings/connections/applications/${process.env.NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID}`
+                      : 'https://github.com/settings/applications'
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  GitHub settings
+                </a>
+                .
               </DialogDescription>
             </DialogHeader>
             <div className="flex gap-2 py-2">
@@ -795,12 +873,53 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
             {connectError && (
               <p className="text-xs text-destructive">{connectError}</p>
             )}
+            {!reposLoading && reposErrorKind === 'no_token' && (
+              <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3">
+                <p className="text-xs text-muted-foreground">GitHub isn&apos;t connected yet.</p>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => {
+                      window.location.href = githubOAuthStartHref('/');
+                    }}
+                  >
+                    <Github className="h-3 w-3 mr-1.5" />
+                    Connect GitHub
+                  </Button>
+                  {onOpenApiKeys && (
+                    <Button type="button" size="sm" variant="outline" className="w-full text-xs" onClick={() => onOpenApiKeys()}>
+                      Open API keys
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+            {!reposLoading && reposErrorKind === 'bad_token' && (
+              <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3">
+                <p className="text-xs text-muted-foreground">Session expired or token revoked. Reconnect GitHub.</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={() => {
+                    window.location.href = githubOAuthStartHref('/');
+                  }}
+                >
+                  <Github className="h-3 w-3 mr-1.5" />
+                  Reconnect GitHub
+                </Button>
+              </div>
+            )}
             {connectMode === 'link' && (
               <div className="border border-grid-line rounded bg-background max-h-48 overflow-y-auto">
                 {reposLoading ? (
                   <p className="p-3 text-xs text-muted-foreground">Loading repositories…</p>
                 ) : repos.length === 0 ? (
-                  <p className="p-3 text-xs text-muted-foreground">No repositories found.</p>
+                  <p className="p-3 text-xs text-muted-foreground">
+                    {reposErrorKind ? 'Fix the connection above, then reopen this dialog.' : 'No repositories found.'}
+                  </p>
                 ) : (
                   <ul className="py-1">
                     {repos.map((r) => (

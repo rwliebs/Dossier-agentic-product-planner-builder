@@ -4,22 +4,18 @@
  */
 
 import { NextResponse } from "next/server";
-import { readConfigFile, getConfigPath } from "@/lib/config/data-dir";
+import { getConfigPath } from "@/lib/config/data-dir";
 import { resolvePlanningCredentialWithSource } from "@/lib/llm/planning-credential";
 import { isClaudeCliAvailable } from "@/lib/llm/claude-client";
-
-function hasKey(key: string, config: Record<string, string>): boolean {
-  return !!(process.env[key]?.trim() || config[key]?.trim());
-}
+import { resolveGitHubToken } from "@/lib/github/resolve-github-token";
 
 export async function GET() {
-  const config = readConfigFile();
   const missing: string[] = [];
   const resolved = resolvePlanningCredentialWithSource();
   const cliAvailable = !resolved && isClaudeCliAvailable();
   const anthropicSatisfied = !!resolved || cliAvailable;
   if (!anthropicSatisfied) missing.push("ANTHROPIC_API_KEY");
-  if (!hasKey("GITHUB_TOKEN", config)) missing.push("GITHUB_TOKEN");
+  if (!resolveGitHubToken()) missing.push("GITHUB_TOKEN");
   const cliDetected = resolved?.source === "cli" || cliAvailable;
   return NextResponse.json({
     needsSetup: missing.length > 0,

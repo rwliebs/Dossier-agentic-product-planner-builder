@@ -38,11 +38,9 @@ export async function GET(request: NextRequest) {
   const returnPath = returnCookie.startsWith("/") ? returnCookie : "/";
 
   const ghError = url.searchParams.get("error");
-  if (ghError === "access_denied") {
-    return redirectError(request, returnPath, "access_denied");
-  }
   if (ghError) {
-    return redirectError(request, returnPath, "access_denied");
+    const code = ghError === "access_denied" ? "access_denied" : "server";
+    return redirectError(request, returnPath, code);
   }
 
   const code = url.searchParams.get("code");

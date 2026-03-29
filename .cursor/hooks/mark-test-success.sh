@@ -4,8 +4,11 @@
 
 input=$(cat)
 
-echo "$input" | python3 << 'PY'
+# Do not combine `echo … | python3` with `<<'PY'`: the heredoc wins as stdin, so the
+# pipe is discarded and sys.stdin.read() in Python never sees the hook JSON.
+python3 -c '
 import json
+import os
 import pathlib
 import re
 import sys
@@ -72,7 +75,7 @@ try:
 except (TypeError, ValueError):
     raise SystemExit(0)
 
-lock_dir = pathlib.Path("/tmp/dossier-scope-locks")
+lock_dir = pathlib.Path(os.environ.get("DOSSIER_SCOPE_LOCK_DIR", "/tmp/dossier-scope-locks"))
 lock_dir.mkdir(parents=True, exist_ok=True)
 stamp = lock_dir / f"{conv}.tests-verified"
 
@@ -83,6 +86,6 @@ else:
         stamp.unlink()
     except OSError:
         pass
-PY
+' <<< "$input"
 
 echo '{}'

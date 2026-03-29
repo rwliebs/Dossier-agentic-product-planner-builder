@@ -102,6 +102,31 @@ describe("GitHub OAuth API routes", () => {
     expect(res.headers.get("location")).toContain("github_error=invalid_state");
   });
 
+  it("GET /api/github/oauth/callback maps access_denied to github_error=access_denied", async () => {
+    const { GET } = await import("@/app/api/github/oauth/callback/route");
+    const req = new NextRequest(
+      "http://127.0.0.1:3000/api/github/oauth/callback?error=access_denied&error_description=user",
+      { headers: { host: "127.0.0.1:3000" } }
+    );
+    const res = await GET(req);
+    expect([302, 307]).toContain(res.status);
+    expect(res.headers.get("location")).toContain("github_error=access_denied");
+    expect(res.headers.get("location")).not.toContain("github_error=server");
+  });
+
+  it("GET /api/github/oauth/callback maps other OAuth errors to github_error=server", async () => {
+    const { GET } = await import("@/app/api/github/oauth/callback/route");
+    const req = new NextRequest(
+      "http://127.0.0.1:3000/api/github/oauth/callback?error=server_error",
+      { headers: { host: "127.0.0.1:3000" } }
+    );
+    const res = await GET(req);
+    expect([302, 307]).toContain(res.status);
+    const loc = res.headers.get("location") ?? "";
+    expect(loc).toContain("github_error=server");
+    expect(loc).not.toContain("github_error=access_denied");
+  });
+
   it("GET /api/github/oauth/meta is true when client id is set", async () => {
     vi.resetModules();
     const { GET } = await import("@/app/api/github/oauth/meta/route");

@@ -12,7 +12,7 @@ if [ -z "$conversation_id" ]; then
   exit 0
 fi
 
-LOCK_DIR="/tmp/dossier-scope-locks"
+LOCK_DIR="${DOSSIER_SCOPE_LOCK_DIR:-/tmp/dossier-scope-locks}"
 STAMP_FILE="$LOCK_DIR/$conversation_id.tests-verified"
 
 if [ "$CURSOR_COMPOSER_MODE" != "agent" ]; then

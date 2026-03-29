@@ -89,6 +89,44 @@ describe("GitHub OAuth API routes", () => {
     vi.unstubAllGlobals();
   });
 
+  it("GET /api/github/oauth/callback does not open-redirect on tampered // return cookie", async () => {
+    const state = "test-state-val";
+    const verifier = "test-verifier-val";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL) => {
+        const u = String(url);
+        if (u.includes("github.com/login/oauth/access_token")) {
+          return new Response(JSON.stringify({ access_token: "gho_from_oauth", token_type: "bearer" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        throw new Error(`unexpected fetch: ${u}`);
+      })
+    );
+
+    const { GET } = await import("@/app/api/github/oauth/callback/route");
+    const req = new NextRequest(
+      `http://127.0.0.1:3000/api/github/oauth/callback?code=exch-code&state=${encodeURIComponent(state)}`,
+      {
+        headers: {
+          host: "127.0.0.1:3000",
+          cookie: `dossier_gh_oauth_state=${state}; dossier_gh_oauth_verifier=${encodeURIComponent(verifier)}; dossier_gh_oauth_return=${encodeURIComponent("//evil.com/path")}`,
+        },
+      }
+    );
+    const res = await GET(req);
+    expect([302, 307]).toContain(res.status);
+    const loc = res.headers.get("location") ?? "";
+    const resolved = new URL(loc, req.url);
+    expect(resolved.origin).toBe(new URL(req.url).origin);
+    expect(resolved.hostname).not.toBe("evil.com");
+    expect(loc).not.toContain("evil.com");
+    expect(loc).toContain("github_oauth=success");
+    vi.unstubAllGlobals();
+  });
+
   it("GET /api/github/oauth/callback rejects bad state", async () => {
     const { GET } = await import("@/app/api/github/oauth/callback/route");
     const req = new NextRequest("http://127.0.0.1:3000/api/github/oauth/callback?code=x&state=bad", {

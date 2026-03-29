@@ -6,6 +6,7 @@ import {
   githubOAuthClientId,
   githubOAuthClientSecret,
   mergeReturnPathQuery,
+  normalizeReturnTo,
   oauthCallbackUrlFromRequest,
 } from "@/lib/github/oauth-server";
 import { removeConfigKeys, writeConfigFile } from "@/lib/config/data-dir";
@@ -34,8 +35,7 @@ export async function GET(request: NextRequest) {
   }
 
   const url = request.nextUrl;
-  const returnCookie = request.cookies.get(COOKIE_RETURN)?.value ?? "/";
-  const returnPath = returnCookie.startsWith("/") ? returnCookie : "/";
+  const returnPath = normalizeReturnTo(request.cookies.get(COOKIE_RETURN)?.value) ?? "/";
 
   const ghError = url.searchParams.get("error");
   if (ghError) {

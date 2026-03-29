@@ -8,7 +8,7 @@
  * Run by: node scripts/sync-action-button-tests.mjs
  * Or via Cursor hook when action files are edited.
  */
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,8 +28,6 @@ function extractConstants() {
 
   // Match: KEY: "value" or key: "value"
   const stringRe = /(\w+):\s*["']([^"']+)["']/g;
-  let m;
-  const seen = new Set();
 
   // Handle nested (CARD_ACTION, VIEW_MODE)
   const nestedRe = /(CARD_ACTION|VIEW_MODE):\s*\{([^}]+)\}/gs;
@@ -65,7 +63,6 @@ function syncTestFile(filePath, valueToPath) {
     if (value.length < 3) continue; // skip short strings
 
     const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp(escaped, "gi");
 
     // Skip if already uses this constant
     if (content.includes(constantPath)) continue;

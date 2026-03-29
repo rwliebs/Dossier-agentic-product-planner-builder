@@ -7,7 +7,7 @@
  * Requires: SQLITE_PATH or ~/.dossier/dossier.db
  */
 
-import { readFileSync, existsSync } from "fs";
+import { existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 

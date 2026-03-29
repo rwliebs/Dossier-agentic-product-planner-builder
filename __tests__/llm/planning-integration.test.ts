@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { parsePlanningResponse } from "@/lib/llm/parse-planning-response";
 import { validatePlanningOutput } from "@/lib/llm/validate-planning-output";
 import { buildPreviewFromActions } from "@/lib/llm/build-preview-response";
@@ -7,7 +7,6 @@ import type { PlanningAction } from "@/lib/schemas/slice-a";
 import { v4 as uuidv4 } from "uuid";
 
 const PROJECT_ID = "11111111-1111-1111-1111-111111111111";
-const WORKFLOW_ID = "22222222-2222-2222-2222-222222222222";
 const ACTIVITY_ID = "33333333-3333-3333-3333-333333333333";
 
 describe("planning integration", () => {

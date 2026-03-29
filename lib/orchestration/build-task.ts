@@ -89,39 +89,26 @@ If YES, proceed to Phase 2.
 const COMPLETION_VERIFICATION_SCRIPT = `
 ## Phase 3: COMPLETION VERIFICATION (MUST complete before reporting done)
 
-You MUST complete this checklist before reporting execution_completed. Show evidence for each checkbox.
+You MUST complete this checklist before reporting execution_completed. Show evidence for each item (Dossier repo).
 
-- [ ] All unit tests passing (show output)
-- [ ] All integration tests passing (show output)
-- [ ] All e2e tests passing (show output)
-- [ ] No new linter errors (show output)
-- [ ] No new type errors (show output)
-- [ ] Uncertainty register resolved
-- [ ] All acceptance criteria met (state criteria and show evidence per criterion)
-- [ ] Basic CRUD operations verified by test (show output)
-- [ ] Related product documentation identified and updated (if applicable)
-- [ ] Answer "Would you bet your family's financial future on this?" with a yes and explain why
-- [ ] Flow boundary preserved (Next.js API route remains FE boundary)
-  - Evidence: file diffs showing changes only in app/api/** and/or server code
-- [ ] No legacy table writes
-  - Evidence: grep outputs show no .insert/.update/.delete on invitation_offers, booking_participants, external cache
-- [ ] Timezone compliance
-  - Evidence: new/changed records persist start_local, end_local, tzid; DB generating start_utc, end_utc
-- [ ] Migrations path compliance
-  - Evidence: only lib/db/sqlite-migrations/** changed (no Alembic)
-- [ ] Stable endpoints unchanged or documented
-  - Evidence: list endpoints touched vs doc anchors in #stable-endpoints
-- [ ] Red-flag status and ADR (if any)
-  - Evidence: ADR link + approval
-- [ ] Boundary exceptions (if any) documented
-  - Evidence: list files permitted to call backend directly and justification
-- [ ] Test logging removed, replace with Sentry spans if required
-  - Evidence: no secrets/PII logged; Sentry only in prod paths
+- [ ] npm run test — paste Vitest summary (expect exit 0)
+- [ ] npm run lint — paste output (expect exit 0)
+- [ ] npx tsc --noEmit — paste output (expect exit 0)
+- [ ] npm run test:e2e — paste summary; report skipped tests and why (dev server, TEST_BASE_URL, DOSSIER_E2E_STRICT_BUILD)
+- [ ] Uncertainty register resolved for this task
+- [ ] Acceptance criteria — restate criteria from this task and give evidence per item
+- [ ] Domain coverage — planning/mutations/orchestration and/or API contract tests, or N/A with reason
+- [ ] Documentation — update docs/, README, or .env.example if behavior or configuration changed; else N/A
+- [ ] Change scope — list main paths touched (app/, lib/, components/, electron/, etc.) and confirm they match the request
+- [ ] Database — if schema or lib/db/migrate.ts changed, describe the migration; else N/A
+- [ ] Secrets — confirm no API keys/tokens logged or exposed in client bundles
+- [ ] npm run build — run when production routes, middleware, or packaging-relevant code changed; else N/A with reason
+- [ ] ADR / architecture — cite docs/adr if the change intersects an ADR or needs a follow-up; else N/A
 
-**Ready for Production?**: YES / NO
+**Ready for production?** YES / NO (if e2e or build was skipped without justification, answer NO)
 
-**If NO, blocking items**:
-- [List specific items that must be resolved before production]
+**If NO — blocking items**:
+- [List what is still required]
 
 Report your knowledge discoveries (facts found, assumptions made, questions raised) in the webhook knowledge field regardless of outcome.
 `;
@@ -237,8 +224,7 @@ ${acceptanceCriteria.map((c) => `- ${c}`).join("\n")}`);
 Retrieved memory IDs for context: ${memoryRefs.join(", ")}`);
   }
 
-  // TEMPORARY: skip Phase 3 completion verification to see if build succeeds faster
-  // sections.push(COMPLETION_VERIFICATION_SCRIPT);
+  sections.push(COMPLETION_VERIFICATION_SCRIPT);
 
   const taskDescription = sections.join("\n\n");
 

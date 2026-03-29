@@ -24,6 +24,7 @@ import {
   fetchMapSnapshot,
   getAllCards,
   cardCount,
+  isDossierProjectsApiAvailable,
   type MapSnapshot,
   type MapWorkflow,
 } from "./helpers";
@@ -103,6 +104,12 @@ async function runFlow(): Promise<{
   });
   if (!createRes.ok) {
     throw new Error(`Projects API failed: ${createRes.status}`);
+  }
+  const ct = createRes.headers.get("content-type") ?? "";
+  if (!ct.includes("application/json")) {
+    throw new Error(
+      `Projects API returned non-JSON (${ct}) — is Dossier running at ${BASE_URL}?`
+    );
   }
 
   const project = await createRes.json();
@@ -250,6 +257,12 @@ describe("project to cards flow", () => {
   it.skipIf(!canRunLLMTests())(
     "map has ≥2 workflows, cards with title, ≥2 cards build-ready (approved planned files + finalized)",
     async () => {
+      if (!(await isDossierProjectsApiAvailable())) {
+        console.warn(
+          `Skipping: Dossier JSON API not available at ${BASE_URL} (HTML or wrong app on port)`
+        );
+        return;
+      }
       const { map, cardBuildReady } = await runFlow();
       const result = satisfiesOutcome(map, cardBuildReady);
 

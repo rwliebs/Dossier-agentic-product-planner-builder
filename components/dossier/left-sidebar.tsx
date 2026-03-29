@@ -174,13 +174,10 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
     if (!populateStorageKey) return;
     if (ids === null) {
       localStorage.removeItem(populateStorageKey);
+      setPopulateOriginalMessageRaw("");
     }
-    // storage is written together with setPopulateOriginalMessage
+    // storage is written together with populateOriginalMessage via useEffect below
   }, [populateStorageKey]);
-
-  const setPopulateOriginalMessage = useCallback((message: string) => {
-    setPopulateOriginalMessageRaw(message);
-  }, []);
 
   // Sync both fields to localStorage whenever either changes
   useEffect(() => {
@@ -243,7 +240,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
       setThinkingPhraseIndex((i) => (i + 1) % THINKING_PHRASES.length);
     }, 3000);
     return () => window.clearInterval(id);
-  }, [isThinking, isPopulating, populateProgress]);
+  }, [isThinking, isPopulating, populateProgress, THINKING_PHRASES.length]);
 
   const commitName = useCallback(() => {
     setEditingName(false);

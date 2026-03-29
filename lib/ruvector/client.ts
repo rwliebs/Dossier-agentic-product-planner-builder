@@ -57,7 +57,6 @@ export type VectorDbInstance = {
 export function isRuvectorAvailable(): boolean {
   if (_available !== null) return _available;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     require("ruvector-core");
     _available = true;
     return true;
@@ -75,7 +74,6 @@ export function getRuvectorClient(): VectorDbInstance | null {
   if (_client) return _client;
   if (!isRuvectorAvailable()) return null;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { VectorDb } = require("ruvector-core");
     const dims = parseInt(process.env.RUVECTOR_DIMENSIONS ?? String(DEFAULT_DIMENSIONS), 10);
     _client = new VectorDb({

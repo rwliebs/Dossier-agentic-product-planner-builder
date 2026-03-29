@@ -6,7 +6,8 @@ describe("electron runtime helpers", () => {
     const dataDir = getDataDir({
       DOSSIER_DATA_DIR: "/tmp/custom-dossier",
       HOME: "/Users/example",
-    });
+      NODE_ENV: "test",
+    } as NodeJS.ProcessEnv);
 
     expect(dataDir).toBe("/tmp/custom-dossier");
   });
@@ -16,7 +17,7 @@ describe("electron runtime helpers", () => {
       isPackaged: true,
       resourcesPath: "/app/Contents/Resources",
       exists: (path) => path === "/app/Contents/Resources/node",
-      env: { PATH: "" },
+      env: { PATH: "", NODE_ENV: "test" } as NodeJS.ProcessEnv,
       platform: "darwin",
     });
 
@@ -28,7 +29,7 @@ describe("electron runtime helpers", () => {
       isPackaged: true,
       resourcesPath: "/app/Contents/Resources",
       exists: (path) => path === "/usr/local/bin/node",
-      env: { PATH: "/usr/local/bin:/usr/bin" },
+      env: { PATH: "/usr/local/bin:/usr/bin", NODE_ENV: "test" } as NodeJS.ProcessEnv,
       platform: "darwin",
     });
 

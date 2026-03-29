@@ -5,7 +5,6 @@ import {
   cardAssumptionSchema,
   cardQuestionSchema,
   cardPlannedFileSchema,
-  knowledgeItemStatusSchema,
 } from "@/lib/schemas/slice-b";
 
 describe("Slice B schema contracts", () => {

@@ -5,7 +5,7 @@ import { json, validationError, internalError } from "@/lib/api/response-helpers
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
+  { params: _params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
@@ -30,7 +30,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
+  { params: _params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
     const body = await request.json();

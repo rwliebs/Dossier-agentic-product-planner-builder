@@ -1,5 +1,4 @@
 import type { PlanningState } from "@/lib/schemas/planning-state";
-import type { PlanningAction } from "@/lib/schemas/slice-a";
 import { createEmptyPlanningState } from "@/lib/schemas/planning-state";
 import { v4 as uuidv4 } from "uuid";
 

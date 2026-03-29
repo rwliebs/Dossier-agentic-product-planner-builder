@@ -12,7 +12,6 @@ import { handleActivateWindow } from "./window-lifecycle";
 import { updateElectronApp } from "update-electron-app";
 
 // Handle Squirrel events (install/update/uninstall) on Windows; quit if handled.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 if (require("electron-squirrel-startup")) {
   app.quit();
   process.exit(0);

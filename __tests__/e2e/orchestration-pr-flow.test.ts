@@ -25,7 +25,6 @@ import {
 
 let serverUp = false;
 let projectId: string;
-let workflowId: string;
 let cardId: string;
 
 function skip() {
@@ -41,7 +40,6 @@ beforeAll(async () => {
     const project = await createProject("Orchestration PR Flow Test");
     projectId = project.id;
     const seeded = await seedProjectWithMap(projectId);
-    workflowId = seeded.workflowId;
     cardId = seeded.cardId;
   } catch {
     serverUp = false;

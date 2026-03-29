@@ -4,11 +4,9 @@ import { useMemo, useState, useRef, useCallback } from 'react';
 import { Pencil, Sparkles, ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ACTION_BUTTONS } from '@/lib/constants/action-buttons';
-import { StoryMapCanvas, type StoryMapCanvasProps } from './story-map-canvas';
+import { StoryMapCanvas } from './story-map-canvas';
 import { ArchitectureView } from './architecture-view';
 import type { MapSnapshot, MapCard, ContextArtifact, CardKnowledgeForDisplay } from '@/lib/types/ui';
-
-const EPIC_COLORS = ['yellow', 'blue', 'purple', 'green', 'orange', 'pink'] as const;
 
 type ProjectContextField = 'description' | 'customer_personas' | 'tech_stack' | 'deployment' | 'design_inspiration';
 

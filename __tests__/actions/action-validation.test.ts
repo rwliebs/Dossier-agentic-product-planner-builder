@@ -5,10 +5,7 @@ import {
   validateReferentialIntegrity,
   validatePolicies,
 } from "@/lib/actions/validate-action";
-import {
-  createEmptyPlanningState,
-  cardExists,
-} from "@/lib/schemas/planning-state";
+import { createEmptyPlanningState } from "@/lib/schemas/planning-state";
 import type { Project, PlanningAction } from "@/lib/schemas/slice-a";
 
 describe("Action Validation", () => {

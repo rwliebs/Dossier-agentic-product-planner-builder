@@ -36,6 +36,13 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "out",
+    ".next",
+    "website/dist",
+    "build",
+    "dist",
+    "coverage",
+    "electron/main.js"
   ]
 }

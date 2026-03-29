@@ -21,7 +21,6 @@ const DEFAULT_DIMENSIONS = 384;
 /** Whether ruvector-core is loadable. */
 export const ruvectorAvailable: boolean = (() => {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     require("ruvector-core");
     return true;
   } catch {
@@ -54,7 +53,6 @@ export async function cleanupRuvectorTestVectors(
 export function createTestRuvectorClient(): VectorDbInstance | null {
   if (!ruvectorAvailable) return null;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { VectorDb } = require("ruvector-core");
     const tmpDir = path.join(os.tmpdir(), `dossier-ruvector-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     fs.mkdirSync(tmpDir, { recursive: true });

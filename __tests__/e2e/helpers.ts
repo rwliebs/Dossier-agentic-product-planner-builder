@@ -28,6 +28,22 @@ export async function canReachServer(): Promise<boolean> {
   }
 }
 
+/** True when GET /api/projects returns a JSON array (Dossier API, not an HTML error page). */
+export async function isDossierProjectsApiAvailable(): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/projects`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return false;
+    const ct = res.headers.get("content-type") ?? "";
+    if (!ct.includes("application/json")) return false;
+    const data: unknown = await res.json();
+    return Array.isArray(data);
+  } catch {
+    return false;
+  }
+}
+
 import { consumeSSEStream } from "@/lib/api/sse";
 
 export async function consumeSSE(

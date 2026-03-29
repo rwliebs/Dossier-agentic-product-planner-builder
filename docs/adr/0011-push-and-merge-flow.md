@@ -18,7 +18,7 @@ Minimal automation: push branch, then hand off to GitHub.
 
 ## Consequences
 
-- One-click push from Dossier UI; no terminal or git commands required
+- One-click push from Dossier UI; no terminal or git commands required (card **Merge** pushes the branch and opens the repo; user creates the PR on GitHub)
 - PR creation and merge remain fully user-controlled on GitHub
 - `PullRequestCandidate` records exist in the DB but are not wired to GitHub API yet
 - Future: GitHub API PR creation can be added without changing the push flow
@@ -26,3 +26,7 @@ Minimal automation: push branch, then hand off to GitHub.
 ## Rollback
 
 Remove push endpoint; user manually pushes from terminal.
+
+## Related
+
+- [User Workflows Reference — GitHub integration: what works today](../product/user-workflows-reference.md#github-integration-what-works-today)

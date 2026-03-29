@@ -406,7 +406,8 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
       const msg = data?.error ?? (res.ok ? '' : 'Sync failed.');
       const { toast } = await import('sonner');
       if (res.ok) {
-        toast.success('Main branch synced with GitHub.');
+        toast.success(`Local ${data.branch ?? 'main'} synced with GitHub.`);
+        await onPlanningApplied?.();
       } else {
         toast.error(msg || 'Sync failed.');
       }
@@ -416,7 +417,7 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
     } finally {
       setSyncLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, onPlanningApplied]);
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   useEffect(() => { scrollToBottom(); }, [messages]);

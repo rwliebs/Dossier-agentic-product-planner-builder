@@ -105,6 +105,12 @@ export function ensureClone(
     const gitDir = path.join(clonePath, ".git");
 
     if (fs.existsSync(gitDir)) {
+      if (!repoUrl.trim().toLowerCase().startsWith("file://")) {
+        execFileSync("git", ["remote", "set-url", "origin", cloneUrl], {
+          cwd: clonePath,
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+      }
       execSync("git fetch origin", {
         cwd: clonePath,
         stdio: ["pipe", "pipe", "pipe"],
@@ -257,6 +263,7 @@ export function createFeatureBranch(
 /**
  * Syncs the local base branch (e.g. main) with origin.
  * Fetches from origin, then checks out the base branch and resets it to origin/<baseBranch>.
+ * If origin/<baseBranch> is missing, falls back to origin/HEAD (the remote's default branch).
  * Use after merging PRs on GitHub so the Dossier clone's local main is up to date.
  * If the clone does not exist, runs ensureClone first (fetch + optional clone).
  */
@@ -264,7 +271,7 @@ export function syncMainBranch(
   projectId: string,
   repoUrl: string,
   baseBranch = "main"
-): { success: boolean; error?: string } {
+): { success: boolean; branch?: string; error?: string } {
   if (!repoUrl?.trim() || repoUrl.includes("placeholder")) {
     return { success: false, error: "No repository connected." };
   }
@@ -280,24 +287,39 @@ export function syncMainBranch(
   const clonePath = cloneResult.clonePath;
 
   try {
-    // origin/<baseBranch> may not exist for a freshly seeded repo
-    let originRefExists = false;
+    let targetRef = `origin/${baseBranch}`;
+    let resolved = false;
+
     try {
-      runGitSync(clonePath, `rev-parse --verify origin/${baseBranch}`);
-      originRefExists = true;
+      runGitSync(clonePath, `rev-parse --verify ${targetRef}`);
+      resolved = true;
     } catch {
-      // Remote base branch not present yet; nothing to sync to
+      // origin/<baseBranch> not found — try origin/HEAD to detect remote default
     }
 
-    if (originRefExists) {
-      // Create or update local baseBranch to match origin (e.g. after merge on GitHub)
-      execSync(`git checkout -B "${baseBranch}" "origin/${baseBranch}"`, {
-        cwd: clonePath,
-        stdio: ["pipe", "pipe", "pipe"],
-      });
+    if (!resolved) {
+      try {
+        const symref = runGitSync(clonePath, "symbolic-ref refs/remotes/origin/HEAD");
+        targetRef = symref.replace("refs/remotes/", "");
+        resolved = true;
+      } catch {
+        // origin/HEAD not set either
+      }
     }
 
-    return { success: true };
+    if (!resolved) {
+      return {
+        success: false,
+        error: `Remote branch "${baseBranch}" not found after fetch. Check that the default branch name in project settings matches your GitHub repository.`,
+      };
+    }
+
+    execSync(`git checkout -B "${baseBranch}" "${targetRef}"`, {
+      cwd: clonePath,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    return { success: true, branch: baseBranch };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {

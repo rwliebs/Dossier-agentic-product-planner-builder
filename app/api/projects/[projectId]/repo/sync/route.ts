@@ -36,14 +36,15 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     const result = syncMainBranch(projectId, repoUrl, baseBranch);
 
     if (result.success) {
-      return json({ success: true, branch: baseBranch });
+      return json({ success: true, branch: result.branch ?? baseBranch });
     }
 
     const status =
       result.error?.includes("GITHUB_TOKEN") ||
       result.error?.includes("Authentication")
         ? 401
-        : result.error?.includes("No repository")
+        : result.error?.includes("No repository") ||
+            result.error?.includes("not found")
           ? 400
           : 502;
 

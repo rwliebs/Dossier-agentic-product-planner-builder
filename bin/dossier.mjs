@@ -101,15 +101,44 @@ function printBanner(dataDir, isFirstRun) {
 }
 
 // ---------------------------------------------------------------------------
-// Open browser (cross-platform via `open` package)
+// Open browser (cross-platform, with fallback chain)
+//
+// Uses execSync so the command runs through the system shell. This is the
+// only reliable approach on Windows — `spawn` with `detached: true` hangs
+// when used with shell built-ins like `start`.
 // ---------------------------------------------------------------------------
-async function openBrowser(url) {
-  try {
-    const open = (await import("open")).default;
-    await open(url);
-  } catch {
-    // Silently fail — user can open the URL manually
+function openBrowser(url) {
+  const p = process.platform;
+  const commands = p === "win32"
+    ? [
+        `rundll32 url.dll,FileProtocolHandler ${url}`,
+        `start "" "${url}"`,
+        `explorer "${url}"`,
+      ]
+    : p === "darwin"
+    ? [
+        `open "${url}"`,
+        `osascript -e 'open location "${url}"'`,
+      ]
+    : [
+        `xdg-open "${url}"`,
+        `sensible-browser "${url}"`,
+        `wslview "${url}"`,
+        `google-chrome "${url}"`,
+        `firefox "${url}"`,
+        `chromium-browser "${url}"`,
+        `chromium "${url}"`,
+      ];
+
+  for (const cmd of commands) {
+    try {
+      execSync(cmd, { stdio: "ignore", timeout: 5000, shell: true });
+      return;
+    } catch {
+      // Try next method
+    }
   }
+  console.error(`  Could not open browser. Please open this URL manually:\n  ${url}`);
 }
 
 // ---------------------------------------------------------------------------

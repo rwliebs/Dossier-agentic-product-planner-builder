@@ -1,4 +1,6 @@
 import { execSync, spawn } from "child_process";
+import { existsSync } from "fs";
+import { join } from "path";
 import type { PlanningState } from "@/lib/schemas/planning-state";
 import type { ContextArtifact } from "@/lib/schemas/slice-b";
 import {
@@ -12,6 +14,42 @@ import { planningResponseFromSdkText } from "./planning-sdk-bridge";
 import { runPlanningQuery, streamPlanningQuery } from "./planning-sdk-runner";
 
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+
+/**
+ * On Windows, Claude Code CLI requires git-bash.  If CLAUDE_CODE_GIT_BASH_PATH
+ * is not already set, probe common install locations and return an env override.
+ */
+function resolveGitBashEnv(): Record<string, string> {
+  if (process.platform !== "win32") return {};
+  if (process.env.CLAUDE_CODE_GIT_BASH_PATH) return {};
+
+  const candidates = [
+    join("C:", "Program Files", "Git", "bin", "bash.exe"),
+    join("C:", "Program Files (x86)", "Git", "bin", "bash.exe"),
+    process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, "Programs", "Git", "bin", "bash.exe") : "",
+    process.env.USERPROFILE ? join(process.env.USERPROFILE, "AppData", "Local", "Programs", "Git", "bin", "bash.exe") : "",
+  ];
+
+  for (const p of candidates) {
+    if (p && existsSync(p)) {
+      // Also set in process.env so ALL child processes (including SDK internals) inherit it
+      process.env.CLAUDE_CODE_GIT_BASH_PATH = p;
+      return { CLAUDE_CODE_GIT_BASH_PATH: p };
+    }
+  }
+  return {};
+}
+
+/** Cached git-bash env resolved once per process. */
+let gitBashEnvCache: Record<string, string> | null = null;
+function getGitBashEnv(): Record<string, string> {
+  if (gitBashEnvCache === null) gitBashEnvCache = resolveGitBashEnv();
+  return gitBashEnvCache;
+}
+
+// Eagerly resolve git-bash env at module load so process.env is populated
+// before any SDK calls (which inherit process.env for child processes).
+getGitBashEnv();
 
 /** Distinguishes API keys (sk-ant-api*) from OAuth tokens (sk-ant-oat*). No longer used for planning routing; kept for tests. */
 export function isLikelyApiKey(credential: string): boolean {
@@ -33,6 +71,7 @@ export function isClaudeCliAvailable(): boolean {
     execSync("claude --version", {
       stdio: "pipe",
       timeout: CLI_VERSION_CHECK_TIMEOUT_MS,
+      env: { ...process.env, ...resolveGitBashEnv() },
     });
     cliAvailableCache = true;
     return true;
@@ -75,7 +114,10 @@ async function claudePlanningRequestViaCli(
 
   return new Promise((resolve, reject) => {
     const args = ["-p", "--output-format", "json", "--model", model];
-    const proc = spawn("claude", args, { stdio: ["pipe", "pipe", "pipe"] });
+    const proc = spawn("claude", args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, ...getGitBashEnv() },
+    });
 
     let stdout = "";
     let stderr = "";
@@ -136,7 +178,10 @@ async function claudeStreamingRequestViaCli(
 
   return new Promise((resolve) => {
     const args = ["-p", "--output-format", "stream-json", "--model", model];
-    const proc = spawn("claude", args, { stdio: ["pipe", "pipe", "pipe"] });
+    const proc = spawn("claude", args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, ...getGitBashEnv() },
+    });
 
     let lineBuffer = "";
     let fullStdout = "";

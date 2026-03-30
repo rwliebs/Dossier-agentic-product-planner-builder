@@ -51,6 +51,15 @@ function buildEnvWithCredential(credential: string): Record<string, string | und
 }
 
 /**
+ * Build env that includes process.env (with any CLAUDE_CODE_GIT_BASH_PATH
+ * already resolved by claude-client.ts at import time). Used when no explicit
+ * credential is provided so the SDK still inherits platform-specific env vars.
+ */
+function buildBaseEnv(): Record<string, string | undefined> {
+  return { ...process.env } as Record<string, string | undefined>;
+}
+
+/**
  * Returns a promise that rejects with AbortError when the signal fires.
  * If already aborted, rejects immediately.
  */
@@ -85,7 +94,7 @@ export async function runPlanningQuery(options: PlanningSdkOptions): Promise<str
       allowedTools: tools,
       persistSession: false,
       ...(options.cwd && { cwd: options.cwd }),
-      ...(options.apiKey && { env: buildEnvWithCredential(options.apiKey) }),
+      env: options.apiKey ? buildEnvWithCredential(options.apiKey) : buildBaseEnv(),
     },
   });
 
@@ -139,7 +148,7 @@ export async function* streamPlanningQuery(options: PlanningSdkOptions): AsyncGe
       allowedTools: tools,
       persistSession: false,
       ...(options.cwd && { cwd: options.cwd }),
-      ...(options.apiKey && { env: buildEnvWithCredential(options.apiKey) }),
+      env: options.apiKey ? buildEnvWithCredential(options.apiKey) : buildBaseEnv(),
     },
   });
 

@@ -1,28 +1,14 @@
 import { NextResponse } from 'next/server';
 import { spawn } from 'child_process';
-import { promisify } from 'util';
-import { exec } from 'child_process';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { getClonePath } from '@/lib/orchestration/repo-manager';
-import open from 'open';
-
-const execAsync = promisify(exec);
+import { findFreePort } from '@/lib/platform/find-free-port';
+import { openBrowser } from '@/lib/platform/open-browser';
 
 const VIEW_PORT_START = 3001;
 const VIEW_PORT_END = 3010;
-
-async function findFreePort(): Promise<number | null> {
-  for (let port = VIEW_PORT_START; port <= VIEW_PORT_END; port++) {
-    try {
-      await execAsync(`lsof -ti :${port}`, { encoding: 'utf8' });
-      // lsof returned output = port in use
-    } catch {
-      // lsof exited non-zero = port free
-      return port;
-    }
-  }
-  return null;
-}
 
 /**
  * POST /api/dev/restart-and-open
@@ -68,7 +54,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const port = await findFreePort();
+  const port = await findFreePort(VIEW_PORT_START, VIEW_PORT_END);
 
   if (port === null) {
     return NextResponse.json(
@@ -77,19 +63,29 @@ export async function POST(request: Request) {
     );
   }
 
-  const script = [
-    `cd "${clonePath}" && PORT=${port} nohup npm run dev > /tmp/dossier-view-${port}.log 2>&1 &`,
-  ].join(' && ');
+  const logDir = path.join(os.tmpdir(), 'dossier');
+  fs.mkdirSync(logDir, { recursive: true });
+  const logFile = path.join(logDir, `view-${port}.log`);
+  const logFd = fs.openSync(logFile, 'a');
 
-  const child = spawn('bash', ['-c', script], {
+  // `shell: true` resolves `npm` → `npm.cmd` on Windows automatically,
+  // and handles PATH lookup on all platforms without platform branching.
+  const child = spawn('npm', ['run', 'dev'], {
     detached: true,
-    stdio: 'ignore',
+    shell: true,
+    stdio: ['ignore', logFd, logFd],
     cwd: clonePath,
+    env: { ...process.env, PORT: String(port) },
+    // Suppress visible console window on Windows (detached opens one by default).
+    ...(process.platform === 'win32' && { windowsHide: true }),
   });
+  child.on('error', () => {});
   child.unref();
+  // Close the fd in the parent — the child inherits its own copy.
+  fs.closeSync(logFd);
 
   setTimeout(() => {
-    open(`http://localhost:${port}`).catch(() => {});
+    openBrowser(`http://localhost:${port}`);
   }, 10_000);
 
   return NextResponse.json({

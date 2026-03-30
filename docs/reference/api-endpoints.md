@@ -34,6 +34,58 @@ All errors return JSON:
 
 ---
 
+## Setup & Environment
+
+### GET /api/setup/status
+
+Return whether first-run setup is required.
+
+**Response:** `200`
+```json
+{
+  "needsSetup": true,
+  "missingKeys": ["ANTHROPIC_API_KEY", "GITHUB_TOKEN"],
+  "configPath": "/home/user/.dossier/config",
+  "anthropicViaCli": false
+}
+```
+
+Notes:
+- `anthropicViaCli=true` means planning can run via installed Claude CLI even when API key is missing.
+- Build orchestration still requires `ANTHROPIC_API_KEY`.
+
+### POST /api/setup
+
+Persist credentials to `~/.dossier/config`.
+
+**Request body:**
+```json
+{
+  "anthropicApiKey": "sk-ant-...",
+  "githubToken": "ghp_..."
+}
+```
+
+At least one key is required.
+
+### GET /api/github/repos
+
+List repositories visible to configured `GITHUB_TOKEN`.
+
+### POST /api/github/repos
+
+Create a GitHub repository for the authenticated user.
+
+**Request body:**
+```json
+{
+  "name": "my-repo",
+  "private": true
+}
+```
+
+---
+
 ## Project Management
 
 ### GET /api/projects
@@ -147,6 +199,19 @@ Submit planning actions. Validates, applies, and persists. Rejects on first fail
 | `setCardKnowledgeStatus` | Set status (draft/approved/rejected) on a knowledge item |
 
 Code-generation intents are rejected.
+
+### POST /api/projects/[projectId]/actions/preview
+
+Dry-run action batch. Validates and returns previews without DB mutation.
+
+**Response:** `200`
+```json
+{
+  "success": true,
+  "previews": [{ "summary": "Create workflow Checkout" }],
+  "summary": ["Create workflow Checkout"]
+}
+```
 
 ---
 
@@ -271,6 +336,159 @@ Delete planned file.
 
 ---
 
+## Chat & Finalization
+
+### POST /api/projects/[projectId]/chat
+
+Non-streaming planning endpoint. Supports `scaffold`, `populate`, `finalize` modes.
+
+**Request body:**
+```json
+{
+  "message": "Create checkout workflow",
+  "mode": "scaffold",
+  "workflow_id": "uuid-when-populate"
+}
+```
+
+### POST /api/projects/[projectId]/chat/stream
+
+Streaming SSE planning endpoint. Emits action/progress events as planning runs.
+
+### GET /api/projects/[projectId]/cards/[cardId]/finalize
+
+Return card finalization package (card, project docs, linked artifacts, requirements, planned files).
+
+### POST /api/projects/[projectId]/cards/[cardId]/finalize
+
+Streaming SSE card finalization:
+1. Links project docs to card
+2. Generates e2e test context artifact
+3. Sets `card.finalized_at`
+
+Possible validation responses include:
+- Project not finalized
+- No card requirements
+- No planned files
+
+### GET /api/projects/[projectId]/cards/[cardId]/context-artifacts
+
+List artifacts linked to a card.
+
+### GET /api/projects/[projectId]/cards/[cardId]/produced-files
+
+List files produced by the completed assignment for a card (`added|modified`).
+
+---
+
+## Build & Orchestration
+
+### POST /api/projects/[projectId]/orchestration/build
+
+Trigger build run for a workflow or single card.
+
+**Request body:**
+```json
+{
+  "scope": "card",
+  "card_id": "uuid",
+  "initiated_by": "user",
+  "trigger_type": "manual"
+}
+```
+
+**Response:** `202`
+```json
+{
+  "runId": "uuid",
+  "assignmentIds": ["uuid"],
+  "message": "Build started",
+  "outcome_type": "success"
+}
+```
+
+### Runs
+
+- `GET /api/projects/[projectId]/orchestration/runs?scope=card|workflow&status=...&limit=...`
+- `POST /api/projects/[projectId]/orchestration/runs`
+- `GET /api/projects/[projectId]/orchestration/runs/[runId]`
+- `PATCH /api/projects/[projectId]/orchestration/runs/[runId]`
+
+### Assignments
+
+- `GET /api/projects/[projectId]/orchestration/runs/[runId]/assignments`
+- `POST /api/projects/[projectId]/orchestration/runs/[runId]/assignments`
+- `GET /api/projects/[projectId]/orchestration/runs/[runId]/assignments/[assignmentId]`
+- `POST /api/projects/[projectId]/orchestration/runs/[runId]/assignments/[assignmentId]/dispatch`
+
+### Checks
+
+- `GET /api/projects/[projectId]/orchestration/runs/[runId]/checks`
+- `POST /api/projects/[projectId]/orchestration/runs/[runId]/checks`
+- `GET /api/projects/[projectId]/orchestration/runs/[runId]/checks/[checkId]`
+
+### Approvals & PR candidates
+
+- `GET /api/projects/[projectId]/orchestration/approvals?run_id=<runId>`
+- `POST /api/projects/[projectId]/orchestration/approvals`
+- `GET /api/projects/[projectId]/orchestration/approvals/[approvalId]`
+- `PATCH /api/projects/[projectId]/orchestration/approvals/[approvalId]`
+- `GET /api/projects/[projectId]/orchestration/pull-requests?run_id=<runId>`
+- `POST /api/projects/[projectId]/orchestration/pull-requests`
+- `GET /api/projects/[projectId]/orchestration/pull-requests/[prId]`
+- `PATCH /api/projects/[projectId]/orchestration/pull-requests/[prId]`
+
+### Recovery & Webhooks
+
+- `POST /api/projects/[projectId]/orchestration/resume-blocked`
+- `POST /api/projects/[projectId]/orchestration/webhooks/agentic-flow`
+
+---
+
+## Repository Operations
+
+### POST /api/projects/[projectId]/repo/sync
+
+Fetch/clone (if needed) and sync local base branch to `origin/<default_branch>`.
+Use after merging PRs remotely to refresh local clone state.
+
+### POST /api/projects/[projectId]/cards/[cardId]/push
+
+Push completed card assignment branch from local clone to origin.
+
+Requires:
+- Connected repository
+- Completed assignment for the card
+- `GITHUB_TOKEN` configured
+
+---
+
+## Docs & Memory
+
+### GET /api/docs
+
+List docs from `docs/docs-index.yaml`.
+
+### GET /api/docs?path=product/user-workflows-reference.md
+
+Return raw markdown content for a specific docs path.
+
+### GET /api/projects/[projectId]/memory
+
+Return stored memory units for project plus storage paths (SQLite + RuVector).
+
+---
+
+## Dev-only Utilities
+
+### POST /api/dev/restart-and-open
+
+Development-only endpoint (`NODE_ENV=development`) used by "View on server":
+- Requires `{ "projectId": "uuid" }`
+- Starts `npm run dev` in project clone
+- Uses first free port in `3001..3010`
+- Opens browser tab after startup delay
+
 ## Project Files (Planned + Repository)
 
 ### GET /api/projects/[projectId]/files
@@ -319,3 +537,5 @@ File tree for the project. Two modes via `source` query param.
 - **Mutations**: All map changes go through the actions endpoint; no direct writes.
 - **Auth**: No auth/RLS; endpoints use anon access (single-user desktop app).
 - **Database**: SQLite only; no Supabase or Postgres.
+- **Planning credential model**: API key and Claude CLI paths are supported for planning endpoints.
+- **Build credential model**: Build/orchestration routes require `ANTHROPIC_API_KEY` and do not use CLI-only fallback.

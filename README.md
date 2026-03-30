@@ -141,7 +141,7 @@ Your browser will open to **http://localhost:3000**. First run creates `~/.dossi
 
 On first run you'll be guided through API key setup, or navigate directly to `/setup`.
 
-**Prerequisites:** Node.js 20+, [Anthropic API key](https://console.anthropic.com/). A [GitHub token](https://github.com/settings/tokens) with `repo` scope is needed only if you want agents to open PRs; agents can write files locally without it.
+**Prerequisites:** Node.js 20+, and Anthropic credentials. For planning, you can use an [Anthropic API key](https://console.anthropic.com/) or an authenticated Claude CLI install. Build orchestration requires `ANTHROPIC_API_KEY`. A [GitHub token](https://github.com/settings/tokens) with `repo` scope is needed only if you want agents to open PRs; agents can write files locally without it.
 
 > **Windows users:** Dossier uses native SQLite, which requires a C++ compiler during install. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/) with the **"Desktop development with C++"** workload, or run this from an elevated PowerShell:
 > ```powershell
@@ -165,7 +165,7 @@ On first run you'll be guided through API key setup, or navigate directly to `/s
 
 Configuration (API keys, GitHub token) can be set via the web UI at `/setup` or by editing `~/.dossier/config`. See [.env.example](.env.example) for all options.
 
-NEW: Use your Claude MAX account directly, no extra setup required (if you've got Claude Code installed locally.)
+NEW: You can use your Claude CLI authentication for planning workflows. Build orchestration still requires `ANTHROPIC_API_KEY`.
 
 ---
 

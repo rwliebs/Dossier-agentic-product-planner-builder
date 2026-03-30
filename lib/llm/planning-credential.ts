@@ -59,13 +59,18 @@ export interface ResolvedCredential {
  * Order: env → ~/.dossier/config → ~/.claude/settings.json.
  * When returning a token we set CLAUDE_CODE_OAUTH_TOKEN for the Agent SDK.
  */
+/** Minimal validation: Anthropic API keys start with "sk-ant-" and are 40+ characters. */
+function looksLikeValidCredential(value: string): boolean {
+  return value.length >= 20 && (value.startsWith("sk-ant-") || value.startsWith("sk-"));
+}
+
 export function resolvePlanningCredentialWithSource(): ResolvedCredential | null {
   const fromEnv = process.env.ANTHROPIC_API_KEY?.trim();
-  if (fromEnv) return { value: fromEnv, source: "env" };
+  if (fromEnv && looksLikeValidCredential(fromEnv)) return { value: fromEnv, source: "env" };
 
   const config = readConfigFile();
   const fromConfig = config.ANTHROPIC_API_KEY?.trim();
-  if (fromConfig) {
+  if (fromConfig && looksLikeValidCredential(fromConfig)) {
     process.env.ANTHROPIC_API_KEY = fromConfig;
     return { value: fromConfig, source: "config" };
   }

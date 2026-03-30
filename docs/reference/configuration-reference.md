@@ -1,6 +1,6 @@
 ---
 document_id: doc.configuration
-last_verified: 2026-02-18
+last_verified: 2026-03-30
 tokens_estimate: 600
 tags:
   - configuration
@@ -23,18 +23,43 @@ ttl_expires_on: null
 
 - INVARIANT: Config precedence: `process.env` > `.env.local` > `~/.dossier/config`
 - INVARIANT: Self-deploy uses `~/.dossier/config`; dev uses `.env.local`
-- Anthropic credential: we accept **API key** first (env, then `~/.dossier/config`). If none is set, we use your **installed Claude CLI** config: `~/.claude/settings.json` (or `CLAUDE_CONFIG_DIR`/settings.json). We read `env.ANTHROPIC_API_KEY` or `env.ANTHROPIC_AUTH_TOKEN` from that file so you don’t need to paste a key if Claude Code is already configured.
+- Planning auth supports two paths:
+  1. API-key path (`ANTHROPIC_API_KEY` from env/config), or
+  2. Claude CLI path (installed/authenticated `claude` CLI, with optional credential read from `~/.claude/settings.json`).
+- Build orchestration requires `ANTHROPIC_API_KEY` (env/config). Claude CLI fallback does not satisfy build dispatch.
 
 ---
 
 ## Required
 
-Anthropic credential (API key or Claude CLI config) and GitHub token:
+Credential requirements depend on subsystem:
 
 | Variable | Purpose |
 |----------|---------|
-| ANTHROPIC_API_KEY | Planning LLM and build (set in env or `~/.dossier/config`; or we use your Claude CLI `~/.claude/settings.json` when no key is set) |
+| ANTHROPIC_API_KEY | Required for build orchestration; also valid for planning LLM |
 | GITHUB_TOKEN | Push branches, create PRs; [github.com/settings/tokens](https://github.com/settings/tokens) `repo` scope |
+
+Planning can additionally use Claude CLI auth when `ANTHROPIC_API_KEY` is absent.
+
+---
+
+## Credential Behavior by Subsystem
+
+| Subsystem | Credential resolution | Notes |
+|----------|------------------------|-------|
+| Planning chat (`/api/projects/[projectId]/chat`, `/chat/stream`) | `ANTHROPIC_API_KEY` (env) → `ANTHROPIC_API_KEY` (`~/.dossier/config`) → `~/.claude/settings.json` (`ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`) → Claude CLI subprocess if no credential but CLI is installed | Setup status reports this as `anthropicViaCli: true` when CLI path is available |
+| Build orchestration (`/api/projects/[projectId]/orchestration/build`) | `ANTHROPIC_API_KEY` (env/config) | Uses Claude Agent SDK query path; no CLI-only fallback |
+
+---
+
+## Troubleshooting
+
+- **Planning works, build fails with Anthropic credential error**
+  - Cause: CLI auth satisfies planning but build still needs `ANTHROPIC_API_KEY`.
+  - Fix: Set `ANTHROPIC_API_KEY` in `/setup`, `.env.local`, or `~/.dossier/config`.
+- **`/setup` keeps requiring `GITHUB_TOKEN`**
+  - Cause: Token missing from both env and config.
+  - Fix: Add token in `/setup` or config file. Some repo endpoints return `401`/`503` without it.
 
 ---
 

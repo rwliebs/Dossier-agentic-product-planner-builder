@@ -1,6 +1,6 @@
 ---
 document_id: doc.development
-last_verified: 2026-02-18
+last_verified: 2026-03-30
 tokens_estimate: 700
 tags:
   - development
@@ -46,6 +46,7 @@ pnpm install   # or: npm install
 - **Development**: Copy `.env.example` to `.env.local`; fill `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`
 - **Self-deploy**: Use `/setup` or edit `~/.dossier/config`
 - Precedence: `process.env` > `.env.local` > `~/.dossier/config`
+- Planning can run through Claude CLI auth when API key is absent; build orchestration still requires `ANTHROPIC_API_KEY`
 
 ---
 
@@ -86,6 +87,52 @@ Override: `DOSSIER_DATA_DIR` or `SQLITE_PATH`
 2. Make changes; run `npm run test` and `npm run lint`
 3. Commit with descriptive message
 4. Rebase on main before merge
+
+---
+
+## Operational Runbook (Common Tasks)
+
+### Sync local clone after merging on GitHub
+
+Use:
+
+`POST /api/projects/[projectId]/repo/sync`
+
+This fetches and syncs local `<default_branch>` in `~/.dossier/repos/<projectId>/` to `origin/<default_branch>`.
+
+### Push a completed card branch
+
+Use:
+
+`POST /api/projects/[projectId]/cards/[cardId]/push`
+
+Requires:
+- Connected repository on project
+- Completed assignment for the card
+- `GITHUB_TOKEN` configured
+
+### View app from cloned project during development
+
+Use:
+
+`POST /api/dev/restart-and-open` with `{ "projectId": "..." }`
+
+Behavior:
+- Dev-only (`NODE_ENV=development`)
+- Starts `npm run dev` in clone path
+- Picks first free port in `3001..3010`
+
+---
+
+## Troubleshooting
+
+- **Planning works but build trigger fails with Anthropic credential error**
+  - Planning may be running via Claude CLI auth.
+  - Build path uses orchestration/Agent SDK and requires `ANTHROPIC_API_KEY`.
+- **Push/sync endpoints failing with auth errors**
+  - Verify `GITHUB_TOKEN` is set in env or `~/.dossier/config`.
+- **Finalize blocked**
+  - Card finalize requires project finalized state, at least one requirement, and at least one planned file.
 
 ---
 

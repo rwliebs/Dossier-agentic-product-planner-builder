@@ -1,6 +1,6 @@
 ---
 document_id: doc.planning
-last_verified: 2026-03-06
+last_verified: 2026-03-30
 tokens_estimate: 750
 tags:
   - planning
@@ -25,6 +25,7 @@ ttl_expires_on: null
 - INVARIANT: Planning LLM outputs PlanningAction[] only; never production code or file contents
 - INVARIANT: Code-generation intents rejected; respond with clarification redirect
 - INVARIANT: IDs in actions must exist in current map state; new entities get fresh UUIDs
+- INVARIANT: Planning auth can use API key or Claude CLI; build orchestration remains API-key-based
 
 ### Boundaries
 - ALLOWED: createWorkflow, createActivity, createCard, updateCard, linkContextArtifact, upsertCardPlannedFile, createContextArtifact, etc.
@@ -49,20 +50,28 @@ Mode selected by `lib/llm/planning-prompt.ts` based on map state.
 ```
 User message → POST /chat/stream
   → buildPlanningSystemPrompt() | buildScaffoldSystemPrompt() | buildPopulateSystemPrompt() | buildFinalizeSystemPrompt()
-  → Claude API (streaming)
+  → auth resolution (API key or Claude CLI)
+  → Claude call (SDK stream or CLI stream-json)
   → stream-action-parser (parse JSON blocks)
   → PlanningAction[] emitted
   → POST /actions (validate + apply)
 ```
 
+### Auth + Transport Paths
+
+| Path | When used | Transport |
+|------|-----------|-----------|
+| API key path | `ANTHROPIC_API_KEY` available via env/config/CLI settings file | Anthropic SDK bridge (`runPlanningQuery` / `streamPlanningQuery`) |
+| CLI path | No API key resolved, but `claude` CLI is installed/authenticated | `claude -p` subprocess (`--output-format json` or `stream-json`) |
+
+Build agents do not use the CLI path; they require `ANTHROPIC_API_KEY`.
+
 ### Per-Card Finalize Flow
 ```
 User clicks "Finalize" on card → POST /cards/[cardId]/finalize
-  → Assemble: project-wide docs + card context + e2e tests
-  → Return finalization package for review
-  → User edits (optional)
-  → POST /cards/[cardId]/finalize/confirm
-  → Set card.finalized_at → card is build-ready
+  → SSE pipeline: link project docs + generate e2e test artifact + stamp finalized_at
+  → Optional memory ingest for build retrieval context
+  → Card becomes build-ready
 ```
 
 ### Key Files
@@ -71,8 +80,8 @@ User clicks "Finalize" on card → POST /cards/[cardId]/finalize
 | `lib/llm/planning-prompt.ts` | System prompts; mode selection |
 | `lib/llm/stream-action-parser.ts` | Parse streaming JSON → actions |
 | `lib/llm/build-preview-response.ts` | Preview response before apply |
-| `lib/llm/claude-client.ts` | Planning LLM client (Messages API) |
-| `lib/llm/planning-credential.ts` | Resolves ANTHROPIC_API_KEY from env or ~/.dossier/config |
+| `lib/llm/claude-client.ts` | Planning auth/router (API-key SDK path or Claude CLI subprocess path) |
+| `lib/llm/planning-credential.ts` | Resolves planning credential from env/config/`~/.claude/settings.json` |
 | `app/api/projects/[id]/chat/route.ts` | Non-streaming chat |
 | `app/api/projects/[id]/chat/stream/route.ts` | Streaming chat (scaffold, populate, finalize) |
 | `app/api/projects/[id]/cards/[cardId]/finalize/route.ts` | Per-card finalize endpoint |

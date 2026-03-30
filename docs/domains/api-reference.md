@@ -1,6 +1,6 @@
 ---
 document_id: doc.api-reference
-last_verified: 2026-02-18
+last_verified: 2026-03-30
 tokens_estimate: 400
 tags:
   - api
@@ -30,7 +30,14 @@ ttl_expires_on: null
 | Artifacts | `/api/projects/[id]/artifacts` | Context artifacts |
 | Card knowledge | `/api/projects/[id]/cards/[cardId]/{requirements,facts,assumptions,questions}` | Knowledge items |
 | Planned files | `/api/projects/[id]/cards/[cardId]/planned-files` | Card planned files |
+| Finalize | `/api/projects/[id]/cards/[cardId]/finalize` | Card finalization package + SSE finalize pipeline |
+| Orchestration build | `/api/projects/[id]/orchestration/build` | Trigger card/workflow build runs |
+| Orchestration runs | `/api/projects/[id]/orchestration/runs` | Create/list runs, assignments, checks |
+| Approvals & PR candidates | `/api/projects/[id]/orchestration/{approvals,pull-requests}` | Human-gated approval + PR metadata lifecycle |
+| Repo sync/push | `/api/projects/[id]/repo/sync`, `/cards/[cardId]/push` | Sync local base branch and push card feature branch |
 | Files | `/api/projects/[id]/files` | File tree (planned or repo); `?source=repo` for produced code |
+| Setup & GitHub | `/api/setup`, `/api/setup/status`, `/api/github/repos` | First-run credentials and GitHub repo list/create |
+| Docs & memory | `/api/docs`, `/api/projects/[id]/memory` | Docs index/content and memory inspection |
 
 ## Related
 - [data-contracts-reference.md](data-contracts-reference.md)

@@ -1,4 +1,4 @@
-import { execSync, spawn } from "child_process";
+import { execFileSync, spawn } from "child_process";
 import type { PlanningState } from "@/lib/schemas/planning-state";
 import type { ContextArtifact } from "@/lib/schemas/slice-b";
 import {
@@ -24,15 +24,17 @@ const CLI_DEFAULT_MODEL = "claude-sonnet-4-6";
 /** Verify the claude binary exists and is authenticated (e.g. Max subscription). */
 const CLI_VERSION_CHECK_TIMEOUT_MS = 3_000;
 
-/** Process-lifetime cache to avoid blocking execSync on every middleware/setup request. */
+/** Process-lifetime cache for CLI probe (execFileSync). Windows resolves `claude` via `claude.cmd`; shell required for batch/cmd shims (CVE-2024-27980). */
 let cliAvailableCache: boolean | null = null;
 
 export function isClaudeCliAvailable(): boolean {
   if (cliAvailableCache !== null) return cliAvailableCache;
   try {
-    execSync("claude --version", {
+    execFileSync("claude", ["--version"], {
       stdio: "pipe",
       timeout: CLI_VERSION_CHECK_TIMEOUT_MS,
+      shell: true,
+      encoding: "utf-8",
     });
     cliAvailableCache = true;
     return true;
@@ -75,7 +77,10 @@ async function claudePlanningRequestViaCli(
 
   return new Promise((resolve, reject) => {
     const args = ["-p", "--output-format", "json", "--model", model];
-    const proc = spawn("claude", args, { stdio: ["pipe", "pipe", "pipe"] });
+    const proc = spawn("claude", args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: true,
+    });
 
     let stdout = "";
     let stderr = "";
@@ -136,7 +141,10 @@ async function claudeStreamingRequestViaCli(
 
   return new Promise((resolve) => {
     const args = ["-p", "--output-format", "stream-json", "--model", model];
-    const proc = spawn("claude", args, { stdio: ["pipe", "pipe", "pipe"] });
+    const proc = spawn("claude", args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: true,
+    });
 
     let lineBuffer = "";
     let fullStdout = "";

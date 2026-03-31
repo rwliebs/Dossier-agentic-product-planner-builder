@@ -1,19 +1,21 @@
 /**
  * Auth branching and CLI subprocess path for claude-client.
  * When no API key is set, planning can use Claude Code CLI (e.g. Max subscription).
- * Mocks child_process.spawn; uses forceCliForTesting to exercise CLI path without execSync mock.
+ * Mocks child_process.spawn and execFileSync; uses forceCliForTesting to exercise CLI path.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 const mockSpawn = vi.fn();
-const mockExecSync = vi.fn();
+const mockExecFileSync = vi.fn();
 
 vi.mock("child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("child_process")>();
   return {
+    ...actual,
     default: actual,
-    execSync: (cmd: string, opts?: unknown) => mockExecSync(cmd, opts),
+    execFileSync: (file: string, args?: readonly string[], opts?: unknown) =>
+      mockExecFileSync(file, args, opts) as ReturnType<typeof actual.execFileSync>,
     spawn: (cmd: string, args: string[], opts?: unknown) => mockSpawn(cmd, args, opts),
   };
 });
@@ -67,10 +69,10 @@ function createFakeProcess(stdout: string, exitCode: number): NodeJS.Process {
 describe("claude-client CLI auth", () => {
   const savedEnv: Record<string, string | undefined> = {};
 
-  it("child_process mock exposes spawn and execSync as functions", async () => {
+  it("child_process mock exposes spawn and execFileSync as functions", async () => {
     const cp = await import("child_process");
     expect(typeof (cp as { spawn?: unknown }).spawn).toBe("function");
-    expect(typeof (cp as { execSync?: unknown }).execSync).toBe("function");
+    expect(typeof (cp as { execFileSync?: unknown }).execFileSync).toBe("function");
   });
 
   beforeEach(() => {
@@ -78,8 +80,8 @@ describe("claude-client CLI auth", () => {
     delete process.env.ANTHROPIC_API_KEY;
     vi.mocked(readConfigFile).mockReturnValue({});
     vi.mocked(resolvePlanningCredential).mockReturnValue(null);
-    mockExecSync.mockReset();
-    mockExecSync.mockImplementation(() => undefined);
+    mockExecFileSync.mockReset();
+    mockExecFileSync.mockImplementation(() => "");
     mockSpawn.mockReset();
   });
 
@@ -105,7 +107,11 @@ describe("claude-client CLI auth", () => {
       { forceCliForTesting: true },
     );
 
-    expect(mockSpawn).toHaveBeenCalledWith("claude", expect.arrayContaining(["-p", "--output-format", "json", "--model"]), expect.any(Object));
+    expect(mockSpawn).toHaveBeenCalledWith(
+      "claude",
+      expect.arrayContaining(["-p", "--output-format", "json", "--model"]),
+      expect.objectContaining({ stdio: ["pipe", "pipe", "pipe"], shell: true }),
+    );
     expect(result.text).toBe("ok");
     expect(result.stopReason).toBe("end_turn");
   });
@@ -145,7 +151,7 @@ describe("claude-client CLI auth", () => {
   });
 
   it("throws informative error when neither API key nor CLI is available", async () => {
-    mockExecSync.mockImplementation(() => {
+    mockExecFileSync.mockImplementation(() => {
       throw new Error("claude: command not found");
     });
     const { claudePlanningRequest } = await import("@/lib/llm/claude-client");

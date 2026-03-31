@@ -217,6 +217,12 @@ export function LeftSidebar({ isCollapsed, onToggle, project, projectId, width, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    setIsThinking(false);
+    setIsPopulating(false);
+    setPopulateProgress(null);
+  }, [projectId]);
+
   useEffect(() => { setDraftName(project.name); }, [project.name]);
   useEffect(() => { setDraftDesc(project.description ?? ''); }, [project.description]);
   useEffect(() => { if (editingName) nameInputRef.current?.focus(); }, [editingName]);

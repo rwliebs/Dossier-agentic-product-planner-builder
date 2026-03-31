@@ -21,6 +21,7 @@ export function useMapSnapshot(projectId: string | undefined): UseMapSnapshotRes
     if (!projectId) {
       setData(null);
       setError(null);
+      setLoading(false);
       return;
     }
     // Only show loading on initial load; background refetches (e.g. polling) keep existing data visible

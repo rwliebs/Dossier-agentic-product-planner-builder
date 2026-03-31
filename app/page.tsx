@@ -1032,7 +1032,7 @@ function DossierPageInner() {
                   </div>
                 )}
                 {!mapLoading && !mapError && snapshot && (
-                  <div className="animate-in fade-in duration-300">
+                  <div className="min-h-0 opacity-100">
                   <MapErrorBoundary onRetry={refetch}>
                   <WorkflowBlock
                     snapshot={snapshot}

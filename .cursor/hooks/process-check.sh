@@ -4,6 +4,18 @@
 input=$(cat)
 
 composer_mode=$(echo "$input" | grep -o '"composer_mode"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
+conversation_id=$(echo "$input" | grep -o '"conversation_id"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
+
+# Snapshot git state at session start so the stop hook can measure session-only changes
+if [ -n "$conversation_id" ]; then
+  snapshot_dir="/tmp/dossier-git-snapshots"
+  mkdir -p "$snapshot_dir"
+  project_dir="${CURSOR_PROJECT_DIR:-$(pwd)}"
+  (cd "$project_dir" 2>/dev/null && {
+    git diff --numstat 2>/dev/null > "$snapshot_dir/$conversation_id.diff-start"
+    git ls-files --others --exclude-standard 2>/dev/null > "$snapshot_dir/$conversation_id.untracked-start"
+  })
+fi
 
 if [ "$composer_mode" = "agent" ]; then
   cat << 'HOOKEOF'

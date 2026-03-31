@@ -11,11 +11,30 @@ const VIEW_PORT_START = 3001;
 const VIEW_PORT_END = 3010;
 
 /**
+ * True when the app process is almost certainly running on a remote PaaS/serverless host.
+ * Avoid generic CI vars (e.g. GITHUB_ACTIONS) so local and GitHub Actions test runs are unaffected.
+ */
+function isLikelyHostedCloudRuntime(): boolean {
+  const e = process.env;
+  if (e.VERCEL) return true;
+  if (e.NETLIFY) return true;
+  if (e.CF_PAGES === "1") return true;
+  if (e.AWS_EXECUTION_ENV) return true;
+  if (e.FLY_APP_NAME) return true;
+  if (e.RAILWAY_ENVIRONMENT) return true;
+  if (e.RENDER) return true;
+  if (e.K_SERVICE) return true;
+  if (e.HEROKU_APP_NAME) return true;
+  return false;
+}
+
+/**
  * Next.js `next dev` sets NODE_ENV=development. Standalone (CLI + Electron) runs production
  * builds locally; those entrypoints set DOSSIER_ALLOW_PROJECT_DEV_SERVER=1 so this route
- * still works. Public deployments should leave that unset so the endpoint stays disabled.
+ * still works. On known hosted platforms this stays off even if those vars are set mistakenly.
  */
 function isRestartAndOpenEnabled(): boolean {
+  if (isLikelyHostedCloudRuntime()) return false;
   if (process.env.NODE_ENV === "development") return true;
   return process.env.DOSSIER_ALLOW_PROJECT_DEV_SERVER === "1";
 }
@@ -27,7 +46,8 @@ function isRestartAndOpenEnabled(): boolean {
  * and opens it in a new browser tab. Tries ports 3001, 3002, ... until a free port is found.
  * Does not kill or restart the primary Dossier server on 3000.
  * Spawns a detached child process so the API can respond immediately.
- * Disabled unless NODE_ENV=development or DOSSIER_ALLOW_PROJECT_DEV_SERVER=1 (local use).
+ * Disabled on detected hosted runtimes, or unless NODE_ENV=development or
+ * DOSSIER_ALLOW_PROJECT_DEV_SERVER=1 (local / Electron / CLI).
  *
  * Body: { projectId: string } (required).
  */

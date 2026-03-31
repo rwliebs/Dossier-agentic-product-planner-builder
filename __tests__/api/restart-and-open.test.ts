@@ -9,9 +9,11 @@ import { describe, it, expect, afterEach } from "vitest";
 const env = process.env as {
   NODE_ENV?: string;
   DOSSIER_ALLOW_PROJECT_DEV_SERVER?: string;
+  VERCEL?: string;
 };
 const originalNodeEnv = env.NODE_ENV;
 const originalAllowFlag = env.DOSSIER_ALLOW_PROJECT_DEV_SERVER;
+const originalVercel = env.VERCEL;
 
 describe("POST /api/dev/restart-and-open", () => {
   afterEach(() => {
@@ -20,6 +22,11 @@ describe("POST /api/dev/restart-and-open", () => {
       delete env.DOSSIER_ALLOW_PROJECT_DEV_SERVER;
     } else {
       env.DOSSIER_ALLOW_PROJECT_DEV_SERVER = originalAllowFlag;
+    }
+    if (originalVercel === undefined) {
+      delete env.VERCEL;
+    } else {
+      env.VERCEL = originalVercel;
     }
   });
 
@@ -54,6 +61,22 @@ describe("POST /api/dev/restart-and-open", () => {
     const data = await res.json();
     expect(data).toHaveProperty("error");
     expect(String(data.error).toLowerCase()).toMatch(/clone|not cloned|run a build/i);
+  });
+
+  it("returns 404 on Vercel-like host even with allow flag and development", async () => {
+    env.VERCEL = "1";
+    env.NODE_ENV = "development";
+    env.DOSSIER_ALLOW_PROJECT_DEV_SERVER = "1";
+    const { POST } = await import("@/app/api/dev/restart-and-open/route");
+    const req = new Request("http://localhost/api/dev/restart-and-open", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId: "any-id" }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(404);
+    const data = await res.json();
+    expect(data).toHaveProperty("error", "Not found");
   });
 
   it("returns 400 when body is missing or invalid JSON", async () => {

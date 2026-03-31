@@ -11,18 +11,28 @@ const VIEW_PORT_START = 3001;
 const VIEW_PORT_END = 3010;
 
 /**
+ * Next.js `next dev` sets NODE_ENV=development. Standalone (CLI + Electron) runs production
+ * builds locally; those entrypoints set DOSSIER_ALLOW_PROJECT_DEV_SERVER=1 so this route
+ * still works. Public deployments should leave that unset so the endpoint stays disabled.
+ */
+function isRestartAndOpenEnabled(): boolean {
+  if (process.env.NODE_ENV === "development") return true;
+  return process.env.DOSSIER_ALLOW_PROJECT_DEV_SERVER === "1";
+}
+
+/**
  * POST /api/dev/restart-and-open
  *
  * Starts the project's dev server from its clone (~/.dossier/repos/<projectId>/)
  * and opens it in a new browser tab. Tries ports 3001, 3002, ... until a free port is found.
  * Does not kill or restart the primary Dossier server on 3000.
  * Spawns a detached child process so the API can respond immediately.
- * Dev-only: disabled in production to prevent unauthenticated DoS.
+ * Disabled unless NODE_ENV=development or DOSSIER_ALLOW_PROJECT_DEV_SERVER=1 (local use).
  *
  * Body: { projectId: string } (required).
  */
 export async function POST(request: Request) {
-  if (process.env.NODE_ENV !== "development") {
+  if (!isRestartAndOpenEnabled()) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

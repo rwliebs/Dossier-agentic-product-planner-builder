@@ -177,6 +177,7 @@ async function main() {
       ...process.env,
       PORT: String(port),
       HOSTNAME: "0.0.0.0",
+      DOSSIER_ALLOW_PROJECT_DEV_SERVER: "1",
     },
     stdio: "inherit",
     cwd: join(__dirname, "..", ".next", "standalone"),

@@ -152,6 +152,8 @@ async function startNextServer(appPath: string): Promise<void> {
       PORT: String(serverPort),
       HOSTNAME: "127.0.0.1",
       DOSSIER_DATA_DIR: dataDir,
+      // Standalone Next uses production NODE_ENV; allow POST /api/dev/restart-and-open.
+      DOSSIER_ALLOW_PROJECT_DEV_SERVER: "1",
     },
     stdio: ["ignore", "pipe", "pipe"],
     cwd: standaloneDir,

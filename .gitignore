@@ -57,3 +57,11 @@ website/node_modules
 website/dist
 website/.local
 website/.agents
+
+# Local Skillsmith / Cursor convenience (canonical agent skills: .agents/skills/)
+/skills/
+/skills-lock.json
+
+# Personal Cursor chat workflow scripts (not part of the shipped product)
+/scripts/cursor-process-gate-*.sh
+

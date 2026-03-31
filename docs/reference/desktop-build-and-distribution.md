@@ -49,6 +49,8 @@ The workflow decodes this to a temporary file and sets `APPLE_API_KEY_PATH` befo
 
 ### Windows (Squirrel code signing)
 
+Windows signing is **active**. Set the following repository secrets and the CI build will sign the installer automatically. When the secrets are absent, an unsigned installer is produced (acceptable for development and testing).
+
 | Secret | Description |
 |--------|-------------|
 | `WINDOWS_CERTIFICATE_PFX_BASE64` | Base64-encoded `.pfx` (or `.p12`) code signing certificate |

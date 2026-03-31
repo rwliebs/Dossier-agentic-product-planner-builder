@@ -11,10 +11,7 @@
 
 import { join } from "node:path";
 import { mkdirSync, existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
-
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 function getDataDir() {
   const env = process.env.DOSSIER_DATA_DIR;

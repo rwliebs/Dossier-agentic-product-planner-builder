@@ -105,7 +105,6 @@ describe("parseActionsFromStream", () => {
   });
 
   it("normalizes createCard target_ref: activity_id -> workflow_activity_id", async () => {
-    const pid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
     const wfId = "22cb49ef-34aa-4cb3-ab3e-81063a2cba0d";
     const actId = "a1f8c3d2-4e5f-6a7b-8c9d-0e1f2a3b4c5d";
     const json = `{"type":"actions","message":"Done.","actions":[{"action_type":"createActivity","target_ref":{"workflow_id":"${wfId}"},"payload":{"id":"${actId}","title":"Register","position":0}},{"action_type":"createCard","target_ref":{"activity_id":"${actId}"},"payload":{"title":"Sign up","status":"todo","priority":1,"position":0}}]}`;
@@ -121,7 +120,6 @@ describe("parseActionsFromStream", () => {
   });
 
   it("parses actions with 'action' field (LLM alternate format)", async () => {
-    const pid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
     const wfId = "22cb49ef-34aa-4cb3-ab3e-81063a2cba0d";
     const actId = "a1f8c3d2-4e5f-6a7b-8c9d-0e1f2a3b4c5d";
     const json = `{"type":"actions","message":"Done.","actions":[{"action":"createActivity","target_ref":{"workflow_id":"${wfId}"},"payload":{"id":"${actId}","title":"Register","position":0}},{"action":"createCard","target_ref":{"workflow_activity_id":"${actId}"},"payload":{"title":"Sign up","status":"todo","priority":1,"position":0}}]}`;
@@ -136,7 +134,6 @@ describe("parseActionsFromStream", () => {
   });
 
   it("accepts createCard with non-UUID id (normalizes to UUID)", async () => {
-    const pid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
     const wfId = "22cb49ef-34aa-4cb3-ab3e-81063a2cba0d";
     const actId = "a1f8c3d2-4e5f-6a7b-8c9d-0e1f2a3b4c5d";
     const json = `{"type":"actions","actions":[{"id":"${actId}","action_type":"createActivity","target_ref":{"workflow_id":"${wfId}"},"payload":{"id":"${actId}","title":"Browse","position":0}},{"id":"c1","action_type":"createCard","target_ref":{"workflow_activity_id":"${actId}"},"payload":{"title":"View list","status":"todo","priority":1,"position":0}}]}`;

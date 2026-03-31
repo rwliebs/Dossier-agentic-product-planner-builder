@@ -5,7 +5,17 @@
  */
 
 import * as crypto from "node:crypto";
-import Database from "better-sqlite3";
+
+/** Structural type for better-sqlite3 Database (package is loosely typed in this repo). */
+export interface SqliteMigrationDb {
+  prepare(sql: string): {
+    get(...params: unknown[]): unknown;
+    run(...params: unknown[]): unknown;
+    all(...params: unknown[]): unknown[];
+  };
+  exec(sql: string): void;
+  pragma(pragma: string): unknown;
+}
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -507,7 +517,7 @@ ALTER TABLE card_assignment ADD COLUMN session_id TEXT;
 ];
 
 /** One-time: replace non-UUID workflow, workflow_activity, and card ids with UUIDs so build API and DB stay in sync. */
-export function runNormalizeEntityUuids(db: any): void {
+export function runNormalizeEntityUuids(db: SqliteMigrationDb): void {
   const name = "009_normalize_entity_uuids";
   const row = db.prepare("SELECT 1 FROM _migrations WHERE name = ?").get(name);
   if (row) return;
@@ -668,7 +678,7 @@ export function runNormalizeEntityUuids(db: any): void {
   }
 }
 
-export function runMigrations(db: any): void {
+export function runMigrations(db: SqliteMigrationDb): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
       name TEXT PRIMARY KEY,

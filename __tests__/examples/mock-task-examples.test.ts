@@ -10,10 +10,7 @@ import {
   mockMinimalTask,
   mockTDDTask,
 } from "../../examples/mock-task-example";
-import {
-  PayloadValidator,
-  validateAndReport,
-} from "../../examples/validate-mock-payload";
+import { PayloadValidator } from "../../examples/validate-mock-payload";
 import { generateQuickTemplate } from "../../examples/generate-mock-task";
 
 describe("Mock Task Examples", () => {
@@ -225,9 +222,9 @@ describe("Mock Task Examples", () => {
         const result = fn();
 
         expect(result.taskDescription).toContain("COMPLETION VERIFICATION");
-        expect(result.taskDescription).toContain("All unit tests passing");
-        expect(result.taskDescription).toContain("No new linter errors");
-        expect(result.taskDescription).toContain("Ready for Production?");
+        expect(result.taskDescription).toContain("npm run test");
+        expect(result.taskDescription).toContain("npm run lint");
+        expect(result.taskDescription).toContain("Ready for production?");
       });
     });
   });

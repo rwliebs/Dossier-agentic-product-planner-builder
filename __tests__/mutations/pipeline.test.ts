@@ -3,17 +3,9 @@
  * Tests: pipelineApply, preview/apply match, idempotency, state reconstruction.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  pipelineApply,
-  applyAction,
-  type ActionInput,
-} from "@/lib/db/mutations";
-import {
-  reconstructStateFromActions,
-  detectDrift,
-  type ReconstructResult,
-} from "@/lib/actions/reconstruct-state";
+import { describe, it, expect, vi } from "vitest";
+import { pipelineApply, type ActionInput } from "@/lib/db/mutations";
+import { reconstructStateFromActions, detectDrift } from "@/lib/actions/reconstruct-state";
 import {
   previewActionBatch,
   applyActionBatch,

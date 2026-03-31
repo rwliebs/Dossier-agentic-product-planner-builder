@@ -1,13 +1,16 @@
 // const path = require("path");
 
-// Signing/notarization (commented out until ready; uncomment and set env vars in CI):
+// Signing/notarization:
+// macOS — commented out until Apple credentials are ready.
 // const hasAppleCreds =
 //   process.env.APPLE_ID && (process.env.APPLE_APP_SPECIFIC_PASSWORD || process.env.APPLE_API_KEY_ID);
 // const hasAppleApiKey =
 //   process.env.APPLE_API_KEY_ID &&
 //   process.env.APPLE_API_ISSUER &&
 //   process.env.APPLE_API_KEY_PATH;
-// const hasWindowsCert = process.env.WINDOWS_CERTIFICATE_PFX_BASE64 && process.env.WINDOWS_CERTIFICATE_PASSWORD;
+// Windows — active when CI secrets are set; unsigned builds still work without them.
+const hasWindowsCert =
+  process.env.WINDOWS_CERTIFICATE_PFX_BASE64 && process.env.WINDOWS_CERTIFICATE_PASSWORD;
 
 /** @type {import('@electron-forge/shared-types').ForgeConfig} */
 module.exports = {
@@ -56,6 +59,10 @@ module.exports = {
       name: "@electron-forge/maker-squirrel",
       config: {
         name: "Dossier",
+        ...(hasWindowsCert && {
+          certificateFile: "cert.pfx",
+          certificatePassword: process.env.WINDOWS_CERTIFICATE_PASSWORD,
+        }),
       },
     },
     {

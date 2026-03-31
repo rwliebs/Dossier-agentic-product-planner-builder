@@ -1,26 +1,54 @@
 /**
  * API contract tests for actions endpoint.
  * Requires dev server and DB (SQLite or Postgres).
+ * Skips when TEST_BASE_URL points at a non-Dossier server (HTML or non-JSON).
  */
+
+import { beforeAll, describe, expect, it } from "vitest";
 
 export {};
 
 const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 
-function canRunIntegrationTests(): boolean {
-  return true; // Run when server is up
+async function isDossierProjectsApiAvailable(): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/projects`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return false;
+    const ct = res.headers.get("content-type") ?? "";
+    if (!ct.includes("application/json")) return false;
+    const data: unknown = await res.json();
+    return Array.isArray(data);
+  } catch {
+    return false;
+  }
 }
 
 describe("actions API contract", () => {
+  let apiOk = false;
+  beforeAll(async () => {
+    apiOk = await isDossierProjectsApiAvailable();
+    if (!apiOk) {
+      console.warn(
+        `[actions.test] Skipping: no Dossier JSON API at ${BASE_URL} (wrong port/app or server down)`
+      );
+    }
+  });
+
   it("returns 404 for non-existent project", async () => {
+    if (!apiOk) return;
     const response = await fetch(
       `${BASE_URL}/api/projects/00000000-0000-0000-0000-000000000000/actions`
     ).catch(() => null);
-    if (!response) return; // skip when server not running
+    if (!response) return;
+    const ct = response.headers.get("content-type") ?? "";
+    if (!ct.includes("application/json")) return;
     expect(response.status).toBe(404);
   });
 
   it("returns action history for existing project", async () => {
+    if (!apiOk) return;
     const listRes = await fetch(`${BASE_URL}/api/projects`).catch(() => null);
     if (!listRes?.ok || !listRes?.headers.get("content-type")?.includes("application/json"))
       return;
@@ -37,10 +65,11 @@ describe("actions API contract", () => {
   });
 
   it("rejects invalid action payload", async () => {
-    if (!canRunIntegrationTests()) return;
+    if (!apiOk) return;
 
     const listRes = await fetch(`${BASE_URL}/api/projects`).catch(() => null);
     if (!listRes?.ok) return;
+    if (!listRes.headers.get("content-type")?.includes("application/json")) return;
     const projects = await listRes.json();
     if (!Array.isArray(projects) || projects.length === 0) return;
 
@@ -58,7 +87,7 @@ describe("actions API contract", () => {
   });
 
   it("applies valid createWorkflow action", async () => {
-    if (!canRunIntegrationTests()) return;
+    if (!apiOk) return;
 
     const createRes = await fetch(`${BASE_URL}/api/projects`, {
       method: "POST",
@@ -66,6 +95,7 @@ describe("actions API contract", () => {
       body: JSON.stringify({ name: "Actions Test " + Date.now() }),
     }).catch(() => null);
     if (!createRes || (createRes.status !== 200 && createRes.status !== 201)) return;
+    if (!createRes.headers.get("content-type")?.includes("application/json")) return;
 
     const project = await createRes.json();
     const projectId = project.id;

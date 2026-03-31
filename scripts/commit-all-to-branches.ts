@@ -65,6 +65,10 @@ async function main() {
     console.log(`Committed (${result.sha?.slice(0, 7)}): ${result.message}`);
   } else if (result.outcome === "no_changes") {
     console.log(result.reason);
+  } else if (result.outcome === "agent_committed") {
+    console.log(
+      `Already committed on branch (${result.sha.slice(0, 7)}), ahead by ${result.aheadBy}`
+    );
   } else {
     console.error(result.error);
     process.exit(1);

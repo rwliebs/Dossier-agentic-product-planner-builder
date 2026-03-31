@@ -141,7 +141,7 @@ Your browser will open to **http://localhost:3000**. First run creates `~/.dossi
 
 On first run you'll be guided through API key setup, or navigate directly to `/setup`.
 
-**Prerequisites:** Node.js 20+, [Anthropic API key](https://console.anthropic.com/). A [GitHub token](https://github.com/settings/tokens) with `repo` scope is needed only if you want agents to open PRs; agents can write files locally without it.
+**Prerequisites:** Node.js 20+, [Anthropic API key](https://console.anthropic.com/). For GitHub (listing repos, HTTPS git, PR flow), use **Connect GitHub** on `/setup` after setting `GITHUB_OAUTH_CLIENT_ID` in `.env.local` (see [.env.example](.env.example)), or paste a [personal access token](https://github.com/settings/tokens) with `repo` scope. You can also set `GITHUB_TOKEN` in the environment (e.g. CI). Agents can write files locally without GitHub.
 
 > **Windows users:** Dossier uses native SQLite, which requires a C++ compiler during install. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/) with the **"Desktop development with C++"** workload, or run this from an elevated PowerShell:
 > ```powershell
@@ -163,7 +163,7 @@ On first run you'll be guided through API key setup, or navigate directly to `/s
 | **Database schema** | [docs/reference/database-schema.md](docs/reference/database-schema.md) |
 | **Full doc index** | [docs/README.md](docs/README.md) |
 
-Configuration (API keys, GitHub token) can be set via the web UI at `/setup` or by editing `~/.dossier/config`. See [.env.example](.env.example) for all options.
+Configuration (API keys, GitHub via OAuth or PAT) can be set via the web UI at `/setup` or by editing `~/.dossier/config`. See [.env.example](.env.example) and the [configuration reference — GitHub OAuth](docs/reference/configuration-reference.md#github-oauth-local--desktop) for OAuth variables and precedence.
 
 NEW: Use your Claude MAX account directly, no extra setup required (if you've got Claude Code installed locally.)
 

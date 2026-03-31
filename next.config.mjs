@@ -3,7 +3,7 @@ const nextConfig = {
   output: "standalone",
   turbopackUseSystemTlsCerts: true,
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     unoptimized: true,

@@ -5,7 +5,6 @@
 
 import * as z from "zod";
 import {
-  projectSchema,
   planningActionTypeSchema,
   artifactTypeSchema,
   plannedFileActionSchema,
@@ -13,7 +12,6 @@ import {
   plannedFileStatusSchema,
   knowledgeItemStatusSchema,
   knowledgeItemSourceSchema,
-  cardStatusSchema,
 } from "@/lib/schemas";
 
 // Project create/update

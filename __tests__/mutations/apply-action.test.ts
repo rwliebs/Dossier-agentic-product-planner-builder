@@ -464,7 +464,6 @@ describe("Action Application (Mutations)", () => {
 describe("Action Preview", () => {
   const projectId = "11111111-1111-4111-8111-111111111111";
   const activityId = "33333333-3333-4333-8333-333333333333";
-  const cardId = "55555555-5555-4555-8555-555555555555";
 
   let project: Project;
 
@@ -510,7 +509,6 @@ describe("Action Preview", () => {
 describe("Batch Mutations", () => {
   const projectId = "11111111-1111-4111-8111-111111111111";
   const activityId = "33333333-3333-4333-8333-333333333333";
-  const cardId = "55555555-5555-4555-8555-555555555555";
 
   let project: Project;
 

@@ -148,15 +148,6 @@ export async function executeRequiredChecksStub(
 /** Basic checks runnable against local worktree (lint, unit). */
 const BASIC_CHECK_TYPES: RunCheckType[] = ["lint", "unit"];
 
-/** Complex checks: stubbed for MVP (integration, e2e, security, dependency, policy). */
-const STUBBED_CHECK_TYPES: RunCheckType[] = [
-  "integration",
-  "e2e",
-  "security",
-  "dependency",
-  "policy",
-];
-
 /** Detect package manager from lockfile. */
 function detectPackageManager(worktreePath: string): "pnpm" | "npm" {
   try {

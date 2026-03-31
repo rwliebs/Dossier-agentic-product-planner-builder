@@ -16,6 +16,7 @@ import {
   MARKETPLACE_PROMPT,
   canRunLLMTests,
   consumeSSE,
+  isDossierProjectsApiAvailable,
 } from "./helpers";
 
 type StreamAction = {
@@ -28,6 +29,13 @@ describe("trading card marketplace planning", () => {
     if (!canRunLLMTests()) {
       console.warn(
         "Skipping: ANTHROPIC_API_KEY required and PLANNING_LLM enabled"
+      );
+      return;
+    }
+
+    if (!(await isDossierProjectsApiAvailable())) {
+      console.warn(
+        `Skipping: Dossier JSON API not available at ${BASE_URL} (start npm run dev or fix TEST_BASE_URL)`
       );
       return;
     }

@@ -20,6 +20,9 @@
     "public/",
     "THIRD-PARTY-NOTICES.md"
   ],
+  "bundledDependencies": [
+    "open"
+  ],
   "scripts": {
     "postinstall": "node bin/postinstall.mjs",
     "build": "next build --webpack && npm run postbuild",

@@ -12,13 +12,6 @@ import { buildTaskFromPayload } from "@/lib/orchestration/build-task";
 import type { DispatchPayload } from "@/lib/orchestration/agentic-flow-client";
 import * as readline from "readline";
 
-interface GeneratorConfig {
-  taskType: "feature" | "bugfix" | "refactor" | "test" | "custom";
-  includeDetailedFiles: boolean;
-  includeContextArtifacts: boolean;
-  includeMemoryRefs: boolean;
-}
-
 class MockTaskGenerator {
   private rl: readline.Interface;
 

@@ -3,8 +3,6 @@ import type { PlanningAction } from "@/lib/schemas/slice-a";
 import {
   PlanningState,
   clonePlanningState,
-  cardExists,
-  getMaxPosition,
   getActivityCards,
   getWorkflowActivities,
 } from "@/lib/schemas/planning-state";

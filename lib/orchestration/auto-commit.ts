@@ -143,7 +143,7 @@ function parsePorcelainLines(lines: string[]): string[] {
  * When the first git status is empty (race: agent writes not yet visible), waits once then retries once.
  */
 export async function performAutoCommit(input: AutoCommitInput): Promise<AutoCommitOutcome> {
-  const { worktreePath, featureBranch, baseBranch = "main", cardTitle, cardId, allowedPaths } = input;
+  const { worktreePath, featureBranch, baseBranch = "main", cardTitle, cardId } = input;
 
   const branchResult = getCurrentBranch(worktreePath);
   if (!branchResult.success) {
@@ -202,7 +202,10 @@ export async function performAutoCommit(input: AutoCommitInput): Promise<AutoCom
       };
     }
 
-    const reason = "No changes to commit";
+    const reason =
+      allPaths.length > 0
+        ? "No changes to commit (all modified paths were excluded as artifacts or disallowed)"
+        : "No changes to commit";
     console.warn("[auto-commit] outcome=no_changes", { cardId, reason });
     return {
       outcome: "no_changes",

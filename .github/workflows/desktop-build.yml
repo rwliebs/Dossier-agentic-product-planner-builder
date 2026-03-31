@@ -13,7 +13,7 @@ on:
 permissions:
   contents: read
 
-# Signing env (commented out until ready; uncomment and set repo secrets to enable)
+# Signing env (macOS commented out until ready; Windows active when secrets are set)
 # env:
 #   APPLE_ID: ${{ secrets.APPLE_ID }}
 #   APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -21,8 +21,9 @@ permissions:
 #   APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
 #   APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
 #   APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
-#   WINDOWS_CERTIFICATE_PFX_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
-#   WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+env:
+  WINDOWS_CERTIFICATE_PFX_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
+  WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
 
 jobs:
   build:
@@ -66,17 +67,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Signing steps (commented out until ready)
+      # Signing steps
       # - name: Prepare Apple API key for notarization
       #   if: matrix.os == 'macos-latest' && env.APPLE_API_KEY_ID != '' && env.APPLE_API_KEY_BASE64 != ''
       #   run: |
       #     echo "$APPLE_API_KEY_BASE64" | base64 -d > "$RUNNER_TEMP/AppleApiKey.p8"
       #     echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AppleApiKey.p8" >> $GITHUB_ENV
-      # - name: Create Windows PFX for signing
-      #   if: matrix.os == 'windows-latest' && env.WINDOWS_CERTIFICATE_PFX_BASE64 != ''
-      #   run: |
-      #     echo "$WINDOWS_CERTIFICATE_PFX_BASE64" | base64 -d > cert.pfx
-      #     chmod 600 cert.pfx
+      - name: Create Windows PFX for signing
+        if: matrix.os == 'windows-latest' && env.WINDOWS_CERTIFICATE_PFX_BASE64 != ''
+        run: |
+          echo "$WINDOWS_CERTIFICATE_PFX_BASE64" | base64 -d > cert.pfx
+          chmod 600 cert.pfx
 
       - name: Build desktop installers
         env:

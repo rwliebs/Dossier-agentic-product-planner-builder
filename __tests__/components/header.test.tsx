@@ -11,6 +11,8 @@ describe("Header", () => {
         agentStatus="idle"
         selectedProjectId=""
         onSelectProjectId={vi.fn()}
+        apiKeysOpen={false}
+        onApiKeysOpenChange={vi.fn()}
       />,
     );
 

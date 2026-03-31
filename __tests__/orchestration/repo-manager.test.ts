@@ -14,6 +14,7 @@ import {
   ensureClone,
   createFeatureBranch,
   writeScaffoldFilesToRepo,
+  syncMainBranch,
 } from "@/lib/orchestration/repo-manager";
 
 describe("repo-manager", () => {
@@ -147,6 +148,67 @@ describe("repo-manager", () => {
       execSync(`git clone "${remoteDir}" "${clonePath}"`, { stdio: "pipe" });
       const result = writeScaffoldFilesToRepo(clonePath, [], "main");
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe("syncMainBranch", () => {
+    it("syncs local main to match origin after remote commit", () => {
+      const projectId = "sync-test";
+      const dataDir = path.join(tempDir, "dossier-data-sync");
+      fs.mkdirSync(dataDir, { recursive: true });
+      const fileUrl = pathToFileURL(remoteDir).href;
+
+      const origEnv = process.env.DOSSIER_DATA_DIR;
+      process.env.DOSSIER_DATA_DIR = dataDir;
+      try {
+        const clone1 = ensureClone(projectId, fileUrl, null);
+        expect(clone1.success).toBe(true);
+
+        fs.writeFileSync(path.join(remoteDir, "new-file.txt"), "hello", "utf-8");
+        execSync("git add new-file.txt", { cwd: remoteDir, stdio: "pipe" });
+        execSync("git commit -m 'add new-file'", { cwd: remoteDir, stdio: "pipe" });
+
+        const result = syncMainBranch(projectId, fileUrl, "main");
+        expect(result.success).toBe(true);
+        expect(result.branch).toBe("main");
+
+        const clonePath = clone1.clonePath!;
+        expect(fs.existsSync(path.join(clonePath, "new-file.txt"))).toBe(true);
+      } finally {
+        if (origEnv !== undefined) process.env.DOSSIER_DATA_DIR = origEnv;
+        else delete process.env.DOSSIER_DATA_DIR;
+      }
+    });
+
+    it("returns error when origin/<baseBranch> does not exist and no origin/HEAD", () => {
+      const projectId = "sync-no-branch";
+      const dataDir = path.join(tempDir, "dossier-data-nobranch");
+      fs.mkdirSync(dataDir, { recursive: true });
+
+      const bareDir = path.join(tempDir, "bare-remote");
+      fs.mkdirSync(bareDir, { recursive: true });
+      execSync("git init --bare", { cwd: bareDir, stdio: "pipe" });
+      const fileUrl = pathToFileURL(bareDir).href;
+
+      const origEnv = process.env.DOSSIER_DATA_DIR;
+      process.env.DOSSIER_DATA_DIR = dataDir;
+      try {
+        const clone1 = ensureClone(projectId, fileUrl, null);
+        expect(clone1.success).toBe(true);
+
+        const result = syncMainBranch(projectId, fileUrl, "nonexistent");
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("not found");
+      } finally {
+        if (origEnv !== undefined) process.env.DOSSIER_DATA_DIR = origEnv;
+        else delete process.env.DOSSIER_DATA_DIR;
+      }
+    });
+
+    it("returns error for placeholder repo URL", () => {
+      const result = syncMainBranch("any-id", "placeholder", "main");
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("No repository connected");
     });
   });
 });

@@ -9,9 +9,17 @@ interface DossierHeaderProps {
   selectedProjectId: string;
   onSelectProjectId: (id: string) => void;
   onSaveCurrentProject?: () => void | Promise<void>;
+  apiKeysOpen: boolean;
+  onApiKeysOpenChange: (open: boolean) => void;
 }
 
-export function Header({ selectedProjectId, onSelectProjectId, onSaveCurrentProject }: DossierHeaderProps) {
+export function Header({
+  selectedProjectId,
+  onSelectProjectId,
+  onSaveCurrentProject,
+  apiKeysOpen,
+  onApiKeysOpenChange,
+}: DossierHeaderProps) {
 
   return (
     <header className="border-b border-grid-line bg-background px-6 py-4">
@@ -32,6 +40,8 @@ export function Header({ selectedProjectId, onSelectProjectId, onSaveCurrentProj
               selectedProjectId={selectedProjectId}
               onSelectProjectId={onSelectProjectId}
               onSaveCurrentProject={onSaveCurrentProject}
+              apiKeysOpen={apiKeysOpen}
+              onApiKeysOpenChange={onApiKeysOpenChange}
             />
           </div>
         </div>

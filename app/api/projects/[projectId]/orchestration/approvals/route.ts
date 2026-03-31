@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
 import { createApprovalRequest } from "@/lib/orchestration";
 import { getApprovalRequestsByRun } from "@/lib/db/queries/orchestration";
-import { json, validationError, notFoundError, internalError } from "@/lib/api/response-helpers";
+import { json, validationError, internalError } from "@/lib/api/response-helpers";
 import { createApprovalRequestSchema } from "@/lib/validation/request-schema";
 import { zodErrorDetails } from "@/lib/validation/zod-details";
 
@@ -11,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const { projectId } = await params;
+    await params;
     const { searchParams } = new URL(request.url);
     const runId = searchParams.get("run_id");
 
@@ -31,7 +31,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
+  { params: _params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
     const rawBody = await request.json();

@@ -12,7 +12,6 @@ import { CardSkeleton } from './card-skeleton';
 import { ACTION_BUTTONS } from '@/lib/constants/action-buttons';
 import type {
   MapCard,
-  CardStatus,
   ContextArtifact,
   CardRequirement,
   CardKnownFact,
@@ -79,15 +78,6 @@ const statusConfig: Record<CardStatusType, { bg: string; text: string; border: s
   production: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', badge: 'bg-emerald-200 text-emerald-700', button: 'bg-emerald-600 hover:bg-emerald-700' },
 };
 
-const statusLabels: Record<CardStatusType, string> = {
-  todo: 'todo',
-  active: 'active',
-  questions: 'questions',
-  review: 'review',
-  production: 'live',
-};
-
-
 export function ImplementationCard({
   card,
   isExpanded,
@@ -113,9 +103,9 @@ export function ImplementationCard({
   requirements = [],
   contextArtifacts = [],
   plannedFiles = [],
-  facts = [],
-  assumptions = [],
-  questions = [],
+  facts: _facts = [],
+  assumptions: _assumptions = [],
+  questions: _questions = [],
   quickAnswer: quickAnswerProp,
   knowledgeLoading = false,
   onDeleteCard,

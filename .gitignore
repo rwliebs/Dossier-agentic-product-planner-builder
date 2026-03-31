@@ -42,6 +42,8 @@ next-env.d.ts
 .cache/
 
 # local tool artifacts (Claude Code, macOS)
+# Developer PATH snapshots (never commit — machine-specific)
+.path
 .claude.json
 .claude/
 .DS_Store

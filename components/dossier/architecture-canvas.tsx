@@ -21,7 +21,7 @@ interface FileLayout {
 export function ArchitectureCanvas({
   codeFiles,
   dataFlows,
-  cards,
+  cards: _cards,
   epics,
   onUpdateFileDescription,
   onFileClick,
@@ -42,7 +42,7 @@ export function ArchitectureCanvas({
     });
 
     return map;
-  }, [cards, epics]);
+  }, [epics]);
 
   // Simple grid layout for files
   const filePositions = useMemo(() => {

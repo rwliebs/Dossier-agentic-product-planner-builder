@@ -1,24 +1,19 @@
 import { NextRequest } from "next/server";
-import { readConfigFile } from "@/lib/config/data-dir";
+import { resolveGitHubToken } from "@/lib/github/resolve-github-token";
 import { json, internalError } from "@/lib/api/response-helpers";
 
 const GITHUB_API = "https://api.github.com";
 
-function getGitHubToken(): string | null {
-  const fromEnv = process.env.GITHUB_TOKEN?.trim();
-  if (fromEnv) return fromEnv;
-  const config = readConfigFile();
-  const fromConfig = config.GITHUB_TOKEN?.trim();
-  return fromConfig ?? null;
-}
-
 /** GET /api/github/repos — list repositories for the authenticated user (uses GITHUB_TOKEN) */
 export async function GET(_request: NextRequest) {
   try {
-    const token = getGitHubToken();
+    const token = resolveGitHubToken();
     if (!token) {
       return json(
-        { error: "GitHub token not configured. Add GITHUB_TOKEN in Setup or environment." },
+        {
+          error:
+            "GitHub isn't connected. Use Connect GitHub or a PAT in Setup / API keys, or set GITHUB_TOKEN in the environment.",
+        },
         503
       );
     }
@@ -67,10 +62,13 @@ export async function GET(_request: NextRequest) {
 /** POST /api/github/repos — create a new repository (uses GITHUB_TOKEN) */
 export async function POST(request: NextRequest) {
   try {
-    const token = getGitHubToken();
+    const token = resolveGitHubToken();
     if (!token) {
       return json(
-        { error: "GitHub token not configured. Add GITHUB_TOKEN in Setup or environment." },
+        {
+          error:
+            "GitHub isn't connected. Use Connect GitHub or a PAT in Setup / API keys, or set GITHUB_TOKEN in the environment.",
+        },
         503
       );
     }
